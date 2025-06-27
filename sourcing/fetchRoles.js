@@ -133,15 +133,22 @@ class RoleFetcher {
         logger.info(`🚫 Filtered out garbage titles: ${rejected.join(', ')}`);
       }
       
-      // Step 2: Google verify each VALID potential role
+      // Step 2: Google verify each VALID potential role with character extraction
       const verifiedRoles = [];
+      const roleCharacters = new Map(); // Store extracted characters
+      
       for (const title of filteredTitles.slice(0, 10)) { // Check top 10 valid titles
-        const isVerified = await this.googleVerifyRole(celebrityName, title);
-        if (isVerified) {
+        const verification = await this.googleVerifyRole(celebrityName, title);
+        if (verification.isVerified) {
           verifiedRoles.push(title);
-          logger.info(`✅ Verified: ${title}`);
+          if (verification.character) {
+            roleCharacters.set(title, verification.character);
+            logger.info(`✅ Verified: ${title} (as ${verification.character})`);
+          } else {
+            logger.info(`✅ Verified: ${title}`);
+          }
         } else {
-          logger.info(`❌ Not verified: ${title}`);
+          logger.info(`❌ Not verified: ${title} (no strong role evidence)`);
         }
         
         // Stop early if we have enough verified roles
@@ -150,12 +157,37 @@ class RoleFetcher {
       
       logger.info(`🔍 Google verification: ${verifiedRoles.length} roles confirmed`);
       
-      // Step 3: If we don't have enough (3-4), trigger Google Hail Mary
-      if (verifiedRoles.length < 3) {
+      // Step 3: If we don't have enough (4-5), trigger Google Hail Mary
+      if (verifiedRoles.length < 4) {
         logger.warn(`🚨 Only ${verifiedRoles.length} verified roles - triggering Google Hail Mary search`);
         const hailMaryRoles = await this.googleHailMarySearch(celebrityName);
-        verifiedRoles.push(...hailMaryRoles);
-        logger.info(`🎯 Hail Mary found ${hailMaryRoles.length} additional roles`);
+        
+        // Verify each Hail Mary result to avoid more false positives
+        logger.info(`🔍 Verifying ${hailMaryRoles.length} Hail Mary candidates...`);
+        for (const hailMaryRole of hailMaryRoles) {
+          if (verifiedRoles.length >= 6) break; // Stop when we have enough
+          
+          // Skip if we already have this role
+          if (verifiedRoles.includes(hailMaryRole)) {
+            logger.info(`⏭️ Skipping duplicate: ${hailMaryRole}`);
+            continue;
+          }
+          
+          const verification = await this.googleVerifyRole(celebrityName, hailMaryRole);
+          if (verification.isVerified) {
+            verifiedRoles.push(hailMaryRole);
+            if (verification.character) {
+              roleCharacters.set(hailMaryRole, verification.character);
+              logger.info(`✅ Hail Mary verified: ${hailMaryRole} (as ${verification.character})`);
+            } else {
+              logger.info(`✅ Hail Mary verified: ${hailMaryRole}`);
+            }
+          } else {
+            logger.info(`❌ Hail Mary rejected: ${hailMaryRole} (no strong role evidence)`);
+          }
+        }
+        
+        logger.info(`🎯 Hail Mary result: ${verifiedRoles.length} total verified roles`);
       }
       
       // Step 4: Convert to role objects with DEDUPLICATION
@@ -181,25 +213,127 @@ class RoleFetcher {
       
       const finalRoles = deduplicatedRoles.slice(0, 5).map((title, index) => {
         const isVoiceRole = this.detectVoiceRole(title, celebrityName);
+        const extractedCharacter = roleCharacters.get(title) || (isVoiceRole ? this.extractCharacterName(title, celebrityName) : 'Unknown role');
         
         return {
           name: title,
-          character: isVoiceRole ? this.extractCharacterName(title, celebrityName) : 'Unknown role',
+          character: extractedCharacter,
           year: null,
           media_type: isVoiceRole ? 'tv' : 'movie',
           popularity: 100 - (index * 10),
           vote_count: 1000 - (index * 100),
           isKnownFor: knownForTitles.includes(title) || filteredTitles.includes(title),
           isVoiceRole: isVoiceRole,
-          characterName: isVoiceRole ? this.extractCharacterName(title, celebrityName) : null,
+          characterName: extractedCharacter !== 'Unknown role' ? extractedCharacter : null,
           tags: ['comprehensive_fallback', isVoiceRole ? 'voice_role' : 'live_action'],
           source: 'comprehensive_fallback',
-          searchTerms: [title, celebrityName, isVoiceRole ? this.extractCharacterName(title, celebrityName) : null].filter(Boolean)
+          searchTerms: [title, celebrityName, extractedCharacter !== 'Unknown role' ? extractedCharacter : null].filter(Boolean)
         };
       });
       
       logger.info(`🎭 Comprehensive fallback created ${finalRoles.length} verified roles:`);
-      finalRoles.forEach((role, i) => {
+  /**
+   * IP DEDUPLICATION: Prevent multiple roles from same franchise/IP
+   */
+  static deduplicateByIP(roles, celebrityName) {
+    const ipGroups = {};
+    const standalone = [];
+    
+    // Group roles by IP/franchise
+    for (const role of roles) {
+      const ip = this.detectIP(role);
+      
+      if (ip) {
+        if (!ipGroups[ip]) {
+          ipGroups[ip] = [];
+        }
+        ipGroups[ip].push(role);
+      } else {
+        standalone.push(role);
+      }
+    }
+    
+    const deduplicatedRoles = [];
+    
+    // For each IP group, select the most specific/character-focused role
+    for (const [ip, ipRoles] of Object.entries(ipGroups)) {
+      if (ipRoles.length === 1) {
+        deduplicatedRoles.push(ipRoles[0]);
+        logger.info(`📺 ${ip}: Single role → ${ipRoles[0]}`);
+      } else {
+        // Prioritize character names over show names
+        const prioritized = ipRoles.sort((a, b) => {
+          const aIsCharacter = this.isCharacterName(a, ip);
+          const bIsCharacter = this.isCharacterName(b, ip);
+          
+          if (aIsCharacter && !bIsCharacter) return -1;
+          if (!aIsCharacter && bIsCharacter) return 1;
+          
+          // If both are characters or both are shows, prefer shorter (more specific)
+          return a.length - b.length;
+        });
+        
+        deduplicatedRoles.push(prioritized[0]);
+        logger.info(`📺 ${ip}: ${ipRoles.length} roles → KEPT: ${prioritized[0]} | REMOVED: ${prioritized.slice(1).join(', ')}`);
+      }
+    }
+    
+    // Add standalone roles
+    deduplicatedRoles.push(...standalone);
+    
+    return deduplicatedRoles;
+  }
+
+  /**
+   * DETECT IP/FRANCHISE: Identify which IP/franchise a role belongs to
+   */
+  static detectIP(roleName) {
+    const ipMappings = {
+      'aqua teen': 'Aqua Teen Hunger Force',
+      'master shake': 'Aqua Teen Hunger Force',
+      'robot chicken': 'Robot Chicken',
+      'harvey birdman': 'Harvey Birdman',
+      'squidbillies': 'Squidbillies',
+      'early cuyler': 'Squidbillies',
+      'granny cuyler': 'Squidbillies',
+      'metalocalypse': 'Metalocalypse',
+      'venture bros': 'Venture Bros',
+      'tim and eric': 'Tim and Eric',
+      'check it out': 'Tim and Eric',
+      'space ghost': 'Space Ghost'
+    };
+    
+    const roleLower = roleName.toLowerCase();
+    
+    for (const [keyword, ip] of Object.entries(ipMappings)) {
+      if (roleLower.includes(keyword)) {
+        return ip;
+      }
+    }
+    
+    return null; // Standalone role
+  }
+
+  /**
+   * CHECK IF ROLE NAME IS A CHARACTER: Determine if this is a character name vs show name
+   */
+  static isCharacterName(roleName, ip) {
+    const roleLower = roleName.toLowerCase();
+    const ipLower = ip.toLowerCase();
+    
+    // If the role name doesn't contain the IP name, it's likely a character
+    if (!roleLower.includes(ipLower)) {
+      return true;
+    }
+    
+    // Known character indicators
+    const characterIndicators = [
+      'master shake', 'early cuyler', 'granny cuyler', 'dr reducto', 
+      'mayor', 'sheriff', 'rusty venture', 'dean venture'
+    ];
+    
+    return characterIndicators.some(char => roleLower.includes(char));
+  }
         const voiceMarker = role.isVoiceRole ? ' (VOICE)' : '';
         const knownMarker = role.isKnownFor ? ' ⭐' : '';
         logger.info(`  ${i + 1}. ${role.name}${voiceMarker}${knownMarker}`);
@@ -214,79 +348,233 @@ class RoleFetcher {
   }
 
   /**
-   * GOOGLE VERIFICATION: Verify each potential role with Google search
+   * ENHANCED CHARACTER-SPECIFIC VERIFICATION: Find actual characters in each project
    */
   static async googleVerifyRole(celebrityName, roleName) {
     try {
-      const verificationQuery = `"${celebrityName}" "${roleName}"`;
+      logger.info(`🔍 Character discovery for ${celebrityName} in ${roleName}...`);
       
-      const params = {
-        api_key: config.api.serpApiKey,
-        engine: 'google',
-        q: verificationQuery,
-        num: 5 // Just need a few results
-      };
+      // Multiple targeted searches for character discovery
+      const characterQueries = [
+        `"${celebrityName}" "${roleName}" character voices plays as`,
+        `"${celebrityName}" voice cast "${roleName}" character name`,
+        `"${roleName}" voice actors "${celebrityName}" plays character`,
+        `"${celebrityName}" "${roleName}" voice behind scenes character`
+      ];
 
-      const response = await axios.get(config.api.serpEndpoint, { 
-        params,
-        timeout: 10000
-      });
+      let discoveredCharacters = [];
+      let hasStrongEvidence = false;
 
-      if (!response.data?.organic_results) {
-        return false;
+      for (const query of characterQueries) {
+        try {
+          const params = {
+            api_key: config.api.serpApiKey,
+            engine: 'google',
+            q: query,
+            num: 8
+          };
+
+          const response = await axios.get(config.api.serpEndpoint, { 
+            params,
+            timeout: 10000
+          });
+
+          if (response.data?.organic_results) {
+            const results = response.data.organic_results;
+            
+            for (const result of results) {
+              const title = (result.title || '').toLowerCase();
+              const snippet = (result.snippet || '').toLowerCase();
+              const combined = title + ' ' + snippet;
+              
+              const hasActor = combined.includes(celebrityName.toLowerCase());
+              const hasRole = combined.includes(roleName.toLowerCase());
+              
+              if (!hasActor || !hasRole) continue;
+
+              // Look for STRONG role evidence
+              const strongRoleIndicators = [
+                'voice of', 'voices', 'plays', 'character', 'role of', 'cast as',
+                'portrays', 'stars as', 'voice cast', 'voice actor', 'recurring character'
+              ];
+              
+              if (strongRoleIndicators.some(indicator => combined.includes(indicator))) {
+                hasStrongEvidence = true;
+                
+                // Extract character names using enhanced patterns
+                const characters = this.extractCharacterFromSnippet(combined, celebrityName, roleName);
+                if (characters.length > 0) {
+                  discoveredCharacters.push(...characters);
+                }
+              }
+            }
+          }
+          
+          // Small delay between character searches
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+        } catch (error) {
+          logger.warn(`Character search failed for query: ${query}`);
+        }
+        
+        // Stop early if we found good characters
+        if (discoveredCharacters.length >= 3) break;
       }
 
-      // Check if results contain both actor name and role
-      const results = response.data.organic_results;
-      const hasGoodMatch = results.some(result => {
-        const title = (result.title || '').toLowerCase();
-        const snippet = (result.snippet || '').toLowerCase();
-        const combined = title + ' ' + snippet;
-        
-        const hasActor = combined.includes(celebrityName.toLowerCase());
-        const hasRole = combined.includes(roleName.toLowerCase());
-        
-        // Look for connection indicators
-        const connectionWords = ['stars', 'starring', 'cast', 'voice', 'plays', 'role', 'character'];
-        const hasConnection = connectionWords.some(word => combined.includes(word));
-        
-        return hasActor && hasRole && hasConnection;
-      });
+      // Deduplicate and clean characters
+      const uniqueCharacters = [...new Set(discoveredCharacters)]
+        .filter(char => char && char.length > 1 && char.length < 30)
+        .slice(0, 3); // Top 3 characters
 
-      // Small delay to be respectful to the API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return hasGoodMatch;
+      if (hasStrongEvidence && uniqueCharacters.length > 0) {
+        const mainCharacter = uniqueCharacters[0]; // Use primary character
+        logger.info(`✅ VERIFIED: ${roleName} → ${mainCharacter} (+ ${uniqueCharacters.length - 1} others)`);
+        return {
+          isVerified: true,
+          character: mainCharacter,
+          allCharacters: uniqueCharacters
+        };
+      } else if (hasStrongEvidence) {
+        logger.info(`✅ VERIFIED: ${roleName} (role confirmed, no specific character found)`);
+        return {
+          isVerified: true,
+          character: null,
+          allCharacters: []
+        };
+      } else {
+        logger.info(`❌ REJECTED: ${roleName} (no strong role evidence)`);
+        return {
+          isVerified: false,
+          character: null,
+          allCharacters: []
+        };
+      }
       
     } catch (error) {
-      logger.warn(`Google verification failed for "${roleName}": ${error.message}`);
-      return false; // Assume false on error to be conservative
+      logger.warn(`Character verification failed for "${roleName}": ${error.message}`);
+      return { isVerified: false, character: null, allCharacters: [] };
     }
   }
 
   /**
-   * GOOGLE HAIL MARY: Last resort Google search for actor roles
+   * ENHANCED CHARACTER EXTRACTION: Multiple patterns for better character discovery
+   */
+  static extractCharacterFromSnippet(text, actorName, projectName) {
+    const actorLower = actorName.toLowerCase();
+    const projectLower = projectName.toLowerCase();
+    const characters = [];
+    
+    // Enhanced patterns for character extraction
+    const characterPatterns = [
+      // "John Doe voices CHARACTER in Project"
+      new RegExp(`${actorLower}\\s+(?:voices?|plays?)\\s+([A-Z][A-Za-z\\s]+?)\\s+(?:in|on)\\s+${projectLower}`, 'gi'),
+      // "CHARACTER (voiced by John Doe)"
+      new RegExp(`([A-Z][A-Za-z\\s]+?)\\s*\\((?:voiced|played)\\s+by\\s+${actorLower}\\)`, 'gi'),
+      // "John Doe as CHARACTER"
+      new RegExp(`${actorLower}\\s+as\\s+([A-Z][A-Za-z\\s]+?)(?:\\s*[,.]|$)`, 'gi'),
+      // "CHARACTER - John Doe" 
+      new RegExp(`([A-Z][A-Za-z\\s]+?)\\s*-\\s*${actorLower}`, 'gi'),
+      // "voice of CHARACTER"
+      new RegExp(`voice\\s+of\\s+([A-Z][A-Za-z\\s]+?)(?:\\s*[,.]|$)`, 'gi'),
+      // "CHARACTER voiced by John Doe"
+      new RegExp(`([A-Z][A-Za-z\\s]+?)\\s+voiced\\s+by\\s+${actorLower}`, 'gi'),
+      // "plays CHARACTER"
+      new RegExp(`plays\\s+([A-Z][A-Za-z\\s]+?)(?:\\s*[,.]|$)`, 'gi'),
+      // Project-specific patterns for common shows
+      new RegExp(`${projectLower}[^.]*?([A-Z][A-Za-z\\s]+?)\\s*\\(${actorLower}\\)`, 'gi'),
+      // "CHARACTER character"
+      new RegExp(`([A-Z][A-Za-z\\s]+?)\\s+character`, 'gi')
+    ];
+    
+    for (const pattern of characterPatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        if (match[1]) {
+          let character = match[1].trim();
+          
+          // Clean up the character name
+          character = character.replace(/\s+(voice|actor|character|voiced|plays?)$/gi, '');
+          character = character.replace(/^(the|a|an)\s+/gi, '');
+          character = character.replace(/\s+(and|or|,).*$/gi, '');
+          character = character.trim();
+          
+          // Validate character name
+          if (this.isValidCharacterName(character, actorName, projectName)) {
+            characters.push(character);
+          }
+        }
+      }
+    }
+    
+    return characters;
+  }
+
+  /**
+   * VALIDATE CHARACTER NAMES: Filter out false character extractions
+   */
+  static isValidCharacterName(character, actorName, projectName) {
+    if (!character || character.length < 2 || character.length > 25) return false;
+    
+    const charLower = character.toLowerCase();
+    const actorLower = actorName.toLowerCase();
+    const projectLower = projectName.toLowerCase();
+    
+    // Don't include if it's the actor's name
+    if (charLower.includes(actorLower) || actorLower.includes(charLower)) return false;
+    
+    // Don't include if it's the project name
+    if (charLower.includes(projectLower) || projectLower.includes(charLower)) return false;
+    
+    // Filter out common non-character words
+    const invalidCharacterWords = [
+      'voice', 'actor', 'actress', 'character', 'role', 'cast', 'member',
+      'show', 'series', 'movie', 'film', 'episode', 'season', 'network',
+      'animation', 'animated', 'cartoon', 'adult', 'swim', 'comedy', 'central',
+      'television', 'starring', 'featuring', 'guest', 'recurring', 'main'
+    ];
+    
+    if (invalidCharacterWords.includes(charLower)) return false;
+    
+    // Must contain actual letters
+    if (!/[A-Za-z]/.test(character)) return false;
+    
+    // Character names should be mostly alphabetic
+    const alphaRatio = (character.match(/[A-Za-z]/g) || []).length / character.length;
+    if (alphaRatio < 0.6) return false;
+    
+    return true;
+  }
+
+  /**
+   * ENHANCED HAIL MARY: Target major voice acting projects specifically
    */
   static async googleHailMarySearch(celebrityName) {
     try {
-      logger.info('🎯 Executing Google Hail Mary search...');
+      logger.info('🎯 Executing ENHANCED Hail Mary search...');
       
+      // Voice actor specific queries targeting major animated shows
       const hailMaryQueries = [
-        `"${celebrityName}" movies roles filmography`,
-        `"${celebrityName}" actor "known for" films`,
-        `"${celebrityName}" voice actor characters shows`,
-        `"${celebrityName}" television series cast member`
+        `"${celebrityName}" voice actor "Adult Swim" shows characters`,
+        `"${celebrityName}" "Cartoon Network" voice cast recurring`,
+        `"${celebrityName}" voice acting credits television animation`,
+        `"${celebrityName}" "Robot Chicken" "Harvey Birdman" "Squidbillies" voice`,
+        `"${celebrityName}" animated series voice work filmography`,
+        `"${celebrityName}" voices characters cartoon comedy shows`,
+        `site:imdb.com "${celebrityName}" voice credits`,
+        `site:behindthevoiceactors.com "${celebrityName}"`
       ];
 
       const extractedRoles = [];
       
       for (const query of hailMaryQueries) {
         try {
+          logger.info(`🔍 Hail Mary query: ${query}`);
+          
           const params = {
             api_key: config.api.serpApiKey,
             engine: 'google',
             q: query,
-            num: 10
+            num: 20 // More results for comprehensive coverage
           };
 
           const response = await axios.get(config.api.serpEndpoint, { 
@@ -297,27 +585,55 @@ class RoleFetcher {
           if (response.data?.organic_results) {
             const roles = this.extractRolesFromGoogleResults(response.data.organic_results, celebrityName);
             extractedRoles.push(...roles);
+            logger.info(`   → Found ${roles.length} candidates`);
           }
 
           // Delay between searches
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 800));
           
         } catch (error) {
           logger.warn(`Hail Mary query failed: ${query} - ${error.message}`);
         }
-        
-        // Stop if we have enough
-        if (extractedRoles.length >= 8) break;
       }
 
-      // Remove duplicates and return top results
+      // Enhanced filtering and deduplication
       const uniqueRoles = [...new Set(extractedRoles)];
-      logger.info(`🎯 Hail Mary extracted: ${uniqueRoles.slice(0, 5).join(', ')}`);
+      const qualityRoles = uniqueRoles.filter(role => {
+        return role.length >= 4 && 
+               role.length <= 40 && 
+               !role.toLowerCase().includes('wikipedia') &&
+               !role.toLowerCase().includes('imdb') &&
+               !role.toLowerCase().includes('credits') &&
+               this.isValidExtractedTitle(role, celebrityName);
+      });
       
-      return uniqueRoles.slice(0, 6); // Return top 6
+      // Prioritize known voice acting shows
+      const voiceActingShows = [
+        'Robot Chicken', 'Harvey Birdman', 'Squidbillies', 'Metalocalypse',
+        'Venture Bros', 'Tim and Eric', 'Check It Out', 'Xavier Renegade Angel',
+        'Stroker and Hoop', 'Perfect Hair Forever', 'Space Ghost Coast to Coast'
+      ];
+      
+      const prioritizedRoles = qualityRoles.sort((a, b) => {
+        const aIsVoiceShow = voiceActingShows.some(show => 
+          a.toLowerCase().includes(show.toLowerCase())
+        );
+        const bIsVoiceShow = voiceActingShows.some(show => 
+          b.toLowerCase().includes(show.toLowerCase())
+        );
+        
+        if (aIsVoiceShow && !bIsVoiceShow) return -1;
+        if (!aIsVoiceShow && bIsVoiceShow) return 1;
+        return 0;
+      });
+      
+      logger.info(`🎯 Hail Mary extraction: ${extractedRoles.length} → ${uniqueRoles.length} → ${qualityRoles.length} quality`);
+      logger.info(`🎯 Top priority candidates: ${prioritizedRoles.slice(0, 8).join(', ')}`);
+      
+      return prioritizedRoles.slice(0, 12); // Return top 12 candidates for verification
       
     } catch (error) {
-      logger.error('Google Hail Mary search failed:', error.message);
+      logger.error('Enhanced Hail Mary search failed:', error.message);
       return [];
     }
   }
