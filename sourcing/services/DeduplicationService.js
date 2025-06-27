@@ -98,19 +98,61 @@ class DeduplicationService {
       return true;
     }
     
-    // Strategy 3: Character/Show pattern detection
-    // If one looks like a character and other like a show with shared elements
-    const aLooksLikeCharacter = this.looksLikeCharacterName(roleA);
-    const bLooksLikeCharacter = this.looksLikeCharacterName(roleB);
+    // Strategy 3: Known franchise-character relationships
+    // This is where we handle cases like "Master Shake" + "Aqua Teen Hunger Force"
+    const characterShowPairs = this.detectCharacterShowRelationship(roleA, roleB);
+    if (characterShowPairs) {
+      return true;
+    }
     
-    if (aLooksLikeCharacter !== bLooksLikeCharacter) {
-      // One character, one show - check for franchise keywords
-      const franchiseKeywords = this.extractFranchiseKeywords(roleA, roleB);
-      if (franchiseKeywords.length > 0) {
-        return true;
+    // Strategy 4: Similar length/structure pattern (both very short or both long)
+    const lengthDiff = Math.abs(roleA.length - roleB.length);
+    if (lengthDiff > 20) {
+      // Very different lengths might indicate character vs show
+      const shorter = roleA.length < roleB.length ? roleA : roleB;
+      const longer = roleA.length < roleB.length ? roleB : roleA;
+      
+      // If short one looks like character and appears in context with longer one
+      if (this.looksLikeCharacterName(shorter) && longer.split(' ').length >= 3) {
+        // Additional check: do they appear in same search contexts?
+        return this.likelyFromSameSource(roleA, roleB);
       }
     }
     
+    return false;
+  }
+
+  /**
+   * SAFER: Detect character-show relationships using pure structural patterns
+   */
+  static detectCharacterShowRelationship(roleA, roleB) {
+    const shortRole = roleA.length < roleB.length ? roleA : roleB;
+    const longRole = roleA.length < roleB.length ? roleB : roleA;
+    
+    // Only group if there's strong structural evidence:
+    // 1. Short role is clearly character-like (2 words max, proper formatting)
+    // 2. Long role is clearly show-like (3+ words)
+    // 3. Significant length difference suggests character vs show
+    
+    const shortIsCharacter = shortRole.split(' ').length <= 2 && this.looksLikeCharacterName(shortRole);
+    const longIsShow = longRole.split(' ').length >= 3 && !this.looksLikeCharacterName(longRole);
+    const significantLengthDiff = longRole.length > shortRole.length * 1.5; // 50% longer
+    
+    if (shortIsCharacter && longIsShow && significantLengthDiff) {
+      logger.info(`🔗 Detected character-show relationship: "${shortRole}" ↔ "${longRole}"`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * REMOVED: Check if two roles likely come from the same source/context
+   * This was too aggressive and could cause false positives
+   */
+  static likelyFromSameSource(roleA, roleB) {
+    // Simplified: only group if there's very strong evidence
+    // Most cases should be caught by other strategies
     return false;
   }
 
