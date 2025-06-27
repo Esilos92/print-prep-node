@@ -185,6 +185,8 @@ BE LENIENT with:
 - Different ages/looks of the same actor
 - High-quality fan art of the correct character
 - Official promotional materials
+- Compression artifacts (JPEG compression but still high res)
+- Slightly soft focus if content is clearly correct
 
 BE STRICT with:
 - Must be the EXACT person: ${celebrityName} (not similar names)
@@ -202,7 +204,7 @@ Respond with exactly one word:
     const requestBody = {
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 20,
-      temperature: 0.1, // Lower temperature for more precise matching
+      temperature: 0.1,
       messages: [{
         role: 'user',
         content: [
