@@ -12,8 +12,12 @@ class RoleFetcher {
     try {
       logger.info(`Fetching roles for: ${celebrityName}`);
       
+      // Get Wikipedia "best known for" information first
+      const knownForTitles = await this.getKnownForTitles(celebrityName);
+      logger.info(`Wikipedia "known for": ${knownForTitles.join(', ') || 'None found'}`);
+      
       // Try TMDb first, fallback to Wikipedia
-      let roles = await this.fetchFromTMDb(celebrityName);
+      let roles = await this.fetchFromTMDb(celebrityName, knownForTitles);
       
       if (roles.length === 0) {
         logger.warn('TMDb returned no results, trying Wikipedia');
@@ -30,9 +34,104 @@ class RoleFetcher {
   }
   
   /**
-   * Fetch roles from TMDb API
+   * Extract "best known for" titles from Wikipedia
    */
-  static async fetchFromTMDb(celebrityName) {
+  static async getKnownForTitles(celebrityName) {
+    try {
+      const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(celebrityName.replace(/\s+/g, '_'))}`;
+      const response = await axios.get(wikipediaUrl, { timeout: 10000 });
+      const $ = cheerio.load(response.data);
+      
+      // Get the first paragraph of the article
+      const firstParagraph = $('p').first().text();
+      
+      const knownForTitles = [];
+      
+      // Patterns to look for "known for" information
+      const patterns = [
+        /(?:best known for|known for|famous for|renowned for).*?(?:his|her|their)\s+(?:role|roles|portrayal|performance).*?(?:as|of)\s+([^.]+)/gi,
+        /(?:best known for|known for|famous for|renowned for).*?(?:playing|portraying)\s+([^.]+)/gi,
+        /(?:best known for|known for|famous for|renowned for)\s+([^.]+)/gi
+      ];
+      
+      for (const pattern of patterns) {
+        let match;
+        while ((match = pattern.exec(firstParagraph)) !== null) {
+          const knownForText = match[1];
+          
+          // Extract titles from the "known for" text
+          const extractedTitles = this.extractTitlesFromText(knownForText);
+          knownForTitles.push(...extractedTitles);
+        }
+      }
+      
+      // Remove duplicates and clean up
+      return [...new Set(knownForTitles)]
+        .filter(title => title.length > 2 && title.length < 50)
+        .slice(0, 5); // Top 5 most mentioned
+      
+    } catch (error) {
+      logger.warn('Could not parse Wikipedia for known-for titles:', error.message);
+      return [];
+    }
+  }
+  
+  /**
+   * Extract title names from "known for" text
+   */
+  static extractTitlesFromText(text) {
+    const titles = [];
+    
+    // Look for patterns like "Character in Title" or "Title"
+    const titlePatterns = [
+      /\b([A-Z][^,]*?)\s+(?:franchise|series|film|movie|show)/gi,
+      /\bin\s+(?:the\s+)?([A-Z][^,.\n]*?)(?:\s|,|\.|$)/gi,
+      /\b([A-Z][a-zA-Z\s:'-]{2,25}?)(?:\s+and|\s*,|\.|$)/gi
+    ];
+    
+    for (const pattern of titlePatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        let title = match[1].trim();
+        
+        // Clean up the extracted title
+        title = title.replace(/^(the|a|an)\s+/i, '');
+        title = title.replace(/\s+(and|or|,).*$/i, '');
+        title = title.trim();
+        
+        // Filter out obvious non-titles
+        if (this.isValidTitle(title)) {
+          titles.push(title);
+        }
+      }
+    }
+    
+    return titles;
+  }
+  
+  /**
+   * Check if extracted text is likely a valid title
+   */
+  static isValidTitle(title) {
+    if (!title || title.length < 3) return false;
+    
+    // Filter out common non-title words
+    const excludeWords = [
+      'actor', 'actress', 'director', 'producer', 'writer', 'comedian', 'singer',
+      'musician', 'artist', 'star', 'celebrity', 'performer', 'character',
+      'role', 'roles', 'performance', 'performances', 'portrayal', 'work',
+      'career', 'american', 'british', 'canadian', 'english', 'film', 'movie',
+      'television', 'tv', 'show', 'series', 'franchise'
+    ];
+    
+    const titleLower = title.toLowerCase();
+    return !excludeWords.some(word => titleLower === word || titleLower.endsWith(' ' + word));
+  }
+  
+  /**
+   * Fetch roles from TMDb API with Wikipedia prioritization
+   */
+  static async fetchFromTMDb(celebrityName, knownForTitles = []) {
     if (!config.api.tmdbKey) {
       logger.warn('TMDb API key not configured');
       return [];
@@ -73,7 +172,7 @@ class RoleFetcher {
           
           // Keep substantial acting roles with good vote counts
           const hasTitle = title.length > 0;
-          const hasVotes = credit.vote_count && credit.vote_count > 100;
+          const hasVotes = credit.vote_count && credit.vote_count > 50; // Lower threshold
           const isActingRole = character && character !== 'Self' && !character.includes('Unknown');
           
           return hasTitle && !isTalkShow && (hasVotes || isActingRole);
@@ -84,6 +183,9 @@ class RoleFetcher {
           const title = isMovie ? credit.title : credit.name;
           const releaseDate = isMovie ? credit.release_date : credit.first_air_date;
           
+          // Check if this title matches Wikipedia "known for"
+          const isKnownFor = this.matchesKnownForTitles(title, knownForTitles);
+          
           return {
             name: title,
             character: credit.character || 'Unknown role',
@@ -91,12 +193,17 @@ class RoleFetcher {
             media_type: credit.media_type,
             popularity: credit.popularity || 0,
             vote_count: credit.vote_count || 0,
+            isKnownFor: isKnownFor,
             tags: [credit.media_type, 'tmdb'],
             searchTerms: [title, credit.character, celebrityName].filter(Boolean)
           };
         })
         .sort((a, b) => {
-          // Sort by VOTE COUNT first (long-term popularity), then by popularity
+          // Prioritize Wikipedia "known for" titles
+          if (a.isKnownFor && !b.isKnownFor) return -1;
+          if (!a.isKnownFor && b.isKnownFor) return 1;
+          
+          // Then sort by VOTE COUNT first (long-term popularity), then by popularity
           if (b.vote_count !== a.vote_count) {
             return b.vote_count - a.vote_count;
           }
@@ -106,7 +213,8 @@ class RoleFetcher {
       
       logger.info(`Found ${roles.length} roles from TMDb`);
       roles.forEach(role => {
-        logger.info(`- ${role.name} (${role.media_type}) - ${role.character} [Votes: ${role.vote_count}, Pop: ${role.popularity.toFixed(1)}]`);
+        const knownForMarker = role.isKnownFor ? ' ⭐ KNOWN FOR' : '';
+        logger.info(`- ${role.name} (${role.media_type}) - ${role.character} [Votes: ${role.vote_count}, Pop: ${role.popularity.toFixed(1)}]${knownForMarker}`);
       });
       
       return roles;
@@ -115,6 +223,33 @@ class RoleFetcher {
       logger.error('TMDb API error:', error.message);
       return [];
     }
+  }
+  
+  /**
+   * Check if a TMDb title matches any Wikipedia "known for" titles
+   */
+  static matchesKnownForTitles(tmdbTitle, knownForTitles) {
+    if (!tmdbTitle || knownForTitles.length === 0) return false;
+    
+    const tmdbLower = tmdbTitle.toLowerCase();
+    
+    return knownForTitles.some(knownTitle => {
+      const knownLower = knownTitle.toLowerCase();
+      
+      // Exact match
+      if (tmdbLower === knownLower) return true;
+      
+      // Partial match (handles "Star Trek" matching "Star Trek II")
+      if (tmdbLower.includes(knownLower) || knownLower.includes(tmdbLower)) return true;
+      
+      // Handle variations like "Star Trek" vs "Star Trek: The Original Series"
+      const tmdbWords = tmdbLower.split(/\s+/);
+      const knownWords = knownLower.split(/\s+/);
+      
+      // If most words match, consider it a match
+      const commonWords = tmdbWords.filter(word => knownWords.includes(word));
+      return commonWords.length >= Math.min(tmdbWords.length, knownWords.length) * 0.6;
+    });
   }
   
   /**
