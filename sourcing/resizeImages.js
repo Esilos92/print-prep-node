@@ -2,14 +2,14 @@ const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
-const { sanitizeFilename } = require('../utils/helpers');
+const { sanitizeFilename, generateFilename } = require('../utils/helpers');
 
 class ImageResizer {
   
   /**
    * Resize images to print formats
    */
-  static async resizeImages(validatedImages, workDir) {
+  static async resizeImages(validatedImages, workDir, celebrityName) {
     try {
       logger.info(`Resizing ${validatedImages.length} validated images...`);
       
@@ -18,6 +18,12 @@ class ImageResizer {
       await fs.mkdir(outputDir, { recursive: true });
       
       for (const image of validatedImages) {
+        // Add missing data for filename generation
+        image.celebrityName = celebrityName;
+        if (!image.indexInRole) {
+          image.indexInRole = this.calculateImageIndex(image, validatedImages);
+        }
+        
         try {
           const resizeResults = await this.resizeImageToFormats(image, outputDir);
           resizedImages.push(...resizeResults);
@@ -34,6 +40,14 @@ class ImageResizer {
       logger.error('Error in image resizing:', error.message);
       return [];
     }
+  }
+  
+  /**
+   * Calculate image index within its role
+   */
+  static calculateImageIndex(currentImage, allImages) {
+    const sameRoleImages = allImages.filter(img => img.role === currentImage.role);
+    return sameRoleImages.indexOf(currentImage) + 1;
   }
   
   /**
@@ -68,8 +82,14 @@ class ImageResizer {
    */
   static async resizeToFormat(image, format, outputDir) {
     const dimensions = this.getPrintDimensions(format);
-    const baseName = path.parse(image.filename).name;
-    const outputFilename = `${sanitizeFilename(baseName)}_${format.replace('x', 'x')}.jpg`;
+    
+    // NEW: Use generateFilename for proper naming convention
+    const outputFilename = generateFilename(
+      image.celebrityName || 'Unknown',
+      image.role || 'Unknown', 
+      image.indexInRole || 1,
+      format
+    );
     const outputPath = path.join(outputDir, outputFilename);
     
     await sharp(image.filepath)
