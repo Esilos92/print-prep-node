@@ -3,7 +3,7 @@
  * Centralized prompts for consistent AI behavior
  */
 
-export const PROMPTS = {
+const PROMPTS = {
   
   /**
    * Main role fetching prompt - handles ANY celebrity type with autograph focus
@@ -124,7 +124,7 @@ Return as simple array:
 /**
  * Prompt configuration settings
  */
-export const PROMPT_CONFIG = {
+const PROMPT_CONFIG = {
   // Temperature settings for different types of requests
   TEMPERATURE: {
     ROLE_FETCHING: 0.3,    // Lower for consistent role selection
@@ -148,4 +148,4 @@ export const PROMPT_CONFIG = {
   }
 };
 
-export default { PROMPTS, PROMPT_CONFIG };
+module.exports = { PROMPTS, PROMPT_CONFIG };
