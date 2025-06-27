@@ -24,6 +24,18 @@ class RoleFetcher {
         allRoles = await this.fetchFromWikipedia(celebrityName);
         return allRoles.slice(0, 5);
       }
+      
+      // Apply franchise diversification
+      const diversifiedRoles = this.diversifyByFranchise(allRoles);
+      
+      return diversifiedRoles.slice(0, 5); // Top 5 diversified roles
+      
+    } catch (error) {
+      logger.error('Error fetching roles:', error.message);
+      // Return fallback generic roles
+      return this.getFallbackRoles(celebrityName);
+    }
+  }
   
   /**
    * Enhanced talk show and guest appearance detection
@@ -126,18 +138,6 @@ class RoleFetcher {
                                   !character.toLowerCase().includes('unknown');
     
     return hasRealCharacterName && (isNotTalkShowFormat || hasSubstantialCharacter);
-  }
-      
-      // Apply franchise diversification
-      const diversifiedRoles = this.diversifyByFranchise(allRoles);
-      
-      return diversifiedRoles.slice(0, 5); // Top 5 diversified roles
-      
-    } catch (error) {
-      logger.error('Error fetching roles:', error.message);
-      // Return fallback generic roles
-      return this.getFallbackRoles(celebrityName);
-    }
   }
   
   /**
@@ -397,17 +397,23 @@ class RoleFetcher {
   static isValidTitle(title) {
     if (!title || title.length < 3) return false;
     
-    // Filter out common non-title words
+    // Filter out common non-title words (but be careful with partial matches)
     const excludeWords = [
       'actor', 'actress', 'director', 'producer', 'writer', 'comedian', 'singer',
-      'musician', 'artist', 'star', 'celebrity', 'performer', 'character',
+      'musician', 'artist', 'celebrity', 'performer', 'character',
       'role', 'roles', 'performance', 'performances', 'portrayal', 'work',
       'career', 'american', 'british', 'canadian', 'english', 'film', 'movie',
       'television', 'tv', 'show', 'series', 'franchise'
     ];
     
     const titleLower = title.toLowerCase();
-    return !excludeWords.some(word => titleLower === word || titleLower.endsWith(' ' + word));
+    
+    // Only filter if the title is EXACTLY one of these words, or ends with " [word]"
+    // This protects "Star Trek" and "Star Wars" which START with "star"
+    return !excludeWords.some(word => {
+      return titleLower === word || 
+             (titleLower.endsWith(' ' + word) && titleLower !== 'star trek' && titleLower !== 'star wars');
+    });
   }
   
   /**
