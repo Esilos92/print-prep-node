@@ -32,59 +32,6 @@ class RoleFetcher {
         }
       }
       
-      // CRITICAL FIX: TMDb Fallback Implementation
-      if (allRoles.length === 0) {
-        logger.warn('🚨 TMDb returned zero results OR wrong person - implementing Wikipedia fallback');
-        allRoles = await this.createWikipediaFallbackRoles(celebrityName, knownForTitles);
-        
-        if (allRoles.length === 0) {
-          logger.warn('Wikipedia fallback also failed, using generic fallback');
-          return this.getFallbackRoles(celebrityName);
-        }
-        
-        logger.info(`✅ Wikipedia fallback successful: ${allRoles.length} roles found`);
-        return allRoles.slice(0, 5);
-      }
-      
-      // Apply franchise diversification
-      const diversifiedRoles = this.diversifyByFranchise(allRoles);
-      
-      return diversifiedRoles.slice(0, 5); // Top 5 diversified roles
-      
-    } catch (error) {
-      logger.error('Error fetching roles:', error.message);
-      // Return fallback generic roles
-      return this.getFallbackRoles(celebrityName);
-    }
-  }
-
-  /**
-   * Fetch top 5 iconic roles for a celebrity with franchise diversification and comprehensive fallback
-   */
-  static async fetchRoles(celebrityName) {
-    try {
-      logger.info(`Fetching roles for: ${celebrityName}`);
-      
-      // Get Wikipedia "best known for" information first
-      const knownForTitles = await this.getKnownForTitles(celebrityName);
-      logger.info(`Wikipedia "known for": ${knownForTitles.join(', ') || 'None found'}`);
-      
-      // Get more roles from TMDb for franchise detection (up to 20)
-      let allRoles = await this.fetchFromTMDb(celebrityName, knownForTitles, 20);
-      
-      // CRITICAL FIX: Validate TMDb results against Wikipedia
-      if (allRoles.length > 0 && knownForTitles.length > 0) {
-        const tmdbMatchesWikipedia = this.validateTMDbAgainstWikipedia(allRoles, knownForTitles);
-        
-        if (!tmdbMatchesWikipedia) {
-          logger.warn(`🚨 TMDb found "${celebrityName}" but results don't match Wikipedia known roles`);
-          logger.warn(`TMDb titles: ${allRoles.map(r => r.name).slice(0, 3).join(', ')}`);
-          logger.warn(`Wikipedia known for: ${knownForTitles.join(', ')}`);
-          logger.warn(`🔄 Treating as TMDb failure - using Wikipedia fallback`);
-          allRoles = []; // Clear TMDb results to trigger fallback
-        }
-      }
-      
       // ENHANCED FALLBACK CHAIN
       if (allRoles.length === 0) {
         logger.warn('🚨 TMDb returned zero results OR wrong person - implementing enhanced fallback chain');
@@ -394,20 +341,30 @@ class RoleFetcher {
   }
 
   /**
-   * Validate extracted title from Google results
+   * CRITICAL FIX: Validate extracted title from Google results - MUCH MORE RESTRICTIVE
    */
   static isValidExtractedTitle(title, celebrityName) {
     if (!title || title.length < 3 || title.length > 50) return false;
+    
+    // Filter out partial phrases and prepositions - THE CORE FIX
+    const invalidPrefixes = ['in ', 'on ', 'of ', 'the ', 'a ', 'an ', 'and ', 'or '];
+    const invalidSuffixes = ["'s animated", "'s ", " animated", " show", " series"];
+    const titleLower = title.toLowerCase();
+    
+    // Reject if starts with preposition - PREVENTS "in Aqua Teen Hunger Force"
+    if (invalidPrefixes.some(prefix => titleLower.startsWith(prefix))) return false;
+    
+    // Reject if ends with generic terms - PREVENTS "Cartoon Network's animated"
+    if (invalidSuffixes.some(suffix => titleLower.endsWith(suffix))) return false;
     
     // Filter out common non-title words
     const excludeWords = [
       'actor', 'actress', 'voice', 'character', 'role', 'cast', 'starring',
       'movie', 'film', 'show', 'series', 'television', 'tv', 'episode',
       'season', 'year', 'years', 'career', 'work', 'performance', 'latest',
-      'news', 'interview', 'photos', 'images', 'biography', 'wikipedia'
+      'news', 'interview', 'photos', 'images', 'biography', 'wikipedia',
+      'animated', 'cartoon', 'network'
     ];
-    
-    const titleLower = title.toLowerCase();
     
     // Don't include if it's just an excluded word
     if (excludeWords.includes(titleLower)) return false;
@@ -415,10 +372,16 @@ class RoleFetcher {
     // Don't include if it contains the actor's name (likely a bio page)
     if (titleLower.includes(celebrityName.toLowerCase())) return false;
     
-    // Must contain at least one letter
-    if (!/[a-zA-Z]/.test(title)) return false;
+    // Must contain at least one letter and be a substantial word
+    if (!/[a-zA-Z]/.test(title) || title.split(' ').length < 2) return false;
     
-    // Looks like a valid title
+    // Must not be just generic phrases - ADDITIONAL PROTECTION
+    const genericPhrases = [
+      'cartoon network', 'adult swim', 'comedy central', 'animated series',
+      'voice actor', 'voice acting', 'television series', 'tv show'
+    ];
+    if (genericPhrases.includes(titleLower)) return false;
+    
     return true;
   }
 
