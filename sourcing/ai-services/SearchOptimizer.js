@@ -7,8 +7,8 @@ class SearchOptimizer {
     this.hasOpenAI = false;
     this.initializeOpenAI();
     
-    // Comprehensive exclusions - no merchandise, events, or fan content
-    this.exclusions = "-funko -toy -figure -doll -collectible -merchandise -convention -comic-con -autograph -signed -signature -event -premiere -red -carpet -interview -behind -scenes -fan -art -drawing -sketch -graphic -compilation -meme -wallpaper -poster -dvd -cover -packaging -box";
+    // Comprehensive exclusions - no merchandise, events, fan content, or framed images
+    this.exclusions = "-funko -toy -figure -doll -collectible -merchandise -convention -comic-con -autograph -signed -signature -event -premiere -red -carpet -interview -behind -scenes -fan -art -drawing -sketch -graphic -compilation -meme -wallpaper -poster -dvd -cover -packaging -box -framed -frame -wall -hanging -mounted -display -render -fanart -deviantart -tumblr -reddit -pinterest -random -vs -versus -comparison -friends -game -thrones -wrong";
   }
 
   initializeOpenAI() {
@@ -90,24 +90,24 @@ class SearchOptimizer {
   }
 
   /**
-   * Generate 6 search terms focused on high-quality character images
+   * Generate 6 search terms focused on high-quality character images (solo AND group)
    */
   generateCharacterImageTerms(celebrityName, character, title, medium) {
     const exclusions = this.exclusions;
     const mediumAdjustments = this.getMediumAdjustments(medium);
     
-    // 6 terms focused on getting character images from source material
-    const term1 = `"${celebrityName}" "${character}" "${title}" ${mediumAdjustments.imageType} scene high quality ${exclusions}`;
+    // Highly specific terms to avoid wrong characters and fan content
+    const term1 = `"${celebrityName}" "${character}" "${title}" ${mediumAdjustments.imageType} screenshot original ${exclusions}`;
     
-    const term2 = `"${character}" "${title}" ${mediumAdjustments.sourceType} screenshot high resolution ${exclusions}`;
+    const term2 = `"${title}" "${celebrityName}" "${character}" ${mediumAdjustments.sourceType} scene official ${exclusions}`;
     
-    const term3 = `"${celebrityName}" as "${character}" "${title}" ${mediumAdjustments.sceneType} image ${exclusions}`;
+    const term3 = `"${celebrityName}" "${character}" from "${title}" ${mediumAdjustments.sceneType} still ${exclusions}`;
     
-    const term4 = `"${title}" "${character}" "${celebrityName}" ${mediumAdjustments.episodeType} still ${exclusions}`;
+    const term4 = `"${title}" show "${character}" "${celebrityName}" ${mediumAdjustments.episodeType} capture ${exclusions}`;
     
-    const term5 = `"${celebrityName}" "${character}" "${title}" ${mediumAdjustments.costumeType} high quality ${exclusions}`;
+    const term5 = `"${celebrityName}" playing "${character}" "${title}" ${mediumAdjustments.costumeType} scene ${exclusions}`;
     
-    const term6 = `"${character}" "${title}" ${mediumAdjustments.characterType} "${celebrityName}" image ${exclusions}`;
+    const term6 = `"${title}" series "${celebrityName}" "${character}" ${mediumAdjustments.characterType} original ${exclusions}`;
     
     return [term1, term2, term3, term4, term5, term6];
   }
@@ -218,7 +218,7 @@ class SearchOptimizer {
   }
 
   /**
-   * Generate medium-specific search terms (fallback)
+   * Generate medium-specific search terms (fallback) - includes group shots
    */
   generateMediumSpecificTerms(role) {
     const { character, title, medium } = role;
@@ -227,36 +227,36 @@ class SearchOptimizer {
 
     switch (medium) {
       case 'live_action_movie':
-        terms.push(`"${title}" movie scene "${character}" ${exclusions}`);
-        terms.push(`"${title}" film screenshot high quality ${exclusions}`);
+        terms.push(`"${title}" movie scene "${character}" cast group ${exclusions}`);
+        terms.push(`"${title}" film screenshot ensemble cast ${exclusions}`);
         break;
 
       case 'live_action_tv':
-        terms.push(`"${title}" tv series scene "${character}" ${exclusions}`);
-        terms.push(`"${title}" episode screenshot ${exclusions}`);
+        terms.push(`"${title}" tv series scene "${character}" cast ${exclusions}`);
+        terms.push(`"${title}" episode main characters group ${exclusions}`);
         break;
 
       case 'voice_anime':
       case 'animation_tv':
       case 'animation_movie':
-        terms.push(`"${title}" anime scene "${character}" ${exclusions}`);
-        terms.push(`"${title}" animation screenshot ${exclusions}`);
+        terms.push(`"${title}" anime scene "${character}" main characters ${exclusions}`);
+        terms.push(`"${title}" animation group characters scene ${exclusions}`);
         break;
 
       case 'voice_cartoon':
       case 'voice_movie':
-        terms.push(`"${title}" cartoon scene "${character}" ${exclusions}`);
-        terms.push(`"${title}" animated screenshot ${exclusions}`);
+        terms.push(`"${title}" cartoon scene "${character}" cast ${exclusions}`);
+        terms.push(`"${title}" animated characters group scene ${exclusions}`);
         break;
 
       case 'voice_game':
-        terms.push(`"${title}" game scene "${character}" ${exclusions}`);
-        terms.push(`"${title}" video game screenshot ${exclusions}`);
+        terms.push(`"${title}" game scene "${character}" party characters ${exclusions}`);
+        terms.push(`"${title}" video game characters group ${exclusions}`);
         break;
 
       default:
-        terms.push(`"${title}" scene "${character}" ${exclusions}`);
-        terms.push(`"${title}" screenshot high quality ${exclusions}`);
+        terms.push(`"${title}" scene "${character}" cast group ${exclusions}`);
+        terms.push(`"${title}" characters ensemble scene ${exclusions}`);
         break;
     }
 
