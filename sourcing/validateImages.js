@@ -33,6 +33,75 @@ class ImageValidator {
   }
   
   /**
+   * Main validation entry point - streamlined workflow
+   */
+  static async validateImages(images, workDir, roleInfo = {}) {
+    try {
+      logger.info(`🔍 Validating ${images.length} images for role: ${roleInfo.name || 'unknown'}...`);
+      
+      const validator = new ImageValidator();
+      const validatedImages = [];
+      const roleName = roleInfo.name || 'unknown';
+      
+      // Initialize role-specific hash storage
+      if (!validator.roleHashes.has(roleName)) {
+        validator.roleHashes.set(roleName, new Map());
+      }
+      
+      for (const image of images) {
+        try {
+          // Quick validation checks first
+          const quickValidation = validator.quickValidationChecks(image, roleInfo);
+          if (!quickValidation.isValid) {
+            logger.warn(`❌ Quick reject ${image.filename}: ${quickValidation.reason}`);
+            continue;
+          }
+          
+          // Image metadata validation
+          const metadataValidation = await validator.validateImageMetadata(image);
+          if (!metadataValidation.isValid) {
+            logger.warn(`❌ Metadata reject ${image.filename}: ${metadataValidation.reason}`);
+            continue;
+          }
+          
+          // Duplicate check within this role only
+          const isDuplicate = await validator.checkForDuplicate(
+            image, 
+            validator.roleHashes.get(roleName),
+            config.image.dedupThreshold || 0.85,
+            roleName
+          );
+          
+          if (isDuplicate) {
+            logger.warn(`❌ Duplicate ${image.filename}: Similar image already exists in this role`);
+            continue;
+          }
+          
+          // Add to validated set
+          validatedImages.push({
+            ...image,
+            actualWidth: metadataValidation.width,
+            actualHeight: metadataValidation.height,
+            formats: metadataValidation.formats,
+            hash: metadataValidation.hash,
+            tags: validator.generateTags(metadataValidation.width, metadataValidation.height, image.filename, roleInfo)
+          });
+          
+        } catch (error) {
+          logger.warn(`❌ Error validating ${image.filename}:`, error.message);
+        }
+      }
+      
+      logger.info(`✅ Validation complete: ${validatedImages.length}/${images.length} images passed for ${roleName}`);
+      return validatedImages;
+      
+    } catch (error) {
+      logger.error('Error in image validation:', error.message);
+      return [];
+    }
+  }
+  
+  /**
    * STREAMLINED: Quick validation checks without complex scoring
    */
   quickValidationChecks(image, roleInfo) {
@@ -334,73 +403,4 @@ class ImageValidator {
   }
 }
 
-module.exports = { validateImages: ImageValidator.validateImages.bind(ImageValidator) }; Main validation entry point - streamlined workflow
-   */
-  static async validateImages(images, workDir, roleInfo = {}) {
-    try {
-      logger.info(`🔍 Validating ${images.length} images for role: ${roleInfo.name || 'unknown'}...`);
-      
-      const validator = new ImageValidator();
-      const validatedImages = [];
-      const roleName = roleInfo.name || 'unknown';
-      
-      // Initialize role-specific hash storage
-      if (!validator.roleHashes.has(roleName)) {
-        validator.roleHashes.set(roleName, new Map());
-      }
-      
-      for (const image of images) {
-        try {
-          // Quick validation checks first
-          const quickValidation = validator.quickValidationChecks(image, roleInfo);
-          if (!quickValidation.isValid) {
-            logger.warn(`❌ Quick reject ${image.filename}: ${quickValidation.reason}`);
-            continue;
-          }
-          
-          // Image metadata validation
-          const metadataValidation = await validator.validateImageMetadata(image);
-          if (!metadataValidation.isValid) {
-            logger.warn(`❌ Metadata reject ${image.filename}: ${metadataValidation.reason}`);
-            continue;
-          }
-          
-          // Duplicate check within this role only
-          const isDuplicate = await validator.checkForDuplicate(
-            image, 
-            validator.roleHashes.get(roleName),
-            config.image.dedupThreshold || 0.85,
-            roleName
-          );
-          
-          if (isDuplicate) {
-            logger.warn(`❌ Duplicate ${image.filename}: Similar image already exists in this role`);
-            continue;
-          }
-          
-          // Add to validated set
-          validatedImages.push({
-            ...image,
-            actualWidth: metadataValidation.width,
-            actualHeight: metadataValidation.height,
-            formats: metadataValidation.formats,
-            hash: metadataValidation.hash,
-            tags: validator.generateTags(metadataValidation.width, metadataValidation.height, image.filename, roleInfo)
-          });
-          
-        } catch (error) {
-          logger.warn(`❌ Error validating ${image.filename}:`, error.message);
-        }
-      }
-      
-      logger.info(`✅ Validation complete: ${validatedImages.length}/${images.length} images passed for ${roleName}`);
-      return validatedImages;
-      
-    } catch (error) {
-      logger.error('Error in image validation:', error.message);
-      return [];
-    }
-  }
-  
-  /**
-   *
+module.exports = { validateImages: ImageValidator.validateImages.bind(ImageValidator) };
