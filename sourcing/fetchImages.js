@@ -14,16 +14,26 @@ class ImageFetcher {
       'warnerbros.com', 'netflix.com', 'hulu.com', 'amazon.com'
     ];
     
-    this.bannedDomains = [
-      'alamy.com', 'gettyimages.com', 'shutterstock.com', 
-      'istockphoto.com', 'depositphotos.com', 'bigstock.com',
-      'dreamstime.com', 'deviantart.com', 'tumblr.com', 
-      'pinterest.com', 'reddit.com', 'fandom.com', 'wikia.com'
+    this.watermarkedDomains = [
+      'alamy.com', 'alamyimages.fr', 'alamy.de', 'alamy.es',
+      'gettyimages.com', 'gettyimages.ca', 'gettyimages.co.uk',
+      'shutterstock.com', 'istockphoto.com', 'depositphotos.com', 
+      'bigstock.com', 'dreamstime.com', 'stockphoto.com',
+      'photobucket.com', 'imageshack.us', '123rf.com',
+      'canstockphoto.com', 'fotolia.com', 'stockvault.net'
+    ];
+    
+    this.fanContentKeywords = [
+      'fanart', 'fan art', 'fan-art', 'deviantart', 'tumblr art',
+      'drawing', 'sketch', 'illustration', 'artwork', 'digital art',
+      'concept art', 'poster design', 'fan poster', 'custom poster',
+      'photomanipulation', 'manip', 'edit', 'fan edit'
     ];
     
     this.watermarkPatterns = [
-      '/comp/', '/preview/', '/sample/', '/watermark/',
-      'watermarked', 'preview', 'sample', 'comp-'
+      '/comp/', '/preview/', '/sample/', '/watermark/', '/thumb/',
+      'watermarked', 'preview', 'sample', 'comp-', 'stockphoto',
+      'low-res', 'lowres', 'proof', 'copyright', '©'
     ];
   }
   
@@ -80,107 +90,81 @@ class ImageFetcher {
   }
   
   /**
-   * Generate enhanced search queries based on role type with strict exclusions
+   * Generate enhanced search queries with aggressive watermark exclusions
    */
   generateEnhancedQueries(celebrityName, role) {
     const queries = [];
     
-    // Comprehensive exclusions to avoid junk content
-    const exclusions = [
+    // Aggressive exclusions for watermarked sites and unwanted content
+    const watermarkExclusions = this.watermarkedDomains.map(domain => `-site:${domain}`).join(' ');
+    const contentExclusions = [
       '-signed', '-autograph', '-autographed', '-auction', '-ebay', 
       '-memorabilia', '-collectible', '-sale', '-selling', '-bid', '-lot',
       '-"comic con"', '-comicon', '-convention', '-podcast', '-interview',
       '-"promotional graphic"', '-"event poster"', '-vhs', '-dvd', '-"blu ray"',
       '-"red carpet"', '-premiere', '-gala', '-awards', '-ceremony',
       '-vs', '-versus', '-"side by side"', '-comparison', '-"then and now"',
-      '-meme', '-parody', '-watermark', '-website'
+      '-meme', '-parody', '-watermark', '-website', '-fanart', '-"fan art"',
+      '-drawing', '-sketch', '-illustration', '-artwork', '-"digital art"'
     ].join(' ');
     
+    const allExclusions = `${watermarkExclusions} ${contentExclusions}`;
+    
     if (role.isVoiceRole) {
-      // Voice acting - focus on character images with strict targeting
       logger.info(`🎭 Voice role detected for ${role.name}, focusing on character images`);
       
       if (role.characterName) {
         queries.push({
-          text: `"${role.characterName}" "${role.name}" character official movie still ${exclusions}`,
+          text: `"${role.characterName}" "${role.name}" character official movie still ${allExclusions}`,
           priority: 'high'
         });
         queries.push({
-          text: `"${role.characterName}" "${role.name}" animated character scene ${exclusions}`,
+          text: `"${role.characterName}" "${role.name}" animated character scene ${allExclusions}`,
           priority: 'high'
         });
       }
       
       queries.push({
-        text: `"${role.name}" character images official movie stills ${exclusions}`,
+        text: `"${role.name}" character images official movie stills ${allExclusions}`,
         priority: 'medium'
       });
     } else {
-      // Live action - focus on actor in role with stricter targeting
       logger.info(`🎬 Live action role detected for ${role.name}, focusing on actor in role`);
       
-      // Most specific queries first
       queries.push({
-        text: `"${celebrityName}" "${role.name}" movie still scene photo ${exclusions}`,
+        text: `"${celebrityName}" "${role.name}" movie still scene photo ${allExclusions}`,
         priority: 'high'
       });
       
       if (role.character && role.character !== 'Unknown role') {
         queries.push({
-          text: `"${celebrityName}" "${role.character}" "${role.name}" scene still ${exclusions}`,
+          text: `"${celebrityName}" "${role.character}" "${role.name}" scene still ${allExclusions}`,
           priority: 'high'
         });
       }
       
       queries.push({
-        text: `"${celebrityName}" "${role.name}" promotional photo official ${exclusions}`,
+        text: `"${celebrityName}" "${role.name}" promotional photo official ${allExclusions}`,
         priority: 'medium'
       });
-      
-      // Only add franchise queries if very specific
-      if (role.franchiseName && role.franchiseName.length > 8) {
-        queries.push({
-          text: `"${celebrityName}" "${role.franchiseName}" official movie still ${exclusions}`,
-          priority: 'medium'
-        });
-      }
-      
-      // Behind scenes only for high-confidence roles
-      if (role.character && role.character !== 'Unknown role') {
-        queries.push({
-          text: `"${celebrityName}" "${role.name}" behind scenes on set ${exclusions}`,
-          priority: 'low'
-        });
-      }
     }
 
-    // Sort by priority and limit to most specific
-    const sortedQueries = queries.sort((a, b) => {
-      const priorityOrder = { high: 3, medium: 2, low: 1 };
-      return priorityOrder[b.priority] - priorityOrder[a.priority];
-    });
-
-    // Only return top 3 most specific queries to avoid noise
-    return sortedQueries.slice(0, 3);
+    return queries.slice(0, 3); // Limit to top 3 most specific queries
   }
   
   /**
-   * Search SerpAPI with enhanced parameters
+   * Search SerpAPI with enhanced parameters and aggressive filtering
    */
   async searchSerpAPI(query, maxResults = 20) {
     try {
-      // Add exclusions to query to filter out banned domains
-      const enhancedQuery = `${query} ${this.bannedDomains.map(d => `-site:${d}`).join(' ')}`;
-      
       const params = {
         api_key: config.api.serpApiKey,
         engine: 'google_images',
-        q: enhancedQuery,
+        q: query, // Query already contains exclusions
         num: Math.min(maxResults, 100),
         ijn: 0,
         safe: 'active',
-        // Add image size filters for better quality
-        imgsz: 'l', // Large images
+        imgsz: 'l', // Large images only
         imgtype: 'photo'
       };
 
@@ -194,15 +178,32 @@ class ImageFetcher {
         return [];
       }
 
-      // Convert to enhanced format
-      const images = response.data.images_results.map((img, index) => ({
+      // Pre-filter results before returning
+      const rawImages = response.data.images_results;
+      const filteredImages = rawImages.filter(img => {
+        // Aggressive watermark domain filtering
+        const sourceUrl = (img.link || '').toLowerCase();
+        if (this.watermarkedDomains.some(domain => sourceUrl.includes(domain))) {
+          return false;
+        }
+        
+        // Check original URL for watermark domains
+        const originalUrl = (img.original || '').toLowerCase();
+        if (this.watermarkedDomains.some(domain => originalUrl.includes(domain))) {
+          return false;
+        }
+        
+        return true;
+      });
+
+      // Convert to our format
+      const images = filteredImages.map((img, index) => ({
         original: img.original || img.thumbnail,
         thumbnail: img.thumbnail,
         title: img.title || `Image ${index + 1}`,
         source: img.source || 'Unknown',
         link: img.link || '',
         position: img.position || index + 1,
-        // Keep original format for compatibility
         url: img.original || img.thumbnail,
         thumbnailUrl: img.thumbnail,
         sourceUrl: img.link || '',
@@ -211,7 +212,7 @@ class ImageFetcher {
         searchQuery: query
       }));
 
-      logger.info(`Found ${images.length} images for: ${query}`);
+      logger.info(`Found ${rawImages.length} raw images, filtered to ${images.length} for: ${query}`);
       return images;
 
     } catch (error) {
@@ -233,19 +234,35 @@ class ImageFetcher {
   }
   
   /**
-   * Filter image sources to remove watermarked and banned content
+   * Filter image sources with aggressive watermark and smart fan content filtering
    */
   filterImageSources(images, role) {
     return images.filter(image => {
-      // Skip if from banned domains
-      if (this.isBannedDomain(image.sourceUrl)) {
-        logger.warn(`Skipping banned domain: ${image.sourceUrl}`);
+      const url = (image.sourceUrl || '').toLowerCase();
+      const title = (image.title || '').toLowerCase();
+      
+      // Aggressive watermark domain blocking
+      if (this.watermarkedDomains.some(domain => url.includes(domain))) {
+        logger.warn(`Blocked watermarked domain: ${url}`);
         return false;
       }
 
-      // Skip watermarked content by URL patterns
-      if (this.hasWatermarkPatterns(image.sourceUrl)) {
-        logger.warn(`Skipping watermarked content: ${image.sourceUrl}`);
+      // Check image URL itself for watermark domains
+      const imageUrl = (image.url || image.original || '').toLowerCase();
+      if (this.watermarkedDomains.some(domain => imageUrl.includes(domain))) {
+        logger.warn(`Blocked watermarked image URL: ${imageUrl}`);
+        return false;
+      }
+
+      // Aggressive watermark pattern detection
+      if (this.watermarkPatterns.some(pattern => url.includes(pattern) || imageUrl.includes(pattern))) {
+        logger.warn(`Blocked watermark pattern: ${url}`);
+        return false;
+      }
+
+      // Smart fan content filtering (by title/content, not domain)
+      if (this.fanContentKeywords.some(keyword => title.includes(keyword))) {
+        logger.warn(`Blocked fan content: ${title}`);
         return false;
       }
 
@@ -279,19 +296,13 @@ class ImageFetcher {
   }
   
   /**
-   * Check if domain is banned
+   * Check if domain has watermarks
    */
-  isBannedDomain(url) {
+  hasWatermarks(url) {
     if (!url) return false;
-    return this.bannedDomains.some(domain => url.toLowerCase().includes(domain));
-  }
-  
-  /**
-   * Check for watermark patterns in URL
-   */
-  hasWatermarkPatterns(url) {
-    if (!url) return false;
-    return this.watermarkPatterns.some(pattern => url.toLowerCase().includes(pattern));
+    const lowerUrl = url.toLowerCase();
+    return this.watermarkedDomains.some(domain => lowerUrl.includes(domain)) ||
+           this.watermarkPatterns.some(pattern => lowerUrl.includes(pattern));
   }
   
   /**
@@ -330,19 +341,25 @@ class ImageFetcher {
    * Check if source is good for live action roles
    */
   isGoodLiveActionSource(image) {
-    const url = image.sourceUrl.toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
     
     // Prefer official and entertainment industry sources
     if (this.preferredDomains.some(domain => url.includes(domain))) {
       return true;
     }
 
-    // Avoid fan sites and social media
-    const fanSitePatterns = [
-      'fan', 'blog', 'wordpress', 'blogspot', 'social', 'forum'
+    // Allow fandom sites but will filter fan content by title later
+    if (url.includes('fandom.com') || url.includes('wikia.com')) {
+      return true;
+    }
+
+    // Avoid obvious fan sites and social media
+    const problematicSites = [
+      'facebook.com', 'twitter.com', 'instagram.com',
+      'blog', 'wordpress', 'blogspot', 'forum'
     ];
     
-    if (fanSitePatterns.some(pattern => url.includes(pattern))) {
+    if (problematicSites.some(site => url.includes(site))) {
       return false;
     }
 
@@ -560,7 +577,7 @@ class ImageFetcher {
   }
   
   /**
-   * Enhanced person verification with balanced validation for group shots
+   * Enhanced person verification with balanced validation for group shots (FIXED SCOPE)
    */
   validatePersonInImage(imageData, celebrityName, role) {
     const title = (imageData.title || '').toLowerCase();
@@ -571,6 +588,12 @@ class ImageFetcher {
     const nameWords = name.split(' ');
     const lastName = nameWords[nameWords.length - 1];
     const firstName = nameWords[0];
+    
+    // Define group indicators at function scope to fix the error
+    const groupIndicators = [
+      'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
+      'with', 'co-star', 'co-stars', 'behind the scenes', 'on set'
+    ];
     
     let confidence = 0;
     let penalties = 0;
@@ -698,8 +721,7 @@ class ImageFetcher {
         confidence += 6; // Medium bonus for first name
       } else {
         // No direct name match - check if it's a legitimate group/cast photo
-        const groupTerms = ['cast', 'crew', 'ensemble', 'group', 'team', 'behind the scenes'];
-        const hasGroupContext = groupTerms.some(term => title.includes(term));
+        const hasGroupContext = groupIndicators.some(term => title.includes(term));
         
         if (hasGroupContext) {
           // Group photo without direct name mention - smaller penalty
@@ -711,11 +733,6 @@ class ImageFetcher {
       }
       
       // BONUS for group shots and cast photos
-      const groupIndicators = [
-        'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
-        'with', 'co-star', 'co-stars', 'behind the scenes', 'on set'
-      ];
-      
       const groupMatches = groupIndicators.filter(indicator => title.includes(indicator));
       confidence += groupMatches.length * 4; // Good bonus for group context
       
