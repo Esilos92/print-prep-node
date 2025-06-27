@@ -368,17 +368,18 @@ class ImageFetcher {
   }
   
   /**
-   * Content diversification - KEEP THIS LOGIC (it works well)
+   * Content diversification - UPDATED LIMITS for better results
    */
   diversifyContentTypes(images) {
+    // INCREASED LIMITS - William Shatner was getting cut off too early
     const contentTypeLimits = {
-      poster: 3,
-      behind_scenes: 5,
-      press: 8,
-      movie_still: 10,
-      cast_group: 6,
-      portrait: 4,
-      general: 10
+      poster: 5,           // Increased from 3 - posters are good
+      behind_scenes: 8,    // Increased from 5 - behind scenes are valuable  
+      press: 15,           // Increased from 8 - promotional photos are excellent
+      movie_still: 20,     // Increased from 10 - THESE ARE MONEY SHOTS
+      cast_group: 15,      // Increased from 6 - group shots are valuable
+      portrait: 8,         // Increased from 4 - portraits are good
+      general: 25          // Increased from 10 - much more flexible
     };
 
     const contentTypeCounts = {};
@@ -387,7 +388,7 @@ class ImageFetcher {
     for (const image of images) {
       const contentType = this.detectContentType(image);
       const currentCount = contentTypeCounts[contentType] || 0;
-      const limit = contentTypeLimits[contentType] || 5;
+      const limit = contentTypeLimits[contentType] || 10;
 
       if (currentCount < limit) {
         diversifiedImages.push({
@@ -401,7 +402,8 @@ class ImageFetcher {
         logger.info(`⏭️ Skipped ${contentType}: limit reached (${limit})`);
       }
 
-      if (diversifiedImages.length >= 50) break;
+      // Increased total limit too - was 50, now 75
+      if (diversifiedImages.length >= 75) break;
     }
 
     logger.info(`Content distribution: ${Object.entries(contentTypeCounts)
