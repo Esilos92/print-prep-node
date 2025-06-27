@@ -42,8 +42,9 @@ class ImageValidator {
       const validatedImages = [];
       
       // Initialize role-specific hash storage
-      if (!validator.roleHashes.has(roleInfo.name)) {
-        validator.roleHashes.set(roleInfo.name, new Map());
+      const roleName = roleInfo.name || 'unknown';
+      if (!validator.roleHashes.has(roleName)) {
+        validator.roleHashes.set(roleName, new Map());
       }
       
       for (const image of images) {
@@ -58,9 +59,9 @@ class ImageValidator {
           // Check for duplicates within this role only
           const isDuplicate = await validator.checkForDuplicate(
             image, 
-            validator.roleHashes.get(roleInfo.name),
+            validator.roleHashes.get(roleName),
             config.image.dedupThreshold,
-            roleInfo.name
+            roleName
           );
           
           if (isDuplicate) {
@@ -82,7 +83,7 @@ class ImageValidator {
         }
       }
       
-      logger.info(`Validation complete: ${validatedImages.length} images passed for ${roleInfo.name}`);
+      logger.info(`Validation complete: ${validatedImages.length} images passed for ${roleName}`);
       return validatedImages;
       
     } catch (error) {
