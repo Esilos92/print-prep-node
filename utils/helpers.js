@@ -91,6 +91,49 @@ class ImageHelpers {
     
     return [...new Set(tags)]; // Remove duplicates
   }
+
+  /**
+   * NEW: Generate filename with celebrity last name
+   * Format: LastName-Role-Index-Format.jpg
+   */
+  static generateFilename(celebrityName, roleName, index, format) {
+    // Extract last name from celebrity name
+    const lastName = ImageHelpers.extractLastName(celebrityName);
+    
+    // Clean up role name (remove special characters, spaces to dashes)
+    const cleanRole = ImageHelpers.cleanRoleName(roleName);
+    
+    // Generate filename: Shatner-Star_Trek_II-1-8x10.jpg
+    return `${lastName}-${cleanRole}-${index}-${format}.jpg`;
+  }
+
+  /**
+   * NEW: Extract last name from full celebrity name
+   */
+  static extractLastName(fullName) {
+    if (!fullName) return 'Unknown';
+    
+    // Split by spaces and take the last part
+    const parts = fullName.trim().split(/\s+/);
+    return parts[parts.length - 1]
+      .replace(/[^a-zA-Z0-9]/g, '') // Remove special characters
+      .trim();
+  }
+
+  /**
+   * NEW: Clean role name for filename use
+   */
+  static cleanRoleName(roleName) {
+    if (!roleName) return 'Unknown';
+    
+    return roleName
+      .replace(/[^\w\s-]/g, '') // Remove special chars except spaces and dashes
+      .replace(/\s+/g, '_')     // Spaces to underscores
+      .replace(/-+/g, '_')      // Dashes to underscores
+      .replace(/_+/g, '_')      // Multiple underscores to single
+      .replace(/^_|_$/g, '')    // Remove leading/trailing underscores
+      .substring(0, 30);        // Limit length
+  }
 }
 
 // Export individual functions for backward compatibility
@@ -101,5 +144,9 @@ module.exports = {
   generateSimpleHash: ImageHelpers.generateSimpleHash.bind(ImageHelpers),
   calculateSimilarity: ImageHelpers.calculateSimilarity.bind(ImageHelpers),
   sanitizeFilename: ImageHelpers.sanitizeFilename.bind(ImageHelpers),
-  extractTags: ImageHelpers.extractTags.bind(ImageHelpers)
+  extractTags: ImageHelpers.extractTags.bind(ImageHelpers),
+  // NEW EXPORTS
+  generateFilename: ImageHelpers.generateFilename.bind(ImageHelpers),
+  extractLastName: ImageHelpers.extractLastName.bind(ImageHelpers),
+  cleanRoleName: ImageHelpers.cleanRoleName.bind(ImageHelpers)
 };
