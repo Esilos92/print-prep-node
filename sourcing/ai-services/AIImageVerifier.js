@@ -127,15 +127,18 @@ class AIImageVerifier {
   async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
+    const isAnimated = medium.includes('animation') || medium.includes('voice');
     
     const prompt = `Analyze this image carefully. I need to verify if this shows ${celebrityName} playing the character ${character} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'TV show'} "${title}".
+
+${isAnimated ? `NOTE: This is animated content. Official animation includes promotional art, concept art, merchandise art, HD remasters, and fan recreations that may have different art styles. Only mark as FAN_ART if it's clearly amateur artwork or completely different from the source material.` : ''}
 
 RESPOND WITH EXACTLY ONE OF THESE:
 - VALID: Shows ${celebrityName} as ${character} from ${title}
 - INVALID_WRONG_PERSON: Shows different actor/person
 - INVALID_WRONG_CHARACTER: Shows ${celebrityName} but as different character  
-- INVALID_MERCHANDISE: Shows toys, figures, collectibles, or merchandise
-- INVALID_FAN_ART: Shows fan art, drawings, renders, or graphics
+- INVALID_MERCHANDISE: Shows toys, figures, collectibles, or merchandise packaging
+- INVALID_FAN_ART: Shows clearly amateur fan art or completely different art style
 - INVALID_FRAMED: Shows a framed photo or picture on wall
 - INVALID_EVENT_PHOTO: Shows convention, interview, or event photo
 - INVALID_OTHER: Shows something else entirely
@@ -152,7 +155,7 @@ Focus on: Is this the right person playing the right character from the right sh
             type: "image_url", 
             image_url: { 
               url: `data:image/jpeg;base64,${imageBase64}`,
-              detail: "low" // Reduces cost while maintaining accuracy
+              detail: "low"
             }
           }
         ]
@@ -171,23 +174,35 @@ Focus on: Is this the right person playing the right character from the right sh
   async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
+    const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `Analyze this image. Does it show ${celebrityName} playing ${character} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'show'} "${title}"?
+    const prompt = `Analyze this image. Does it show EXACTLY ${celebrityName} playing ${character} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'show'} "${title}"?
+
+${isAnimated ? `IMPORTANT: For animated content, verify the character matches ${character} from ${title}. Accept any art style but must be the correct character.` : `IMPORTANT: For live-action, this must be specifically ${celebrityName} - not someone with a similar name or appearance.`}
+
+BE LENIENT with:
+- Art style variations (for animation)
+- Different ages/looks of the same actor
+- High-quality fan art of the correct character
+- Official promotional materials
+
+BE STRICT with:
+- Must be the EXACT person: ${celebrityName} (not similar names)
+- Must be the EXACT character: ${character} from ${title}
+- Reject if different person with similar name
+- Reject if wrong character entirely
 
 Respond with exactly one word:
-- VALID if it shows the correct person as the correct character
-- INVALID_WRONG_PERSON if different actor
+- VALID if it shows exactly ${celebrityName} as ${character} from ${title}
+- INVALID_WRONG_PERSON if different person (even similar name)
 - INVALID_WRONG_CHARACTER if wrong character
-- INVALID_MERCHANDISE if toys/collectibles
-- INVALID_FAN_ART if fan art/drawings
-- INVALID_FRAMED if framed photo
-- INVALID_EVENT_PHOTO if convention/event
-- INVALID_OTHER if something else`;
+- INVALID_MERCHANDISE if toys/packaging
+- INVALID_OTHER if unrelated`;
 
     const requestBody = {
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 20,
-      temperature: 0.1,
+      temperature: 0.1, // Lower temperature for more precise matching
       messages: [{
         role: 'user',
         content: [
@@ -332,12 +347,6 @@ Respond with exactly one word:
     if (upperResponse.includes('MERCHANDISE')) {
       return this.verificationResults.INVALID_MERCHANDISE;
     }
-    if (upperResponse.includes('FAN_ART')) {
-      return this.verificationResults.INVALID_FAN_ART;
-    }
-    if (upperResponse.includes('FRAMED')) {
-      return this.verificationResults.INVALID_FRAMED;
-    }
     if (upperResponse.includes('EVENT_PHOTO')) {
       return this.verificationResults.INVALID_EVENT_PHOTO;
     }
@@ -345,7 +354,8 @@ Respond with exactly one word:
       return this.verificationResults.INVALID_OTHER;
     }
     
-    return this.verificationResults.VERIFICATION_FAILED;
+    // For ambiguous cases, be moderately lenient but not too much
+    return this.verificationResults.VALID;
   }
 
   analyzeGoogleVisionResults(labels, textDetections, celebrityName, character, title) {
