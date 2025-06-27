@@ -6,7 +6,7 @@ const logger = require('../utils/logger');
 class RoleFetcher {
   
   /**
-   * Fetch top 5 iconic roles for a celebrity with franchise diversification
+   * Fetch top 5 iconic roles for a celebrity with franchise diversification and TMDb fallback
    */
   static async fetchRoles(celebrityName) {
     try {
@@ -19,9 +19,17 @@ class RoleFetcher {
       // Get more roles from TMDb for franchise detection (up to 20)
       let allRoles = await this.fetchFromTMDb(celebrityName, knownForTitles, 20);
       
+      // CRITICAL FIX: TMDb Fallback Implementation
       if (allRoles.length === 0) {
-        logger.warn('TMDb returned no results, trying Wikipedia');
-        allRoles = await this.fetchFromWikipedia(celebrityName);
+        logger.warn('🚨 TMDb returned zero results - implementing Wikipedia fallback');
+        allRoles = await this.createWikipediaFallbackRoles(celebrityName, knownForTitles);
+        
+        if (allRoles.length === 0) {
+          logger.warn('Wikipedia fallback also failed, using generic fallback');
+          return this.getFallbackRoles(celebrityName);
+        }
+        
+        logger.info(`✅ Wikipedia fallback successful: ${allRoles.length} roles found`);
         return allRoles.slice(0, 5);
       }
       
@@ -35,6 +43,255 @@ class RoleFetcher {
       // Return fallback generic roles
       return this.getFallbackRoles(celebrityName);
     }
+  }
+
+  /**
+   * CRITICAL FIX: Create roles directly from Wikipedia when TMDb fails
+   * This solves the Dana Snyder case where TMDb has no data
+   */
+  static async createWikipediaFallbackRoles(celebrityName, knownForTitles) {
+    try {
+      logger.info('🔄 Creating roles from Wikipedia fallback data...');
+      
+      // Get expanded Wikipedia role data
+      const wikipediaRoles = await this.fetchExpandedWikipediaRoles(celebrityName);
+      
+      // Combine known-for titles with discovered roles
+      const allDiscoveredTitles = [...knownForTitles, ...wikipediaRoles];
+      
+      // Convert to role objects with proper structure
+      const fallbackRoles = allDiscoveredTitles.map((title, index) => {
+        const isVoiceRole = this.detectVoiceRole(title, celebrityName);
+        
+        return {
+          name: title,
+          character: isVoiceRole ? this.extractCharacterName(title, celebrityName) : 'Unknown role',
+          year: null,
+          media_type: isVoiceRole ? 'tv' : 'movie',
+          popularity: 100 - (index * 10), // Descending priority
+          vote_count: 1000 - (index * 100), // Synthetic vote count for sorting
+          isKnownFor: knownForTitles.includes(title),
+          isVoiceRole: isVoiceRole,
+          characterName: isVoiceRole ? this.extractCharacterName(title, celebrityName) : null,
+          tags: ['wikipedia_fallback', isVoiceRole ? 'voice_role' : 'live_action'],
+          source: 'wikipedia_fallback',
+          searchTerms: [title, celebrityName, isVoiceRole ? this.extractCharacterName(title, celebrityName) : null].filter(Boolean)
+        };
+      });
+      
+      logger.info(`🎭 Wikipedia fallback created ${fallbackRoles.length} roles`);
+      fallbackRoles.forEach((role, i) => {
+        const voiceMarker = role.isVoiceRole ? ' (VOICE)' : '';
+        const knownMarker = role.isKnownFor ? ' ⭐' : '';
+        logger.info(`  ${i + 1}. ${role.name}${voiceMarker}${knownMarker}`);
+      });
+      
+      return fallbackRoles;
+      
+    } catch (error) {
+      logger.error('Wikipedia fallback creation failed:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Enhanced Wikipedia scraping for fallback scenarios
+   */
+  static async fetchExpandedWikipediaRoles(celebrityName) {
+    try {
+      const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(celebrityName.replace(/\s+/g, '_'))}`;
+      const response = await axios.get(wikipediaUrl, { timeout: 10000 });
+      const $ = cheerio.load(response.data);
+      
+      const roles = new Set(); // Use Set to avoid duplicates
+      
+      // Strategy 1: Look for filmography sections
+      $('h2, h3').each((i, heading) => {
+        const headingText = $(heading).text().toLowerCase();
+        if (headingText.includes('filmography') || headingText.includes('voice') || 
+            headingText.includes('television') || headingText.includes('film')) {
+          
+          // Get the next few elements after this heading
+          let nextElement = $(heading).next();
+          let attempts = 0;
+          
+          while (nextElement.length > 0 && attempts < 5) {
+            if (nextElement.is('table')) {
+              // Extract from tables
+              nextElement.find('tr').each((j, row) => {
+                const cells = $(row).find('td');
+                if (cells.length >= 2) {
+                  // Usually format is: Year | Title | Role
+                  let title = '';
+                  
+                  // Try different cell positions for title
+                  for (let cellIndex = 0; cellIndex < Math.min(cells.length, 3); cellIndex++) {
+                    const cellText = $(cells[cellIndex]).text().trim();
+                    if (cellText && cellText.length > 2 && !cellText.match(/^\d{4}$/)) {
+                      title = cellText;
+                      break;
+                    }
+                  }
+                  
+                  if (title && this.isValidTitle(title)) {
+                    roles.add(title);
+                  }
+                }
+              });
+              break; // Found table, stop looking
+            } else if (nextElement.is('ul')) {
+              // Extract from lists
+              nextElement.find('li').each((j, item) => {
+                const text = $(item).text().trim();
+                const titleMatch = text.match(/^([^(]+)/); // Get text before first parenthesis
+                if (titleMatch && this.isValidTitle(titleMatch[1].trim())) {
+                  roles.add(titleMatch[1].trim());
+                }
+              });
+              break;
+            }
+            
+            nextElement = nextElement.next();
+            attempts++;
+          }
+        }
+      });
+      
+      // Strategy 2: Look for notable works in the intro
+      const firstParagraph = $('p').first().text();
+      const notableWorksPattern = /(?:known for|appeared in|voiced|starred in)[^.]*?([A-Z][^,.]*?)(?:\s+and|\s*,|\s*\(|\.)/gi;
+      let match;
+      while ((match = notableWorksPattern.exec(firstParagraph)) !== null) {
+        const potentialTitle = match[1].trim();
+        if (this.isValidTitle(potentialTitle)) {
+          roles.add(potentialTitle);
+        }
+      }
+      
+      logger.info(`Found ${roles.size} roles from expanded Wikipedia search`);
+      return Array.from(roles).slice(0, 10); // Return up to 10 roles
+      
+    } catch (error) {
+      logger.warn('Expanded Wikipedia scraping failed:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * GENERALIZED: Enhanced voice role detection for all voice actors
+   */
+  static detectVoiceRole(title, celebrityName) {
+    if (!title) return false;
+    
+    const titleLower = title.toLowerCase();
+    
+    // Animation networks and studios
+    const animationNetworks = [
+      'adult swim', 'cartoon network', 'nickelodeon', 'disney channel', 'disney junior',
+      'fox kids', 'kids wb', 'toonami', 'boomerang', 'comedy central'
+    ];
+    
+    // Animation-specific terms
+    const animationTerms = [
+      'animated', 'animation', 'cartoon', 'anime', 'voice', 'voice actor',
+      'voice cast', 'animated series', 'animated film', 'animated movie'
+    ];
+    
+    // Common animated show patterns
+    const animatedShowPatterns = [
+      'adventures of', 'tales of', 'chronicles of', 'legend of',
+      'teenage mutant', 'transformers', 'my little pony', 'pokemon',
+      'dragon ball', 'naruto', 'one piece', 'attack on titan'
+    ];
+    
+    // Production companies known for animation
+    const animationStudios = [
+      'pixar', 'dreamworks', 'illumination', 'blue sky', 'warner bros animation',
+      'sony pictures animation', 'paramount animation', 'disney animation'
+    ];
+    
+    // Check all categories
+    const allVoiceIndicators = [
+      ...animationNetworks,
+      ...animationTerms,
+      ...animatedShowPatterns,
+      ...animationStudios
+    ];
+    
+    return allVoiceIndicators.some(indicator => titleLower.includes(indicator));
+  }
+
+  /**
+   * GENERALIZED: Extract character name for any voice role
+   */
+  static extractCharacterName(title, celebrityName) {
+    if (!title) return 'Unknown Character';
+    
+    const titleLower = title.toLowerCase();
+    
+    // Generic character extraction patterns
+    const characterExtractionPatterns = [
+      // "Voice of Character in Show" -> Character
+      /voice\s+of\s+([A-Z][^,\n\(]+?)(?:\s+in|\s*,|\s*\(|$)/i,
+      // "Character (voice)" -> Character  
+      /^([A-Z][^,\n\(]+?)\s*\(voice\)/i,
+      // "Show: Character" -> Character
+      /:\s*([A-Z][^,\n\(]+?)(?:\s*,|\s*\(|$)/i,
+      // "Character - Show" -> Character
+      /^([A-Z][^,\n\-]+?)\s*-\s*/i,
+      // Look for character names in parentheses
+      /\(([A-Z][^,\n\)]+?)\)/i,
+      // "as Character" -> Character
+      /\bas\s+([A-Z][^,\n\(]+?)(?:\s*,|\s*\(|$)/i
+    ];
+    
+    // Try pattern-based extraction first
+    for (const pattern of characterExtractionPatterns) {
+      const match = title.match(pattern);
+      if (match && match[1]) {
+        let character = match[1].trim();
+        
+        // Clean up common artifacts
+        character = character.replace(/\s+(voice|actor|character)$/i, '');
+        character = character.replace(/^(the|a|an)\s+/i, '');
+        
+        if (character.length > 1 && character.length < 50) {
+          return character;
+        }
+      }
+    }
+    
+    // Fallback: Look for capitalized words that could be character names
+    const words = title.split(/\s+/);
+    const potentialCharacterWords = words.filter(word => {
+      // Must be capitalized and substantial
+      if (word.length < 2 || word[0] !== word[0].toUpperCase()) return false;
+      
+      // Filter out common show-related words
+      const commonWords = [
+        'show', 'series', 'movie', 'film', 'animated', 'adventures',
+        'tales', 'chronicles', 'legend', 'story', 'season', 'episode',
+        'voice', 'actor', 'cast', 'starring', 'featuring'
+      ];
+      
+      return !commonWords.includes(word.toLowerCase());
+    });
+    
+    // Return first 1-2 potential character words
+    if (potentialCharacterWords.length > 0) {
+      return potentialCharacterWords.slice(0, 2).join(' ');
+    }
+    
+    // Ultimate fallback: extract from title without common words
+    const cleanTitle = title.replace(/\b(the|a|an|voice|of|in|as|actor|character|show|series|movie|film|animated)\b/gi, ' ')
+                           .replace(/\s+/g, ' ')
+                           .trim();
+    
+    if (cleanTitle && cleanTitle.length > 2 && cleanTitle.length < 30) {
+      return cleanTitle;
+    }
+    
+    return 'Unknown Character';
   }
   
   /**
@@ -455,6 +712,7 @@ class RoleFetcher {
       const searchResponse = await axios.get(searchUrl);
       
       if (searchResponse.data.results.length === 0) {
+        logger.warn('❌ TMDb found no person matches');
         return [];
       }
       
@@ -465,6 +723,11 @@ class RoleFetcher {
       const creditsResponse = await axios.get(creditsUrl);
       
       const allCredits = creditsResponse.data.cast || [];
+      
+      if (allCredits.length === 0) {
+        logger.warn('❌ TMDb found person but no credits');
+        return [];
+      }
       
       // Process and sort all credits (movies and TV)
       const roles = allCredits
@@ -491,6 +754,9 @@ class RoleFetcher {
           // Check if this title matches Wikipedia "known for"
           const isKnownFor = this.matchesKnownForTitles(title, knownForTitles);
           
+          // Enhanced voice role detection
+          const isVoiceRole = this.detectVoiceRole(title, celebrityName);
+          
           return {
             name: title,
             character: credit.character || 'Unknown role',
@@ -499,6 +765,8 @@ class RoleFetcher {
             popularity: credit.popularity || 0,
             vote_count: credit.vote_count || 0,
             isKnownFor: isKnownFor,
+            isVoiceRole: isVoiceRole,
+            characterName: isVoiceRole ? credit.character : null,
             tags: [credit.media_type, 'tmdb'],
             searchTerms: [title, credit.character, celebrityName].filter(Boolean)
           };
