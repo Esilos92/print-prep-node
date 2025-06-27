@@ -1,5 +1,5 @@
 const sharp = require('sharp');
-const imageHash = require('image-hash');
+const imghash = require('imghash');
 const fs = require('fs').promises;
 const config = require('../utils/config');
 const logger = require('../utils/logger');
@@ -112,15 +112,12 @@ class ImageValidator {
    * Generate perceptual hash for duplicate detection
    */
   static async generatePerceptualHash(filepath) {
-    return new Promise((resolve, reject) => {
-      imageHash(filepath, 16, true, (error, data) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(data);
-        }
-      });
-    });
+    try {
+      const hash = await imghash.hash(filepath);
+      return hash;
+    } catch (error) {
+      throw new Error(`Failed to generate hash: ${error.message}`);
+    }
   }
   
   /**
