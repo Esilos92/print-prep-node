@@ -58,11 +58,25 @@ class RoleFetcher {
       // Process and sort all credits (movies and TV)
       const roles = allCredits
         .filter(credit => {
-          // Filter for substantial roles with good popularity
-          const hasTitle = credit.title || credit.name;
-          const hasPopularity = credit.popularity && credit.popularity > 3;
-          const hasVotes = credit.vote_count && credit.vote_count > 50;
-          return hasTitle && (hasPopularity || hasVotes);
+          const title = credit.title || credit.name || '';
+          const character = credit.character || '';
+          
+          // Filter OUT talk shows and guest appearances
+          const isTalkShow = title.toLowerCase().includes('tonight show') ||
+                           title.toLowerCase().includes('late show') ||
+                           title.toLowerCase().includes('late late show') ||
+                           title.toLowerCase().includes('colbert') ||
+                           title.toLowerCase().includes('ferguson') ||
+                           title.toLowerCase().includes('kelly clarkson') ||
+                           character.toLowerCase().includes('self') ||
+                           character.toLowerCase().includes('guest');
+          
+          // Keep substantial acting roles with good vote counts
+          const hasTitle = title.length > 0;
+          const hasVotes = credit.vote_count && credit.vote_count > 100;
+          const isActingRole = character && character !== 'Self' && !character.includes('Unknown');
+          
+          return hasTitle && !isTalkShow && (hasVotes || isActingRole);
         })
         .map(credit => {
           // Normalize the data structure for both movies and TV
@@ -82,17 +96,17 @@ class RoleFetcher {
           };
         })
         .sort((a, b) => {
-          // Sort by popularity first, then by vote count
-          if (b.popularity !== a.popularity) {
-            return b.popularity - a.popularity;
+          // Sort by VOTE COUNT first (long-term popularity), then by popularity
+          if (b.vote_count !== a.vote_count) {
+            return b.vote_count - a.vote_count;
           }
-          return b.vote_count - a.vote_count;
+          return b.popularity - a.popularity;
         })
         .slice(0, 5);
       
       logger.info(`Found ${roles.length} roles from TMDb`);
       roles.forEach(role => {
-        logger.info(`- ${role.name} (${role.media_type}) - ${role.character} [Pop: ${role.popularity.toFixed(1)}]`);
+        logger.info(`- ${role.name} (${role.media_type}) - ${role.character} [Votes: ${role.vote_count}, Pop: ${role.popularity.toFixed(1)}]`);
       });
       
       return roles;
