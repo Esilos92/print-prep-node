@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
-import { PROMPTS, PROMPT_CONFIG } from '../config/prompts.js';
+const OpenAI = require('openai');
+const { PROMPTS, PROMPT_CONFIG } = require('../config/prompts.js');
 
 class SearchOptimizer {
   constructor() {
