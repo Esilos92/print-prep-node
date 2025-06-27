@@ -222,19 +222,25 @@ class ImageFetcher {
   }
   
   /**
-   * Filter image sources to remove watermarked and banned content
+   * Filter image sources to remove watermarked, banned, and unwanted content
    */
   filterImageSources(images, role) {
     return images.filter(image => {
       // Skip if from banned domains
       if (this.isBannedDomain(image.sourceUrl)) {
-        logger.debug(`Skipping banned domain: ${image.sourceUrl}`);
+        logger.warn(`Skipping banned domain: ${image.sourceUrl}`);
         return false;
       }
 
       // Skip watermarked content by URL patterns
       if (this.hasWatermarkPatterns(image.sourceUrl)) {
-        logger.debug(`Skipping watermarked content: ${image.sourceUrl}`);
+        logger.warn(`Skipping watermarked content: ${image.sourceUrl}`);
+        return false;
+      }
+
+      // Skip already signed items or auction content
+      if (this.isSignedOrAuctionContent(image)) {
+        logger.warn(`Skipping signed/auction content: ${image.title}`);
         return false;
       }
 
@@ -246,6 +252,25 @@ class ImageFetcher {
       // For live action, prefer official promotional sources
       return this.isGoodLiveActionSource(image);
     });
+  }
+
+  /**
+   * Check for signed items or auction content
+   */
+  isSignedOrAuctionContent(image) {
+    const title = (image.title || '').toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
+    
+    const signedKeywords = [
+      'signed', 'autograph', 'autographed', 'signature',
+      'auction', 'ebay', 'bid', 'lot', 'sale', 'selling',
+      'memorabilia', 'collectible', 'vintage', 'rare',
+      'authentic', 'coa', 'certificate of authenticity'
+    ];
+    
+    return signedKeywords.some(keyword => 
+      title.includes(keyword) || url.includes(keyword)
+    );
   }
   
   /**
@@ -320,51 +345,170 @@ class ImageFetcher {
   }
   
   /**
-   * Remove duplicates (enhanced)
+   * Remove duplicates with enhanced poster detection
    */
   removeDuplicateImages(images) {
     const seen = new Set();
+    const seenPosters = new Set();
+    
     return images.filter(img => {
       const urlKey = (img.url || img.original).split('?')[0].toLowerCase();
       
+      // Standard URL duplicate check
       if (seen.has(urlKey)) {
         return false;
       }
       seen.add(urlKey);
+      
+      // Enhanced poster duplicate detection
+      const title = (img.title || '').toLowerCase();
+      if (title.includes('poster')) {
+        // Create a poster signature from title
+        const posterSignature = title
+          .replace(/[^\w\s]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .split(' ')
+          .filter(word => word.length > 3)
+          .sort()
+          .join(' ');
+          
+        if (seenPosters.has(posterSignature)) {
+          logger.info(`🎬 Skipping duplicate poster: ${title}`);
+          return false;
+        }
+        seenPosters.add(posterSignature);
+      }
+      
       return true;
     });
   }
   
   /**
-   * Filter and verify images with enhanced voice role support
+   * Filter and verify images with enhanced voice role support and content diversification
    */
   filterAndVerifyImages(images, celebrityName, role) {
-    return images
+    // First pass: basic validation and scoring
+    const scoredImages = images
       .map(image => ({
         ...image,
         reliabilityScore: this.scoreImageSource(image, celebrityName, role),
-        personVerification: this.validatePersonInImage(image, celebrityName, role)
+        personVerification: this.validatePersonInImage(image, celebrityName, role),
+        contentType: this.detectContentType(image)
       }))
       .filter(image => {
         // Must pass person verification
         if (!image.personVerification.isValid) {
-          logger.debug(`❌ Rejected: ${image.title} - Failed verification (score: ${image.personVerification.confidence})`);
+          logger.warn(`❌ Rejected: ${image.title} - Failed verification (score: ${image.personVerification.confidence})`);
           return false;
         }
         
         // Must have reasonable reliability score
         if (image.reliabilityScore < -2) {
-          logger.debug(`❌ Rejected: ${image.title} - Very low reliability source`);
+          logger.warn(`❌ Rejected: ${image.title} - Very low reliability source`);
           return false;
         }
         
         return true;
-      })
-      .sort((a, b) => {
-        const scoreA = a.personVerification.confidence + a.reliabilityScore;
-        const scoreB = b.personVerification.confidence + b.reliabilityScore;
-        return scoreB - scoreA;
       });
+
+    // Second pass: diversify content types
+    return this.diversifyContentTypes(scoredImages);
+  }
+
+  /**
+   * Detect the type of content (poster, still, portrait, etc.)
+   */
+  detectContentType(image) {
+    const title = (image.title || '').toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
+    
+    // Movie posters
+    if (title.includes('poster') || title.includes('movie poster') || 
+        url.includes('poster') || title.includes('theatrical poster')) {
+      return 'poster';
+    }
+    
+    // Behind the scenes / production stills
+    if (title.includes('behind the scenes') || title.includes('production still') ||
+        title.includes('on set') || title.includes('filming')) {
+      return 'behind_scenes';
+    }
+    
+    // Press/promotional photos
+    if (title.includes('press') || title.includes('promotional') || 
+        title.includes('publicity') || title.includes('promo')) {
+      return 'press';
+    }
+    
+    // Movie stills/scenes
+    if (title.includes('still') || title.includes('scene') || 
+        title.includes('movie still') || title.includes('film still')) {
+      return 'movie_still';
+    }
+    
+    // Cast/group photos
+    if (title.includes('cast') || title.includes('group') || 
+        title.includes('ensemble') || title.includes('crew')) {
+      return 'cast_group';
+    }
+    
+    // Portrait/headshot
+    if (title.includes('portrait') || title.includes('headshot') || 
+        title.includes('photo shoot')) {
+      return 'portrait';
+    }
+    
+    // Default
+    return 'general';
+  }
+
+  /**
+   * Diversify content types to avoid too many of the same type
+   */
+  diversifyContentTypes(images) {
+    const contentTypeLimits = {
+      poster: 3,           // Max 3 posters
+      behind_scenes: 5,    // Max 5 behind scenes
+      press: 8,            // Max 8 press photos
+      movie_still: 10,     // Max 10 movie stills
+      cast_group: 6,       // Max 6 group photos
+      portrait: 4,         // Max 4 portraits
+      general: 10          // Max 10 general images
+    };
+
+    const contentTypeCounts = {};
+    const diversifiedImages = [];
+
+    // Sort by combined score first
+    const sortedImages = images.sort((a, b) => {
+      const scoreA = a.personVerification.confidence + a.reliabilityScore;
+      const scoreB = b.personVerification.confidence + b.reliabilityScore;
+      return scoreB - scoreA;
+    });
+
+    for (const image of sortedImages) {
+      const contentType = image.contentType;
+      const currentCount = contentTypeCounts[contentType] || 0;
+      const limit = contentTypeLimits[contentType] || 5;
+
+      if (currentCount < limit) {
+        diversifiedImages.push(image);
+        contentTypeCounts[contentType] = currentCount + 1;
+        
+        logger.info(`✅ Added ${contentType}: ${image.title} (${currentCount + 1}/${limit})`);
+      } else {
+        logger.info(`⏭️  Skipped ${contentType}: ${image.title} (limit reached: ${limit})`);
+      }
+
+      // Stop when we have enough images
+      if (diversifiedImages.length >= 50) break;
+    }
+
+    logger.info(`Content distribution: ${Object.entries(contentTypeCounts)
+      .map(([type, count]) => `${type}:${count}`)
+      .join(', ')}`);
+
+    return diversifiedImages;
   }
   
   /**
