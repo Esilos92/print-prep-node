@@ -47,26 +47,42 @@ Format your response as a JSON array with this exact structure:
 Provide exactly 5 roles, ordered from most autograph-worthy/fan-recognizable to least.`,
 
   /**
-   * Search term optimization prompt - adapts to medium type
+   * Search term optimization prompt - both group AND solo photo optimization
    */
-  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at creating optimal Google image search terms. 
+  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at finding HIGH-VALUE AUTOGRAPH PHOTOS for convention sales.
 
-For the ${medium.includes('voice') ? 'character' : 'role'} "${character}" from "${title}" (medium: ${medium}), create 3 search terms that will return the best images.
+For the ${medium.includes('voice') ? 'character' : 'role'} "${character}" from "${title}" (medium: ${medium}), create 5 search terms: 3 for GROUP PHOTOS (highest value) and 2 for SOLO PHOTOS (premium quality).
 
-Guidelines for ${medium.includes('voice') ? 'voice acting roles' : 'live-action roles'}:
+GROUP PHOTOS (Terms 1-3) - MAXIMUM AUTOGRAPH VALUE:
 ${medium.includes('voice') ? 
-  `- Focus on getting clear character images or official artwork
-  - Include character name and show/movie title
-  - Add terms like "character", "anime", "cartoon" as appropriate
-  - Avoid terms that might return voice actor photos instead of character` :
-  `- Focus on getting clear photos of the actor in this specific role
-  - Include actor name, character name, and movie/show title
-  - Add descriptive terms about the role or costume
-  - Include movie/show name to get role-specific images`
+  `- Show name + "main characters" + "group"/"together"
+  - Show name + "cast" + "all characters"
+  - Character name + "with other characters" + show name
+  GOAL: Multiple character artwork for multiple signatures` :
+  `- Show/movie name + "main cast" + "group photo"
+  - Actor name + "with cast" + show/movie name  
+  - Show/movie name + "ensemble" + "promotional"
+  GOAL: Multiple actors in one photo for multiple signatures`
 }
 
-Return as JSON array:
-["search term 1", "search term 2", "search term 3"]`,
+SOLO PHOTOS (Terms 4-5) - PREMIUM SINGLE SIGNATURES:
+${medium.includes('voice') ? 
+  `- Character name + show name + "official artwork"/"promotional art"
+  - Character name + "high quality" + show name
+  GOAL: Professional character artwork, not fan art or merchandise` :
+  `- Actor name + character name + "promotional photo"
+  - Actor name + show/movie name + "production still"
+  GOAL: Professional promotional photos, not convention or fan photos`
+}
+
+AVOID ALL TERMS THAT FIND:
+- Convention photos, autograph signings, meet & greets
+- Merchandise (Funko, action figures, toys, mugs, shirts)
+- Fan photos, selfies, low-quality images
+- eBay listings, signed memorabilia
+
+Return as JSON array with 5 terms (3 group + 2 solo):
+["group term 1", "group term 2", "group term 3", "solo term 1", "solo term 2"]`,
 
   /**
    * Performer type detection prompt - broader scope
