@@ -103,7 +103,7 @@ class RoleFetcher {
     const isFiltered = (isTalkShowTitle || isGuestCharacter || hasGuestIndicators) && !isLikelyActingRole;
     
     if (isFiltered) {
-      logger.debug(`🚫 Filtered talk show/guest: "${title}" (${character})`);
+      logger.info(`🚫 Filtered talk show/guest: "${title}" (${character})`);
     }
     
     return isFiltered;
