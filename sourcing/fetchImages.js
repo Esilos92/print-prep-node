@@ -33,7 +33,8 @@ class ImageFetcher {
     this.preferredDomains = [
       'imdb.com', 'themoviedb.org', 'rottentomatoes.com',
       'variety.com', 'hollywoodreporter.com', 'entertainment.com',
-      'disney.com', 'marvel.com', 'starwars.com', 'paramount.com'
+      'disney.com', 'marvel.com', 'starwars.com', 'paramount.com',
+      'fandom.com', 'wikia.org' // Character wikis with official images
     ];
   }
   
