@@ -158,7 +158,7 @@ class AIRoleFetcher {
   }
 
   /**
-   * Claude API query (fallback)
+   * Claude API query (fallback) - Fixed for correct API format
    */
   async queryClaudeAPI(celebrityName, customPrompt = null) {
     const claudeApiKey = process.env.ANTHROPIC_API_KEY;
@@ -167,6 +167,18 @@ class AIRoleFetcher {
     try {
       const prompt = customPrompt || PROMPTS.FETCH_ROLES(celebrityName);
       
+      const requestBody = {
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: PROMPT_CONFIG.MAX_TOKENS.ROLE_FETCHING,
+        temperature: PROMPT_CONFIG.TEMPERATURE.ROLE_FETCHING,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      };
+
+      console.log(`🔍 Making Claude API request for ${celebrityName}...`);
+      
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -174,22 +186,23 @@ class AIRoleFetcher {
           'x-api-key': claudeApiKey,
           'anthropic-version': '2023-06-01'
         },
-        body: JSON.stringify({
-          model: 'claude-3-sonnet-20240229',
-          max_tokens: PROMPT_CONFIG.MAX_TOKENS.ROLE_FETCHING,
-          temperature: PROMPT_CONFIG.TEMPERATURE.ROLE_FETCHING,
-          messages: [{
-            role: 'user',
-            content: prompt
-          }]
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      if (!response.ok) throw new Error(`Claude API error: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log(`Claude API error details:`, errorText);
+        throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+      }
       
       const data = await response.json();
-      const content = data.content[0].text;
+      console.log(`✅ Claude API response received`);
       
+      if (!data.content || !data.content[0] || !data.content[0].text) {
+        throw new Error('Invalid response format from Claude API');
+      }
+      
+      const content = data.content[0].text;
       return this.parseAndValidateResponse(content, celebrityName);
       
     } catch (error) {
