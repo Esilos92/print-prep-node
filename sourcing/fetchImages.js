@@ -180,7 +180,7 @@ class ImageFetcher {
         num: Math.min(maxResults, 100),
         ijn: 0,
         safe: 'active',
-        imgsz: 'l',
+        imgsz: 'l', // Back to large - but we'll be more lenient in validation
         imgtype: 'photo'
       };
 
