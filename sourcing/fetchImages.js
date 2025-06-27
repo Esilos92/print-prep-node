@@ -589,11 +589,13 @@ class ImageFetcher {
     const lastName = nameWords[nameWords.length - 1];
     const firstName = nameWords[0];
     
-    // Define group indicators at function scope to fix the error
+    // Define variables at function scope to fix scope errors
     const groupIndicators = [
       'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
       'with', 'co-star', 'co-stars', 'behind the scenes', 'on set'
     ];
+    
+    const roleWords = role.name.toLowerCase().split(' ').filter(word => word.length > 3);
     
     let confidence = 0;
     let penalties = 0;
@@ -737,7 +739,6 @@ class ImageFetcher {
       confidence += groupMatches.length * 4; // Good bonus for group context
       
       // Role context
-      const roleWords = role.name.toLowerCase().split(' ').filter(word => word.length > 3);
       const roleMatches = roleWords.filter(word => title.includes(word));
       
       if (roleMatches.length >= 2) {
