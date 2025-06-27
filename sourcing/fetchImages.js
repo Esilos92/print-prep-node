@@ -18,7 +18,7 @@ class ImageFetcher {
       // Use your working search approach but with enhanced queries
       const allImages = [];
       
-      // Search 1: Specific role query (enhanced)
+      // Search 1: Specific role query (enhanced for group shots)
       const roleQuery = this.buildSpecificQuery(celebrityName, role);
       logger.info(`Search query: "${roleQuery}"`);
       
@@ -35,7 +35,7 @@ class ImageFetcher {
       // Remove duplicates
       const uniqueImages = this.removeDuplicateImages(allImages);
       
-      // Apply person verification (NEW)
+      // Apply person verification (GROUP SHOT FRIENDLY)
       const verifiedImages = this.filterAndVerifyImages(uniqueImages, celebrityName, role);
       logger.info(`${verifiedImages.length} images passed verification`);
       
@@ -57,25 +57,25 @@ class ImageFetcher {
   }
   
   /**
-   * Build specific query (same as enhanced version)
+   * Build specific query (ENHANCED for group shots)
    */
   static buildSpecificQuery(celebrityName, role) {
     const name = celebrityName;
     const roleTitle = role.name;
     const character = role.character;
-    const year = role.year;
     
+    // Try different query strategies to find group shots
     if (character && character !== 'Unknown role') {
-      return `${name} ${character} ${roleTitle}`;
-    } else if (year) {
-      return `${name} ${roleTitle} ${year}`;
+      // Include cast/group terms for better group shots
+      return `${name} ${character} ${roleTitle} cast`;
     } else {
-      return `${name} ${roleTitle}`;
+      // Add terms that help find group/promotional photos
+      return `${name} ${roleTitle} behind scenes cast`;
     }
   }
   
   /**
-   * Search SerpAPI using YOUR WORKING PARAMETERS
+   * Search SerpAPI using YOUR WORKING PARAMETERS (simplified)
    */
   static async searchSerpAPI(query, maxResults = 20) {
     try {
@@ -85,10 +85,8 @@ class ImageFetcher {
         q: query,
         num: Math.min(maxResults, 100),
         ijn: 0,
-        // Use your working parameters
-        tbs: 'isz:l,sur:fmc', // Large images, free for commercial use
-        safe: 'active',
-        nfpr: 1
+        // Simplified - removed restrictive filters
+        safe: 'active'
       };
 
       const response = await axios.get(config.api.serpEndpoint, { 
@@ -156,7 +154,7 @@ class ImageFetcher {
   }
   
   /**
-   * Filter and verify images (NEW - person verification)
+   * Filter and verify images (GROUP SHOT FRIENDLY)
    */
   static filterAndVerifyImages(images, celebrityName, role) {
     return images
@@ -172,9 +170,9 @@ class ImageFetcher {
           return false;
         }
         
-        // Must have reasonable reliability score
-        if (image.reliabilityScore < 0) {
-          logger.info(`❌ Rejected: ${image.title} - Low reliability source`);
+        // Must have reasonable reliability score (very lenient)
+        if (image.reliabilityScore < -2) {
+          logger.info(`❌ Rejected: ${image.title} - Very low reliability source`);
           return false;
         }
         
@@ -188,7 +186,7 @@ class ImageFetcher {
   }
   
   /**
-   * Score image source reliability (NEW)
+   * Score image source reliability
    */
   static scoreImageSource(imageData, celebrityName) {
     const url = (imageData.source || '').toLowerCase();
@@ -206,7 +204,7 @@ class ImageFetcher {
       'fanpop.com', 'flickr.com', 'tvguide.com', 'people.com'
     ];
     
-    // Low reliability sources
+    // Low reliability sources (less penalty now)
     const lowReliabilitySources = [
       'tumblr.com', 'reddit.com', 'facebook.com', 'twitter.com'
     ];
@@ -220,14 +218,14 @@ class ImageFetcher {
     });
     
     lowReliabilitySources.forEach(source => {
-      if (url.includes(source)) score -= 1;
+      if (url.includes(source)) score -= 0.5; // Reduced penalty
     });
     
     return score;
   }
   
   /**
-   * Validate person in image (NEW)
+   * GROUP SHOT FRIENDLY person verification
    */
   static validatePersonInImage(imageData, celebrityName, role) {
     const title = (imageData.title || '').toLowerCase();
@@ -240,45 +238,98 @@ class ImageFetcher {
     
     let confidence = 0;
     
+    // POSITIVE INDICATORS
+    
     // Strong name matches
-    if (title.includes(name)) confidence += 5;
+    if (title.includes(name)) confidence += 10;
     
     // Partial name matches
-    if (title.includes(lastName) && title.includes(firstName)) confidence += 4;
+    if (title.includes(lastName)) confidence += 4;
+    if (title.includes(firstName) && firstName.length > 3) confidence += 3;
     
     // Character context
     if (role.character && role.character !== 'Unknown role') {
       const character = role.character.toLowerCase();
-      if (title.includes(character)) confidence += 3;
+      if (title.includes(character)) confidence += 4;
     }
     
-    // Professional context
-    const professionalTerms = ['actor', 'star', 'celebrity'];
-    professionalTerms.forEach(term => {
-      if (title.includes(term)) confidence += 1;
+    // Role/franchise context
+    const roleWords = role.name.toLowerCase().split(' ').slice(0, 2);
+    roleWords.forEach(word => {
+      if (word.length > 3 && title.includes(word)) confidence += 2;
     });
     
-    // Negative indicators
-    let penalties = 0;
-    const wrongTypes = ['cartoon', 'animation', 'drawing'];
-    wrongTypes.forEach(type => {
-      if (title.includes(type)) penalties += 2;
+    // Professional indicators
+    const professionalTerms = ['actor', 'star', 'celebrity', 'cast', 'portrait', 'headshot'];
+    professionalTerms.forEach(term => {
+      if (title.includes(term)) confidence += 2;
     });
+    
+    // GROUP SHOT BONUSES (NEW!)
+    const groupIndicators = [
+      'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
+      'with', 'and', 'co-star', 'co-stars', 'behind the scenes'
+    ];
+    groupIndicators.forEach(indicator => {
+      if (title.includes(indicator)) confidence += 3;  // BONUS for group shots!
+    });
+    
+    // STAR TREK SPECIFIC BONUSES (since that's his main franchise)
+    const trekTerms = ['trek', 'enterprise', 'kirk', 'spock', 'bridge', 'starfleet'];
+    trekTerms.forEach(term => {
+      if (title.includes(term)) confidence += 3;
+    });
+    
+    // Good source bonus
+    const goodSources = ['imdb', 'wikipedia', 'getty', 'fanpop', 'startrek'];
+    goodSources.forEach(goodSource => {
+      if (source.includes(goodSource)) confidence += 3;
+    });
+    
+    // NEGATIVE INDICATORS (Much more selective now)
+    let penalties = 0;
+    
+    // Only penalize if it's DEFINITELY not a real photo
+    const definitelyWrong = ['cartoon', 'animation', 'drawing', 'painting', 'sketch', 'artwork'];
+    definitelyWrong.forEach(wrong => {
+      if (title.includes(wrong)) penalties += 5;
+    });
+    
+    // REMOVED: Penalties for other actor names - we WANT group shots!
+    
+    // Only penalize if it's clearly about someone else INSTEAD of William
+    const exclusivelyOtherPerson = [
+      'elvis presley', 'james dean', 'marilyn monroe', 'audrey hepburn'
+    ];
+    exclusivelyOtherPerson.forEach(other => {
+      if (title.includes(other) && !title.includes(name) && !title.includes(lastName)) {
+        penalties += 4;
+      }
+    });
+    
+    // Penalize if it's clearly the wrong profession
+    if (title.includes('musician') && !title.includes('actor')) penalties += 2;
+    if (title.includes('politician') && !title.includes('actor')) penalties += 2;
     
     const finalScore = confidence - penalties;
     
     return {
-      isValid: finalScore >= 2, // Lower threshold since we're more conservative
+      isValid: finalScore >= 1,  // Very low threshold - just needs to be plausibly related
       confidence: finalScore,
       reasons: {
-        nameMatch: title.includes(name),
-        characterMatch: role.character && title.includes(role.character.toLowerCase())
+        nameMatch: title.includes(name) || title.includes(lastName),
+        characterMatch: role.character && title.includes(role.character.toLowerCase()),
+        groupShot: groupIndicators.some(indicator => title.includes(indicator)),
+        trekContext: trekTerms.some(term => title.includes(term)),
+        professionalContext: professionalTerms.some(term => title.includes(term)),
+        penalties: penalties,
+        details: `Score: ${finalScore} (confidence: ${confidence}, penalties: ${penalties})`
       }
     };
   }
   
   /**
-   * Download images (adapted from your working version)
+   * Download verified images
    */
   static async downloadImages(images, workDir, celebrityName, role) {
     const downloadDir = path.join(workDir, 'downloaded');
