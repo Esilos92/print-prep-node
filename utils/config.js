@@ -2,7 +2,8 @@ require('dotenv').config();
 
 const config = {
   api: {
-    bingImageKey: process.env.BING_IMAGE_API_KEY,
+    serpApiKey: process.env.SERP_API_KEY,
+    serpEndpoint: process.env.SERP_ENDPOINT || 'https://serpapi.com/search.json',
     tmdbKey: process.env.TMDB_API_KEY,
   },
   
