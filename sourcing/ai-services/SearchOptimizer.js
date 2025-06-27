@@ -262,4 +262,4 @@ class SearchOptimizer {
   }
 }
 
-export default SearchOptimizer;
+module.exports = SearchOptimizer;
