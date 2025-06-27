@@ -27,9 +27,9 @@ class ImageHelpers {
    * Determine best print format for image
    */
   static getBestFormat(width, height) {
-    if (this.meetsResolution(width, height, '11x17')) {
+    if (ImageHelpers.meetsResolution(width, height, '11x17')) {
       return ['11x17', '8x10'];
-    } else if (this.meetsResolution(width, height, '8x10')) {
+    } else if (ImageHelpers.meetsResolution(width, height, '8x10')) {
       return ['8x10'];
     }
     return [];
@@ -73,7 +73,7 @@ class ImageHelpers {
     const tags = [];
     
     // Orientation
-    tags.push(this.getOrientation(width, height));
+    tags.push(ImageHelpers.getOrientation(width, height));
     
     // Group detection (basic)
     if (filename.toLowerCase().includes('group') || 
@@ -93,4 +93,13 @@ class ImageHelpers {
   }
 }
 
-module.exports = ImageHelpers;
+// Export individual functions for backward compatibility
+module.exports = {
+  getOrientation: ImageHelpers.getOrientation.bind(ImageHelpers),
+  meetsResolution: ImageHelpers.meetsResolution.bind(ImageHelpers),
+  getBestFormat: ImageHelpers.getBestFormat.bind(ImageHelpers),
+  generateSimpleHash: ImageHelpers.generateSimpleHash.bind(ImageHelpers),
+  calculateSimilarity: ImageHelpers.calculateSimilarity.bind(ImageHelpers),
+  sanitizeFilename: ImageHelpers.sanitizeFilename.bind(ImageHelpers),
+  extractTags: ImageHelpers.extractTags.bind(ImageHelpers)
+};
