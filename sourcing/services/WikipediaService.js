@@ -165,20 +165,238 @@ class WikipediaService {
   }
 
   /**
-   * EXPERIMENTAL: Fetch from BehindTheVoiceActors.com for voice actor roles
+   * ENHANCED: Fetch from BehindTheVoiceActors.com with better scraping
    */
   static async fetchFromBehindTheVoiceActors(celebrityName) {
     try {
       logger.info('🎤 Attempting BehindTheVoiceActors.com lookup...');
       
-      // Create URL-friendly name
-      const urlName = celebrityName.toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '');
+      // Multiple URL variations to try
+      const nameVariations = [
+        celebrityName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        celebrityName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''),
+        celebrityName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+      ];
       
-      const btvaUrl = `https://www.behindthevoiceactors.com/voice-actors/${urlName}/`;
+      for (const urlName of nameVariations) {
+        const btvaUrl = `https://www.behindthevoiceactors.com/voice-actors/${urlName}/`;
+        
+        try {
+          logger.info(`🔍 Trying BTVA URL: ${btvaUrl}`);
+          
+          const response = await axios.get(btvaUrl, { 
+            timeout: 15000,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'DNT': '1',
+              'Connection': 'keep-alive',
+              'Upgrade-Insecure-Requests': '1'
+            }
+          });
+          
+          const $ = cheerio.load(response.data);
+          const roles = [];
+          
+          // Enhanced selectors - try multiple patterns
+          const voiceActingSelectors = [
+            '.voice-acting table tr',
+            '.filmography table tr', 
+            '.credits table tr',
+            'table.voice tr',
+            '.roles table tr'
+          ];
+          
+          let foundRoles = false;
+          
+          for (const selector of voiceActingSelectors) {
+            $(selector).each((i, row) => {
+              if (i === 0) return; // Skip header
+              
+              const cells = $(row).find('td');
+              if (cells.length >= 2) {
+                const character = $(cells[0]).text().trim();
+                const show = $(cells[1]).text().trim();
+                
+                if (character && show && 
+                    character !== 'Character' && 
+                    show !== 'Show/Movie' &&
+                    character.length > 1 && show.length > 1) {
+                  
+                  const roleTitle = `${show}: ${character}`;
+                  if (roleTitle.length > 5 && roleTitle.length < 100) {
+                    roles.push(roleTitle);
+                    foundRoles = true;
+                  }
+                }
+              }
+            });
+            
+            if (foundRoles) break; // Stop trying selectors if we found roles
+          }
+          
+          // Try alternative selectors for different page layouts
+          if (!foundRoles) {
+            // Look for character names in different structures
+            $('.character-name, .role-name, .voice-role').each((i, elem) => {
+              const roleText = $(elem).text().trim();
+              if (roleText && roleText.length > 3 && roleText.length < 100) {
+                roles.push(roleText);
+              }
+            });
+            
+            // Look for show titles with character info
+            $('.show-title, .series-title').each((i, elem) => {
+              const showText = $(elem).text().trim();
+              if (showText && showText.length > 3 && showText.length < 100) {
+                roles.push(showText);
+              }
+            });
+          }
+          
+          const uniqueRoles = [...new Set(roles)].slice(0, 10);
+          
+          if (uniqueRoles.length > 0) {
+            logger.info(`🎤 BTVA SUCCESS: Found ${uniqueRoles.length} roles: ${uniqueRoles.slice(0, 3).join(', ')}`);
+            return uniqueRoles;
+          } else {
+            logger.info(`🎤 BTVA: No roles found with URL ${btvaUrl}, trying next variation...`);
+          }
+          
+        } catch (error) {
+          logger.info(`🎤 BTVA URL failed: ${btvaUrl} - ${error.message}`);
+          continue; // Try next URL variation
+        }
+        
+        // Small delay between attempts
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
-      const response = await axios.get(btvaUrl, { 
+      logger.info('🎤 BTVA: All URL variations failed');
+      return [];
+      
+    } catch (error) {
+      logger.info(`🎤 BehindTheVoiceActors lookup failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * NEW: Fetch from MyAnimeList for anime voice actors
+   */
+  static async fetchFromMyAnimeList(celebrityName) {
+    try {
+      logger.info('🎌 Attempting MyAnimeList lookup...');
+      
+      // MAL uses different URL structure - search first
+      const searchName = celebrityName.replace(/\s+/g, '%20');
+      const searchUrl = `https://myanimelist.net/people.php?q=${searchName}`;
+      
+      const searchResponse = await axios.get(searchUrl, {
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': 'https://myanimelist.net/'
+        }
+      });
+      
+      const $ = cheerio.load(searchResponse.data);
+      const roles = [];
+      
+      // Look for person results and extract anime roles
+      $('.people-result, .person-result').first().each((i, person) => {
+        const personLink = $(person).find('a').attr('href');
+        if (personLink) {
+          // This would require a second request to get the person's page
+          // For now, extract any anime titles from search results
+          $(person).find('.anime-title, .title').each((j, title) => {
+            const animeTitle = $(title).text().trim();
+            if (animeTitle && animeTitle.length > 2 && animeTitle.length < 50) {
+              roles.push(animeTitle);
+            }
+          });
+        }
+      });
+      
+      // Alternative: look for anime titles in the search results directly
+      $('.anime-title, .title, .information').each((i, elem) => {
+        const text = $(elem).text().trim();
+        // Filter for anime-like titles
+        if (text && text.length > 3 && text.length < 50 && 
+            !text.toLowerCase().includes('more info')) {
+          roles.push(text);
+        }
+      });
+      
+      const uniqueRoles = [...new Set(roles)].slice(0, 8);
+      
+      if (uniqueRoles.length > 0) {
+        logger.info(`🎌 MAL found ${uniqueRoles.length} anime roles: ${uniqueRoles.slice(0, 3).join(', ')}`);
+      } else {
+        logger.info('🎌 MAL: No anime roles found');
+      }
+      
+      return uniqueRoles;
+      
+    } catch (error) {
+      logger.info(`🎌 MyAnimeList lookup failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * NEW: Enhanced voice actor role discovery combining multiple anime sources
+   */
+  static async fetchAnimeVoiceRoles(celebrityName) {
+    try {
+      logger.info('🎭 Fetching anime voice roles from multiple sources...');
+      
+      const allRoles = [];
+      
+      // Source 1: Enhanced BTVA
+      const btvaRoles = await this.fetchFromBehindTheVoiceActors(celebrityName);
+      allRoles.push(...btvaRoles);
+      
+      // Source 2: MyAnimeList
+      const malRoles = await this.fetchFromMyAnimeList(celebrityName);
+      allRoles.push(...malRoles);
+      
+      // Source 3: Anime News Network (simple search)
+      try {
+        const annRoles = await this.fetchFromAnimeNewsNetwork(celebrityName);
+        allRoles.push(...annRoles);
+      } catch (error) {
+        logger.info('🎭 ANN lookup failed, continuing...');
+      }
+      
+      // Deduplicate and clean
+      const uniqueRoles = [...new Set(allRoles)]
+        .filter(role => role && role.length > 3 && role.length < 100)
+        .slice(0, 12);
+      
+      logger.info(`🎭 Combined anime sources: ${uniqueRoles.length} total roles`);
+      return uniqueRoles;
+      
+    } catch (error) {
+      logger.error('Enhanced anime voice role fetch failed:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * NEW: Fetch from Anime News Network
+   */
+  static async fetchFromAnimeNewsNetwork(celebrityName) {
+    try {
+      logger.info('📰 Attempting Anime News Network lookup...');
+      
+      const searchName = celebrityName.replace(/\s+/g, '+');
+      const annUrl = `https://www.animenewsnetwork.com/encyclopedia/search.php?searchbox=${searchName}`;
+      
+      const response = await axios.get(annUrl, {
         timeout: 10000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -188,43 +406,25 @@ class WikipediaService {
       const $ = cheerio.load(response.data);
       const roles = [];
       
-      // Look for voice acting credits
-      $('.voice-acting table tr').each((i, row) => {
-        const cells = $(row).find('td');
-        if (cells.length >= 2) {
-          const character = $(cells[0]).text().trim();
-          const show = $(cells[1]).text().trim();
-          
-          if (character && show && character !== 'Character' && show !== 'Show/Movie') {
-            const roleTitle = `${show}: ${character}`;
-            if (roleTitle.length > 5 && roleTitle.length < 100) {
-              roles.push(roleTitle);
-            }
-          }
+      // Look for anime titles in search results
+      $('.anime-title, .title, .result-title').each((i, elem) => {
+        const title = $(elem).text().trim();
+        if (title && title.length > 3 && title.length < 60) {
+          roles.push(title);
         }
       });
       
-      // Also check for popular roles section
-      $('.popular-roles .role').each((i, elem) => {
-        const roleText = $(elem).text().trim();
-        if (roleText && roleText.length > 3 && roleText.length < 100) {
-          roles.push(roleText);
-        }
-      });
-      
-      const uniqueRoles = [...new Set(roles)].slice(0, 8); // Top 8 voice roles
+      const uniqueRoles = [...new Set(roles)].slice(0, 6);
       
       if (uniqueRoles.length > 0) {
-        logger.info(`🎤 BehindTheVoiceActors found ${uniqueRoles.length} roles: ${uniqueRoles.slice(0, 3).join(', ')}`);
-      } else {
-        logger.info('🎤 BehindTheVoiceActors: No roles found');
+        logger.info(`📰 ANN found ${uniqueRoles.length} anime titles`);
       }
       
       return uniqueRoles;
       
     } catch (error) {
-      logger.info(`🎤 BehindTheVoiceActors lookup failed: ${error.message}`);
-      return []; // Fail silently, this is experimental
+      logger.info(`📰 Anime News Network lookup failed: ${error.message}`);
+      return [];
     }
   }
 
