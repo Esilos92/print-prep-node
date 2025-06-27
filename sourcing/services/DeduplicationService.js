@@ -4,55 +4,194 @@ const logger = require('../../utils/logger');
 class DeduplicationService {
 
   /**
-   * IP DEDUPLICATION: Prevent multiple roles from same franchise/IP
+   * DYNAMIC IP DEDUPLICATION: Detect franchise relationships without hardcoded mappings
    */
   static deduplicateByIP(roles, celebrityName) {
-    const ipGroups = {};
-    const standalone = [];
+    if (roles.length <= 1) return roles;
     
-    // Group roles by IP/franchise
-    for (const role of roles) {
-      const ip = this.detectIP(role);
-      
-      if (ip) {
-        if (!ipGroups[ip]) {
-          ipGroups[ip] = [];
-        }
-        ipGroups[ip].push(role);
-      } else {
-        standalone.push(role);
-      }
-    }
+    logger.info(`🔍 Analyzing ${roles.length} roles for franchise relationships...`);
+    
+    // Step 1: Find franchise groups dynamically
+    const franchiseGroups = this.detectFranchiseGroups(roles);
     
     const deduplicatedRoles = [];
+    const processedRoles = new Set();
     
-    // For each IP group, select the most specific/character-focused role
-    for (const [ip, ipRoles] of Object.entries(ipGroups)) {
-      if (ipRoles.length === 1) {
-        deduplicatedRoles.push(ipRoles[0]);
-        logger.info(`📺 ${ip}: Single role → ${ipRoles[0]}`);
+    // Step 2: Process each franchise group
+    franchiseGroups.forEach(group => {
+      if (group.length === 1) {
+        // Single role, keep it
+        deduplicatedRoles.push(group[0]);
+        processedRoles.add(group[0]);
+        logger.info(`📺 Standalone: ${group[0]}`);
       } else {
-        // Prioritize character names over show names
-        const prioritized = ipRoles.sort((a, b) => {
-          const aIsCharacter = this.isCharacterName(a, ip);
-          const bIsCharacter = this.isCharacterName(b, ip);
-          
-          if (aIsCharacter && !bIsCharacter) return -1;
-          if (!aIsCharacter && bIsCharacter) return 1;
-          
-          // If both are characters or both are shows, prefer shorter (more specific)
-          return a.length - b.length;
-        });
+        // Multiple roles in same franchise - pick the best one
+        const bestRole = this.selectBestRoleFromGroup(group);
+        deduplicatedRoles.push(bestRole);
+        group.forEach(role => processedRoles.add(role));
         
-        deduplicatedRoles.push(prioritized[0]);
-        logger.info(`📺 ${ip}: ${ipRoles.length} roles → KEPT: ${prioritized[0]} | REMOVED: ${prioritized.slice(1).join(', ')}`);
+        const removed = group.filter(role => role !== bestRole);
+        logger.info(`📺 Franchise group: KEPT "${bestRole}" | REMOVED: ${removed.join(', ')}`);
+      }
+    });
+    
+    // Step 3: Add any roles that weren't grouped
+    roles.forEach(role => {
+      if (!processedRoles.has(role)) {
+        deduplicatedRoles.push(role);
+        logger.info(`📺 Ungrouped: ${role}`);
+      }
+    });
+    
+    return deduplicatedRoles;
+  }
+
+  /**
+   * DYNAMIC: Detect which roles belong to the same franchise
+   */
+  static detectFranchiseGroups(roles) {
+    const groups = [];
+    const processed = new Set();
+    
+    roles.forEach(roleA => {
+      if (processed.has(roleA)) return;
+      
+      const group = [roleA];
+      processed.add(roleA);
+      
+      // Find other roles that belong to the same franchise
+      roles.forEach(roleB => {
+        if (roleA === roleB || processed.has(roleB)) return;
+        
+        if (this.areRolesRelated(roleA, roleB)) {
+          group.push(roleB);
+          processed.add(roleB);
+        }
+      });
+      
+      groups.push(group);
+    });
+    
+    return groups;
+  }
+
+  /**
+   * DYNAMIC: Check if two roles belong to the same franchise
+   */
+  static areRolesRelated(roleA, roleB) {
+    const roleALower = roleA.toLowerCase();
+    const roleBLower = roleB.toLowerCase();
+    
+    // Strategy 1: Shared significant keywords (3+ characters)
+    const wordsA = roleALower.split(/\s+/).filter(w => w.length >= 3);
+    const wordsB = roleBLower.split(/\s+/).filter(w => w.length >= 3);
+    
+    const sharedWords = wordsA.filter(word => wordsB.includes(word));
+    
+    // If they share 2+ significant words, likely same franchise
+    if (sharedWords.length >= 2) {
+      return true;
+    }
+    
+    // Strategy 2: One contains the other (substring relationship)
+    if (roleALower.includes(roleBLower) || roleBLower.includes(roleALower)) {
+      return true;
+    }
+    
+    // Strategy 3: Character/Show pattern detection
+    // If one looks like a character and other like a show with shared elements
+    const aLooksLikeCharacter = this.looksLikeCharacterName(roleA);
+    const bLooksLikeCharacter = this.looksLikeCharacterName(roleB);
+    
+    if (aLooksLikeCharacter !== bLooksLikeCharacter) {
+      // One character, one show - check for franchise keywords
+      const franchiseKeywords = this.extractFranchiseKeywords(roleA, roleB);
+      if (franchiseKeywords.length > 0) {
+        return true;
       }
     }
     
-    // Add standalone roles
-    deduplicatedRoles.push(...standalone);
+    return false;
+  }
+
+  /**
+   * DYNAMIC: Select the best role from a franchise group
+   */
+  static selectBestRoleFromGroup(group) {
+    // Priority 1: Character names over show names
+    const characters = group.filter(role => this.looksLikeCharacterName(role));
+    const shows = group.filter(role => !this.looksLikeCharacterName(role));
     
-    return deduplicatedRoles;
+    if (characters.length > 0) {
+      // Prefer shorter, more specific character names
+      return characters.sort((a, b) => a.length - b.length)[0];
+    }
+    
+    // Priority 2: If no clear characters, prefer shorter/more specific titles
+    return group.sort((a, b) => a.length - b.length)[0];
+  }
+
+  /**
+   * DYNAMIC: Detect if a role name looks like a character vs show name
+   */
+  static looksLikeCharacterName(roleName) {
+    if (!roleName) return false;
+    
+    const role = roleName.trim();
+    const words = role.split(/\s+/);
+    
+    // Character name patterns
+    const characterPatterns = [
+      // First Last (2 capitalized words)
+      /^[A-Z][a-z]+ [A-Z][a-z]+$/,
+      // Single name (often characters)
+      /^[A-Z][a-z]{2,15}$/,
+      // Title + Name (Dr. Evil, Mr. Burns)
+      /^(Dr|Mr|Ms|Mrs|Captain|Professor|The)\s+[A-Z]/i,
+      // Character-like compound names
+      /^[A-Z][a-z]+ [A-Z][a-z]+[A-Z][a-z]*$/ // CamelCase endings
+    ];
+    
+    // Check patterns
+    for (const pattern of characterPatterns) {
+      if (pattern.test(role)) {
+        return true;
+      }
+    }
+    
+    // Heuristic: 1-2 words = likely character, 3+ words = likely show
+    if (words.length <= 2 && words.length > 0) {
+      // Additional check: doesn't contain show-like words
+      const showKeywords = ['show', 'series', 'adventures', 'chronicles', 'tales'];
+      const hasShowKeywords = showKeywords.some(keyword => 
+        roleName.toLowerCase().includes(keyword)
+      );
+      
+      if (!hasShowKeywords) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * DYNAMIC: Extract shared franchise keywords between two roles
+   */
+  static extractFranchiseKeywords(roleA, roleB) {
+    const wordsA = roleA.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
+    const wordsB = roleB.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
+    
+    // Find meaningful shared words (4+ characters)
+    const sharedWords = wordsA.filter(word => {
+      // Skip common words
+      const commonWords = ['show', 'series', 'movie', 'film', 'animated', 'animation'];
+      if (commonWords.includes(word)) return false;
+      
+      return wordsB.includes(word);
+    });
+    
+    return sharedWords;
   }
 
   /**
