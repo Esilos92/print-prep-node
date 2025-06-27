@@ -121,11 +121,21 @@ class RoleFetcher {
       ];
       
       const uniqueTitles = [...new Set(potentialTitles)];
-      logger.info(`📋 Found ${uniqueTitles.length} potential titles from Wikipedia/BTVA`);
       
-      // Step 2: Google verify each potential role
+      // CRITICAL FIX: Apply title validation filter BEFORE Google verification
+      const filteredTitles = uniqueTitles.filter(title => 
+        this.isValidExtractedTitle(title, celebrityName)
+      );
+      
+      logger.info(`📋 Found ${uniqueTitles.length} potential titles → ${filteredTitles.length} after filtering`);
+      if (uniqueTitles.length > filteredTitles.length) {
+        const rejected = uniqueTitles.filter(title => !filteredTitles.includes(title));
+        logger.info(`🚫 Filtered out garbage titles: ${rejected.join(', ')}`);
+      }
+      
+      // Step 2: Google verify each VALID potential role
       const verifiedRoles = [];
-      for (const title of uniqueTitles.slice(0, 10)) { // Check top 10
+      for (const title of filteredTitles.slice(0, 10)) { // Check top 10 valid titles
         const isVerified = await this.googleVerifyRole(celebrityName, title);
         if (isVerified) {
           verifiedRoles.push(title);
@@ -1057,10 +1067,21 @@ class RoleFetcher {
         }
       }
       
-      // Remove duplicates and clean up
-      return [...new Set(knownForTitles)]
-        .filter(title => title.length > 2 && title.length < 50)
-        .slice(0, 5); // Top 5 most mentioned
+      // CRITICAL FIX: Filter out garbage titles using isValidExtractedTitle
+      const rawTitles = [...new Set(knownForTitles)]
+        .filter(title => title.length > 2 && title.length < 50);
+      
+      const validTitles = rawTitles.filter(title => 
+        this.isValidExtractedTitle(title, celebrityName)
+      );
+      
+      logger.info(`📋 Wikipedia extraction: ${rawTitles.length} raw titles → ${validTitles.length} valid titles`);
+      if (rawTitles.length > validTitles.length) {
+        const filtered = rawTitles.filter(title => !validTitles.includes(title));
+        logger.info(`🚫 Filtered out: ${filtered.join(', ')}`);
+      }
+      
+      return validTitles.slice(0, 5); // Top 5 valid titles
       
     } catch (error) {
       logger.warn('Could not parse Wikipedia for known-for titles:', error.message);
