@@ -30,6 +30,37 @@ class RoleFetcher {
           logger.warn(`🔄 Treating as TMDb failure - using Wikipedia fallback`);
           allRoles = []; // Clear TMDb results to trigger fallback
         }
+
+  /**
+   * Generate fallback roles when APIs fail
+   */
+  static getFallbackRoles(celebrityName) {
+    logger.warn('Using fallback generic roles');
+    return [
+      {
+        name: `${celebrityName} - Professional Photos`,
+        character: null,
+        year: null,
+        tags: ['fallback', 'professional'],
+        searchTerms: [celebrityName, 'professional photos', 'headshots']
+      },
+      {
+        name: `${celebrityName} - Red Carpet`,
+        character: null,
+        year: null,
+        tags: ['fallback', 'events'],
+        searchTerms: [celebrityName, 'red carpet', 'premiere']
+      },
+      {
+        name: `${celebrityName} - Portrait`,
+        character: null,
+        year: null,
+        tags: ['fallback', 'portrait'],
+        searchTerms: [celebrityName, 'portrait', 'photo shoot']
+      }
+    ];
+  }
+}
       }
       
       // ENHANCED FALLBACK CHAIN
@@ -1655,33 +1686,142 @@ class RoleFetcher {
   }
   
   /**
-   * Generate fallback roles when APIs fail
+   * IP DEDUPLICATION: Prevent multiple roles from same franchise/IP
    */
-  static getFallbackRoles(celebrityName) {
-    logger.warn('Using fallback generic roles');
-    return [
-      {
-        name: `${celebrityName} - Professional Photos`,
-        character: null,
-        year: null,
-        tags: ['fallback', 'professional'],
-        searchTerms: [celebrityName, 'professional photos', 'headshots']
-      },
-      {
-        name: `${celebrityName} - Red Carpet`,
-        character: null,
-        year: null,
-        tags: ['fallback', 'events'],
-        searchTerms: [celebrityName, 'red carpet', 'premiere']
-      },
-      {
-        name: `${celebrityName} - Portrait`,
-        character: null,
-        year: null,
-        tags: ['fallback', 'portrait'],
-        searchTerms: [celebrityName, 'portrait', 'photo shoot']
+  static deduplicateByIP(roles, celebrityName) {
+    const ipGroups = {};
+    const standalone = [];
+    
+    // Group roles by IP/franchise
+    for (const role of roles) {
+      const ip = this.detectIP(role);
+      
+      if (ip) {
+        if (!ipGroups[ip]) {
+          ipGroups[ip] = [];
+        }
+        ipGroups[ip].push(role);
+      } else {
+        standalone.push(role);
       }
+    }
+    
+    const deduplicatedRoles = [];
+    
+    // For each IP group, select the most specific/character-focused role
+    for (const [ip, ipRoles] of Object.entries(ipGroups)) {
+      if (ipRoles.length === 1) {
+        deduplicatedRoles.push(ipRoles[0]);
+        logger.info(`📺 ${ip}: Single role → ${ipRoles[0]}`);
+      } else {
+        // Prioritize character names over show names
+        const prioritized = ipRoles.sort((a, b) => {
+          const aIsCharacter = this.isCharacterName(a, ip);
+          const bIsCharacter = this.isCharacterName(b, ip);
+          
+          if (aIsCharacter && !bIsCharacter) return -1;
+          if (!aIsCharacter && bIsCharacter) return 1;
+          
+          // If both are characters or both are shows, prefer shorter (more specific)
+          return a.length - b.length;
+        });
+        
+        deduplicatedRoles.push(prioritized[0]);
+        logger.info(`📺 ${ip}: ${ipRoles.length} roles → KEPT: ${prioritized[0]} | REMOVED: ${prioritized.slice(1).join(', ')}`);
+      }
+    }
+    
+    // Add standalone roles
+    deduplicatedRoles.push(...standalone);
+    
+    return deduplicatedRoles;
+  }
+
+  /**
+   * DETECT IP/FRANCHISE: Identify which IP/franchise a role belongs to
+   */
+  static detectIP(roleName) {
+    const ipMappings = {
+      'aqua teen': 'Aqua Teen Hunger Force',
+      'master shake': 'Aqua Teen Hunger Force',
+      'robot chicken': 'Robot Chicken',
+      'harvey birdman': 'Harvey Birdman',
+      'squidbillies': 'Squidbillies',
+      'early cuyler': 'Squidbillies',
+      'granny cuyler': 'Squidbillies',
+      'metalocalypse': 'Metalocalypse',
+      'venture bros': 'Venture Bros',
+      'tim and eric': 'Tim and Eric',
+      'check it out': 'Tim and Eric',
+      'space ghost': 'Space Ghost'
+    };
+    
+    const roleLower = roleName.toLowerCase();
+    
+    for (const [keyword, ip] of Object.entries(ipMappings)) {
+      if (roleLower.includes(keyword)) {
+        return ip;
+      }
+    }
+    
+    return null; // Standalone role
+  }
+
+  /**
+   * CHECK IF ROLE NAME IS A CHARACTER: Determine if this is a character name vs show name
+   */
+  static isCharacterName(roleName, ip) {
+    const roleLower = roleName.toLowerCase();
+    const ipLower = ip.toLowerCase();
+    
+    // If the role name doesn't contain the IP name, it's likely a character
+    if (!roleLower.includes(ipLower)) {
+      return true;
+    }
+    
+    // Known character indicators
+    const characterIndicators = [
+      'master shake', 'early cuyler', 'granny cuyler', 'dr reducto', 
+      'mayor', 'sheriff', 'rusty venture', 'dean venture'
     ];
+    
+    return characterIndicators.some(char => roleLower.includes(char));
+  }
+
+  /**
+   * VALIDATE CHARACTER NAMES: Filter out false character extractions
+   */
+  static isValidCharacterName(character, actorName, projectName) {
+    if (!character || character.length < 2 || character.length > 25) return false;
+    
+    const charLower = character.toLowerCase();
+    const actorLower = actorName.toLowerCase();
+    const projectLower = projectName.toLowerCase();
+    
+    // Don't include if it's the actor's name
+    if (charLower.includes(actorLower) || actorLower.includes(charLower)) return false;
+    
+    // Don't include if it's the project name
+    if (charLower.includes(projectLower) || projectLower.includes(charLower)) return false;
+    
+    // Filter out common non-character words
+    const invalidCharacterWords = [
+      'voice', 'actor', 'actress', 'character', 'role', 'cast', 'member',
+      'show', 'series', 'movie', 'film', 'episode', 'season', 'network',
+      'animation', 'animated', 'cartoon', 'adult', 'swim', 'comedy', 'central',
+      'television', 'starring', 'featuring', 'guest', 'recurring', 'main'
+    ];
+    
+    if (invalidCharacterWords.includes(charLower)) return false;
+    
+    // Must contain actual letters
+    if (!/[A-Za-z]/.test(character)) return false;
+    
+    // Character names should be mostly alphabetic
+    const alphaRatio = (character.match(/[A-Za-z]/g) || []).length / character.length;
+    if (alphaRatio < 0.6) return false;
+    
+    return true;
   }
 }
 
