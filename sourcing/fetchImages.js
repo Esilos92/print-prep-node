@@ -80,77 +80,88 @@ class ImageFetcher {
   }
   
   /**
-   * Generate enhanced search queries based on role type
+   * Generate enhanced search queries based on role type with strict exclusions
    */
   generateEnhancedQueries(celebrityName, role) {
     const queries = [];
     
+    // Comprehensive exclusions to avoid junk content
+    const exclusions = [
+      '-signed', '-autograph', '-autographed', '-auction', '-ebay', 
+      '-memorabilia', '-collectible', '-sale', '-selling', '-bid', '-lot',
+      '-"comic con"', '-comicon', '-convention', '-podcast', '-interview',
+      '-"promotional graphic"', '-"event poster"', '-vhs', '-dvd', '-"blu ray"',
+      '-"red carpet"', '-premiere', '-gala', '-awards', '-ceremony',
+      '-vs', '-versus', '-"side by side"', '-comparison', '-"then and now"',
+      '-meme', '-parody', '-watermark', '-website'
+    ].join(' ');
+    
     if (role.isVoiceRole) {
-      // Voice acting - focus on character images
+      // Voice acting - focus on character images with strict targeting
       logger.info(`🎭 Voice role detected for ${role.name}, focusing on character images`);
       
       if (role.characterName) {
         queries.push({
-          text: `"${role.characterName}" "${role.name}" character official`,
+          text: `"${role.characterName}" "${role.name}" character official movie still ${exclusions}`,
           priority: 'high'
         });
         queries.push({
-          text: `"${role.characterName}" ${role.name} animated character`,
+          text: `"${role.characterName}" "${role.name}" animated character scene ${exclusions}`,
           priority: 'high'
-        });
-        queries.push({
-          text: `${role.name} ${role.characterName} movie stills`,
-          priority: 'medium'
         });
       }
       
       queries.push({
-        text: `${role.name} character images official -fanart -deviantart`,
+        text: `"${role.name}" character images official movie stills ${exclusions}`,
         priority: 'medium'
       });
-      queries.push({
-        text: `${role.name} animated movie characters -pinterest`,
-        priority: 'low'
-      });
     } else {
-      // Live action - focus on actor in role
-      logger.info(`🎬 Live action role detected for ${role.name}, focusing on actor images`);
+      // Live action - focus on actor in role with stricter targeting
+      logger.info(`🎬 Live action role detected for ${role.name}, focusing on actor in role`);
       
+      // Most specific queries first
       queries.push({
-        text: `"${celebrityName}" "${role.name}" official promotional`,
-        priority: 'high'
-      });
-      queries.push({
-        text: `"${celebrityName}" "${role.name}" movie stills press photos`,
+        text: `"${celebrityName}" "${role.name}" movie still scene photo ${exclusions}`,
         priority: 'high'
       });
       
       if (role.character && role.character !== 'Unknown role') {
         queries.push({
-          text: `"${celebrityName}" "${role.character}" "${role.name}" cast`,
-          priority: 'medium'
+          text: `"${celebrityName}" "${role.character}" "${role.name}" scene still ${exclusions}`,
+          priority: 'high'
         });
       }
       
       queries.push({
-        text: `"${celebrityName}" ${role.name} behind scenes cast`,
+        text: `"${celebrityName}" "${role.name}" promotional photo official ${exclusions}`,
         priority: 'medium'
       });
       
-      // Franchise-specific queries
-      if (role.franchiseName) {
+      // Only add franchise queries if very specific
+      if (role.franchiseName && role.franchiseName.length > 8) {
         queries.push({
-          text: `"${celebrityName}" "${role.franchiseName}" official photos`,
+          text: `"${celebrityName}" "${role.franchiseName}" official movie still ${exclusions}`,
           priority: 'medium'
+        });
+      }
+      
+      // Behind scenes only for high-confidence roles
+      if (role.character && role.character !== 'Unknown role') {
+        queries.push({
+          text: `"${celebrityName}" "${role.name}" behind scenes on set ${exclusions}`,
+          priority: 'low'
         });
       }
     }
 
-    // Sort by priority
-    return queries.sort((a, b) => {
+    // Sort by priority and limit to most specific
+    const sortedQueries = queries.sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       return priorityOrder[b.priority] - priorityOrder[a.priority];
     });
+
+    // Only return top 3 most specific queries to avoid noise
+    return sortedQueries.slice(0, 3);
   }
   
   /**
@@ -222,7 +233,7 @@ class ImageFetcher {
   }
   
   /**
-   * Filter image sources to remove watermarked, banned, and unwanted content
+   * Filter image sources to remove watermarked and banned content
    */
   filterImageSources(images, role) {
     return images.filter(image => {
@@ -235,12 +246,6 @@ class ImageFetcher {
       // Skip watermarked content by URL patterns
       if (this.hasWatermarkPatterns(image.sourceUrl)) {
         logger.warn(`Skipping watermarked content: ${image.sourceUrl}`);
-        return false;
-      }
-
-      // Skip already signed items or auction content
-      if (this.isSignedOrAuctionContent(image)) {
-        logger.warn(`Skipping signed/auction content: ${image.title}`);
         return false;
       }
 
@@ -555,11 +560,12 @@ class ImageFetcher {
   }
   
   /**
-   * Enhanced person verification with voice role support
+   * Enhanced person verification with balanced validation for group shots
    */
   validatePersonInImage(imageData, celebrityName, role) {
     const title = (imageData.title || '').toLowerCase();
     const source = (imageData.source || '').toLowerCase();
+    const url = (imageData.sourceUrl || '').toLowerCase();
     
     const name = celebrityName.toLowerCase();
     const nameWords = name.split(' ');
@@ -567,107 +573,229 @@ class ImageFetcher {
     const firstName = nameWords[0];
     
     let confidence = 0;
+    let penalties = 0;
+    
+    // STRICT NEGATIVE FILTERS FIRST - immediate rejection
+    
+    // Reject if ONLY other actors mentioned and NO mention of target actor
+    const otherActors = [
+      'sandra bullock', 'benjamin bratt', 'michael caine', 'candice bergen',
+      'chris pine', 'zachary quinto', 'jim parsons', 'johnny galecki', 'kaley cuoco',
+      'simon helberg', 'kunal nayyar', 'mayim bialik', 'melissa rauch'
+    ];
+    
+    let hasOtherActor = false;
+    let hasTargetActor = title.includes(name) || title.includes(lastName);
+    
+    for (const actor of otherActors) {
+      if (title.includes(actor)) {
+        hasOtherActor = true;
+        // If it's ONLY about other actors and NO mention of target, reject
+        if (!hasTargetActor) {
+          return {
+            isValid: false,
+            confidence: -100,
+            reasons: { rejection: `Only contains other actor: ${actor}, no mention of ${celebrityName}` }
+          };
+        }
+      }
+    }
+    
+    // Reject promotional graphics, podcasts, conventions
+    const promotionalRejects = [
+      'comic con', 'comicon', 'convention', 'podcast', 'interview graphic',
+      'promotional graphic', 'event poster', 'announcement', 'logo',
+      'vhs', 'dvd box', 'blu ray', 'bluray', 'box art', 'cover art'
+    ];
+    
+    for (const reject of promotionalRejects) {
+      if (title.includes(reject) || url.includes(reject)) {
+        return {
+          isValid: false,
+          confidence: -100,
+          reasons: { rejection: `Promotional/packaging content: ${reject}` }
+        };
+      }
+    }
+    
+    // Reject edited/composite images
+    const editedRejects = [
+      'vs', 'versus', 'side by side', 'comparison', 'then and now',
+      'old and new', 'young and old', 'photoshop', 'edited', 'composite',
+      'mashup', 'meme', 'parody'
+    ];
+    
+    for (const reject of editedRejects) {
+      if (title.includes(reject)) {
+        return {
+          isValid: false,
+          confidence: -100,
+          reasons: { rejection: `Edited/composite image: ${reject}` }
+        };
+      }
+    }
+    
+    // Reject website watermarks
+    if (title.includes('watermark') || url.includes('watermark') || 
+        title.includes('.com') || title.includes('website')) {
+      return {
+        isValid: false,
+        confidence: -100,
+        reasons: { rejection: 'Website watermark detected' }
+      };
+    }
+    
+    // Light penalties for red carpet (but don't reject - some are good)
+    const eventTerms = ['red carpet', 'premiere', 'gala', 'awards', 'ceremony'];
+    for (const term of eventTerms) {
+      if (title.includes(term)) {
+        penalties += 3; // Light penalty, not rejection
+      }
+    }
     
     // VOICE ROLE SPECIFIC VALIDATION
     if (role.isVoiceRole) {
-      // For voice roles, character name is more important than actor name
+      // For voice roles, character name is essential
       if (role.characterName) {
         const character = role.characterName.toLowerCase();
-        if (title.includes(character)) confidence += 8;
+        if (title.includes(character)) {
+          confidence += 10;
+        } else {
+          // No character name for voice role is suspicious
+          penalties += 5;
+        }
       }
       
-      // Animation context indicators
+      // Animation context required for voice roles
       const animationKeywords = ['character', 'animated', 'animation', 'cartoon'];
-      animationKeywords.forEach(keyword => {
-        if (title.includes(keyword)) confidence += 3;
-      });
+      const hasAnimationContext = animationKeywords.some(keyword => 
+        title.includes(keyword) || url.includes(keyword)
+      );
       
-      // Penalize actor photos for voice roles
-      if (title.includes(name) && !title.includes('character') && !title.includes('animated')) {
-        confidence -= 3;
+      if (hasAnimationContext) {
+        confidence += 5;
+      } else {
+        penalties += 3;
+      }
+      
+      // Actor name in voice role images is usually wrong (unless it's cast info)
+      if (title.includes(name) && !hasAnimationContext && !title.includes('cast')) {
+        penalties += 5;
       }
     } else {
-      // LIVE ACTION VALIDATION
+      // LIVE ACTION VALIDATION - balanced for group shots
       
-      // Strong name matches
-      if (title.includes(name)) confidence += 10;
+      // Name matching (generous for group shots)
+      const hasFullName = title.includes(name);
+      const hasLastName = title.includes(lastName);
+      const hasFirstName = title.includes(firstName) && firstName.length > 3;
       
-      // Partial name matches
-      if (title.includes(lastName)) confidence += 4;
-      if (title.includes(firstName) && firstName.length > 3) confidence += 3;
+      if (hasFullName) {
+        confidence += 15; // Strong bonus for full name
+      } else if (hasLastName) {
+        confidence += 10; // Good bonus for last name (important for group shots)
+      } else if (hasFirstName) {
+        confidence += 6; // Medium bonus for first name
+      } else {
+        // No direct name match - check if it's a legitimate group/cast photo
+        const groupTerms = ['cast', 'crew', 'ensemble', 'group', 'team', 'behind the scenes'];
+        const hasGroupContext = groupTerms.some(term => title.includes(term));
+        
+        if (hasGroupContext) {
+          // Group photo without direct name mention - smaller penalty
+          penalties += 3;
+        } else {
+          // No name and no group context - bigger penalty
+          penalties += 8;
+        }
+      }
       
-      // Character context
+      // BONUS for group shots and cast photos
+      const groupIndicators = [
+        'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
+        'with', 'co-star', 'co-stars', 'behind the scenes', 'on set'
+      ];
+      
+      const groupMatches = groupIndicators.filter(indicator => title.includes(indicator));
+      confidence += groupMatches.length * 4; // Good bonus for group context
+      
+      // Role context
+      const roleWords = role.name.toLowerCase().split(' ').filter(word => word.length > 3);
+      const roleMatches = roleWords.filter(word => title.includes(word));
+      
+      if (roleMatches.length >= 2) {
+        confidence += 8; // Multiple role words
+      } else if (roleMatches.length === 1) {
+        confidence += 4; // One role word
+      } else {
+        penalties += 3; // No role context (lighter penalty)
+      }
+      
+      // Character context (if available)
       if (role.character && role.character !== 'Unknown role') {
         const character = role.character.toLowerCase();
-        if (title.includes(character)) confidence += 4;
+        if (title.includes(character)) {
+          confidence += 6;
+        }
       }
     }
     
     // COMMON VALIDATION (both voice and live action)
     
-    // Role/franchise context
-    const roleWords = role.name.toLowerCase().split(' ').slice(0, 2);
-    roleWords.forEach(word => {
-      if (word.length > 3 && title.includes(word)) confidence += 2;
-    });
-    
-    // Professional indicators
-    const professionalTerms = ['actor', 'star', 'celebrity', 'cast', 'portrait'];
-    professionalTerms.forEach(term => {
-      if (title.includes(term)) confidence += 1;
-    });
-    
-    // Group shot bonuses (for live action)
-    if (!role.isVoiceRole) {
-      const groupIndicators = [
-        'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
-        'with', 'and', 'co-star', 'co-stars', 'behind the scenes'
-      ];
-      groupIndicators.forEach(indicator => {
-        if (title.includes(indicator)) confidence += 3;
-      });
-    }
-    
-    // Franchise bonuses
+    // Franchise context (important for group shots)
     if (role.franchiseName) {
       const franchiseWords = role.franchiseName.toLowerCase().split(' ');
-      franchiseWords.forEach(word => {
-        if (word.length > 3 && title.includes(word)) confidence += 2;
-      });
+      const franchiseMatches = franchiseWords.filter(word => 
+        word.length > 3 && title.includes(word)
+      );
+      confidence += franchiseMatches.length * 3; // Good bonus for franchise context
     }
     
     // Good source bonus
     const goodSources = ['imdb', 'themoviedb', 'rottentomatoes'];
-    goodSources.forEach(goodSource => {
-      if (source.includes(goodSource)) confidence += 2;
-    });
-    
-    // NEGATIVE INDICATORS
-    let penalties = 0;
-    
-    // Definitely wrong content
-    const definitelyWrong = ['cartoon', 'drawing', 'painting', 'sketch', 'artwork'];
-    if (!role.isVoiceRole) { // Only penalize non-animated for live action
-      definitelyWrong.forEach(wrong => {
-        if (title.includes(wrong)) penalties += 5;
-      });
+    if (goodSources.some(goodSource => source.includes(goodSource))) {
+      confidence += 4;
     }
     
-    const finalScore = confidence - penalties;
-    const threshold = role.isVoiceRole ? 3 : 1; // Higher threshold for voice roles
+    // Professional context
+    const professionalTerms = ['actor', 'star', 'cast', 'movie', 'film'];
+    if (professionalTerms.some(term => title.includes(term))) {
+      confidence += 3;
+    }
     
-    return {
+    // FINAL SCORING
+    const finalScore = confidence - penalties;
+    
+    // Balanced thresholds - not too strict for group shots
+    const threshold = role.isVoiceRole ? 8 : 7; // Reasonable thresholds
+    
+    const result = {
       isValid: finalScore >= threshold,
       confidence: finalScore,
       reasons: {
-        nameMatch: title.includes(name) || title.includes(lastName),
+        nameMatch: hasTargetActor,
+        hasOtherActor: hasOtherActor,
+        groupContext: !role.isVoiceRole && groupIndicators.some(indicator => title.includes(indicator)),
         characterMatch: role.characterName && title.includes(role.characterName.toLowerCase()),
-        roleContext: roleWords.some(word => word.length > 3 && title.includes(word)),
+        roleContext: roleWords && roleWords.some(word => word.length > 3 && title.includes(word)),
+        franchiseContext: role.franchiseName && role.franchiseName.toLowerCase().split(' ').some(word => 
+          word.length > 3 && title.includes(word)
+        ),
         isVoiceRole: role.isVoiceRole,
         penalties: penalties,
+        threshold: threshold,
         details: `Score: ${finalScore} (confidence: ${confidence}, penalties: ${penalties}, threshold: ${threshold})`
       }
     };
+    
+    // Log rejections for debugging
+    if (!result.isValid) {
+      logger.info(`❌ REJECTED "${title}" - Score: ${finalScore}/${threshold} (conf:${confidence}, pen:${penalties})`);
+    } else if (result.reasons.groupContext) {
+      logger.info(`✅ GROUP SHOT: "${title}" - Score: ${finalScore}/${threshold}`);
+    }
+    
+    return result;
   }
   
   /**
@@ -719,9 +847,15 @@ class ImageFetcher {
   }
   
   /**
-   * Download single image with retry logic
+   * Download single image with enhanced URL validation and retry logic
    */
   async downloadSingleImage(url, filepath, retries = 3) {
+    // Pre-validate URL before attempting download
+    if (!this.isValidImageUrl(url)) {
+      logger.warn(`Skipping invalid image URL: ${url}`);
+      return false;
+    }
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const response = await axios({
@@ -729,15 +863,23 @@ class ImageFetcher {
           url: url,
           responseType: 'stream',
           timeout: 15000,
+          maxRedirects: 3,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/*,*/*;q=0.8'
           }
         });
 
-        // Check content type
+        // Check content type before proceeding
         const contentType = response.headers['content-type'];
         if (!contentType || !contentType.startsWith('image/')) {
           throw new Error(`Invalid content type: ${contentType}`);
+        }
+
+        // Check content length if available
+        const contentLength = response.headers['content-length'];
+        if (contentLength && parseInt(contentLength) < 10000) { // Less than 10KB
+          throw new Error(`File too small: ${contentLength} bytes`);
         }
 
         const writer = require('fs').createWriteStream(filepath);
@@ -749,18 +891,48 @@ class ImageFetcher {
         });
         
       } catch (error) {
-        logger.warn(`Download attempt ${attempt} failed: ${error.message}`);
+        logger.warn(`Download attempt ${attempt} failed for ${filepath}: ${error.message}`);
         
         if (attempt === retries) {
           return false;
         }
         
-        // Wait before retry
+        // Wait before retry with exponential backoff
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
     
     return false;
+  }
+
+  /**
+   * Validate if URL is likely to return an actual image
+   */
+  isValidImageUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    
+    const lowerUrl = url.toLowerCase();
+    
+    // Check for obvious non-image URLs
+    const badPatterns = [
+      '/search?', '/login', '/signin', '/register',
+      'javascript:', 'data:', 'mailto:',
+      '.html', '.htm', '.php', '.asp', '.jsp',
+      'facebook.com', 'twitter.com', 'instagram.com'
+    ];
+    
+    if (badPatterns.some(pattern => lowerUrl.includes(pattern))) {
+      return false;
+    }
+    
+    // Should have image extension or be from known image hosting
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+    const imageHosts = ['imgur.com', 'flickr.com', 'photobucket.com'];
+    
+    const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
+    const isImageHost = imageHosts.some(host => lowerUrl.includes(host));
+    
+    return hasImageExtension || isImageHost;
   }
   
   /**
