@@ -47,42 +47,50 @@ Format your response as a JSON array with this exact structure:
 Provide exactly 5 roles, ordered from most autograph-worthy/fan-recognizable to least.`,
 
   /**
-   * Search term optimization prompt - both group AND solo photo optimization
+   * Search term optimization prompt - STRICT production photo targeting
    */
-  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at finding HIGH-VALUE AUTOGRAPH PHOTOS for convention sales.
+  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at finding PROFESSIONAL PRODUCTION PHOTOS from TV shows and movies, avoiding all merchandise, fan art, and convention content.
 
-For the ${medium.includes('voice') ? 'character' : 'role'} "${character}" from "${title}" (medium: ${medium}), create 5 search terms: 3 for GROUP PHOTOS (highest value) and 2 for SOLO PHOTOS (premium quality).
+For "${character}" from "${title}" (${medium}), create 5 search terms that find ONLY authentic production content with the actual actor/character visible.
 
-GROUP PHOTOS (Terms 1-3) - MAXIMUM AUTOGRAPH VALUE:
+MANDATORY REQUIREMENTS - MUST include these exclusion terms:
+- Add "-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -dvd -cover -poster -comic -fan -art -edit -meme" to EVERY search term
+- Add "production OR promotional OR official OR press" to prioritize professional content
+- Focus on the actual actor's name + character name + show/movie name
+
+GROUP PHOTOS (Terms 1-3):
 ${medium.includes('voice') ? 
-  `- Show name + "main characters" + "group"/"together"
-  - Show name + "cast" + "all characters"
-  - Character name + "with other characters" + show name
-  GOAL: Multiple character artwork for multiple signatures` :
-  `- Show/movie name + "main cast" + "group photo"
-  - Actor name + "with cast" + show/movie name  
-  - Show/movie name + "ensemble" + "promotional"
-  GOAL: Multiple actors in one photo for multiple signatures`
+  `- "${title} main characters official artwork -funko -pop -toy -merchandise -fan -art"
+  - "${title} character group promotional art -action -figure -convention -edit"  
+  - "${character} with other ${title} characters official -comic -meme -poster"` :
+  `- "${title} cast group production photo -funko -pop -toy -merchandise -convention"
+  - "William Shatner ${character} with cast promotional -action -figure -signed -dvd"
+  - "${title} main cast press photo -convention -autograph -poster -fan -art"`
 }
 
-SOLO PHOTOS (Terms 4-5) - PREMIUM SINGLE SIGNATURES:
+SOLO PHOTOS (Terms 4-5):
 ${medium.includes('voice') ? 
-  `- Character name + show name + "official artwork"/"promotional art"
-  - Character name + "high quality" + show name
-  GOAL: Professional character artwork, not fan art or merchandise` :
-  `- Actor name + character name + "promotional photo"
-  - Actor name + show/movie name + "production still"
-  GOAL: Professional promotional photos, not convention or fan photos`
+  `- "${character} ${title} official character art -funko -pop -toy -merchandise -fan"
+  - "${character} ${title} promotional artwork -action -figure -convention -edit"` :
+  `- "William Shatner ${character} production still -funko -pop -toy -merchandise -convention"
+  - "William Shatner ${title} promotional photo -action -figure -signed -dvd -poster"`
 }
 
-AVOID ALL TERMS THAT FIND:
-- Convention photos, autograph signings, meet & greets
-- Merchandise (Funko, action figures, toys, mugs, shirts)
-- Fan photos, selfies, low-quality images
-- eBay listings, signed memorabilia
+CRITICAL EXCLUSIONS FOR ALL TERMS:
+- NO merchandise: -funko -pop -action -figure -toy -collectible -statue
+- NO fan content: -fan -art -edit -meme -comic -cartoon -animation  
+- NO convention content: -convention -autograph -signed -meet -greet
+- NO packaging: -dvd -cover -poster -box -case -package
+- NO other shows: -"game of thrones" -friends -"other characters"
 
-Return as JSON array with 5 terms (3 group + 2 solo):
-["group term 1", "group term 2", "group term 3", "solo term 1", "solo term 2"]`,
+INCLUDE ONLY:
+- Production stills from actual episodes/movies
+- Official promotional photos from the show/movie
+- Press photos with the actual actors
+- Behind-the-scenes photos from production
+
+Return 5 search terms with proper exclusions:
+["term with exclusions", "term with exclusions", "term with exclusions", "term with exclusions", "term with exclusions"]`,
 
   /**
    * Performer type detection prompt - broader scope
