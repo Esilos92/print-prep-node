@@ -37,20 +37,17 @@ class ImageFetcher {
    * Build optimized search query
    */
   static buildSearchQuery(celebrityName, role) {
-    const terms = [celebrityName];
+    // Start with just the celebrity name for better results
+    let query = celebrityName;
     
-    if (role.character) {
-      terms.push(role.character);
-    }
-    
+    // Add movie/show name if it's not a generic role
     if (role.name && role.name !== `${celebrityName} - Professional Photos`) {
-      terms.push(role.name);
+      // Only add movie name, skip character names as they're often too specific
+      query += ` ${role.name}`;
     }
     
-    // Add quality modifiers
-    terms.push('high resolution', 'professional photo');
-    
-    return terms.join(' ');
+    // Keep it simple - don't add quality modifiers that might filter out results
+    return query;
   }
   
   /**
@@ -65,9 +62,8 @@ class ImageFetcher {
       q: query,
       num: config.image.maxImagesPerRole,
       ijn: 0, // Image page number
-      tbs: 'isz:l,sur:fmc', // Large images, free for commercial use
-      safe: 'active',
-      nfpr: 1 // No auto-correction
+      tbs: 'isz:l', // Just large images, remove the commercial use filter for now
+      safe: 'active'
     };
     
     const headers = {
