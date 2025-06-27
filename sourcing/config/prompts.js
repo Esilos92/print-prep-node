@@ -49,7 +49,7 @@ Provide exactly 5 roles, ordered from most autograph-worthy/fan-recognizable to 
   /**
    * Search term optimization prompt - production photos AND official movie posters
    */
-  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at finding PROFESSIONAL PRODUCTION PHOTOS and HIGH-RESOLUTION OFFICIAL MOVIE POSTERS from TV shows and movies for autograph sales.
+  OPTIMIZE_SEARCH: (character, title, medium, actorName) => `You are an expert at finding PROFESSIONAL PRODUCTION PHOTOS and HIGH-RESOLUTION OFFICIAL MOVIE POSTERS from TV shows and movies for autograph sales.
 
 For "${character}" from "${title}" (${medium}), create 6 search terms that find authentic production content and official promotional materials.
 
@@ -68,8 +68,8 @@ SOLO PHOTOS (Terms 3-4):
 ${medium.includes('voice') ? 
   `- "${character} ${title} official character art -funko -pop -toy -merchandise -fan"
   - "${character} ${title} promotional artwork -action -figure -convention -edit"` :
-  `- "William Shatner ${character} production still -funko -pop -toy -merchandise -convention"
-  - "William Shatner ${title} promotional photo -action -figure -signed -fan -art"`
+  `- "${actorName || 'ACTOR_NAME'} ${character} production still -funko -pop -toy -merchandise -convention"
+  - "${actorName || 'ACTOR_NAME'} ${title} promotional photo -action -figure -signed -fan -art"`
 }
 
 OFFICIAL MOVIE POSTERS (Terms 5-6) - HIGH AUTOGRAPH VALUE:
