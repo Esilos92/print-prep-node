@@ -238,17 +238,9 @@ class RoleFetcher {
     
     const titleLower = title.toLowerCase();
     
-    // Clean up the title and extract base name
-    let baseName = titleLower
-      // Remove numbers and colons (Star Trek II: Wrath of Khan -> Star Trek)
-      .split(/[:\-\d]/)[0]
-      // Remove common subtitle indicators
-      .replace(/\s+(the|a|an)\s+/g, ' ')
-      .replace(/\s+(part|episode|chapter)\s*\d*/g, '')
-      .trim();
-    
-    // Handle special cases for better grouping
+    // Handle special cases first for better grouping
     const specialCases = {
+      'star trek': 'star trek',          // All Star Trek movies/shows
       'captain america': 'marvel',
       'iron man': 'marvel', 
       'thor': 'marvel',
@@ -276,12 +268,24 @@ class RoleFetcher {
       'fantastic beasts': 'harry potter'
     };
     
-    // Check for special case matches
+    // Check for special case matches FIRST
     for (const [pattern, franchise] of Object.entries(specialCases)) {
       if (titleLower.includes(pattern)) {
         return franchise;
       }
     }
+    
+    // If no special case, clean up the title and extract base name
+    let baseName = titleLower
+      // Remove roman numerals and numbers (II, III, IV, 2, 3, etc.)
+      .replace(/\s+(ii|iii|iv|v|vi|vii|viii|ix|x)\b/g, '')
+      .replace(/\s+\d+\b/g, '')
+      // Remove subtitle after colon or dash
+      .split(/[:\-]/)[0]
+      // Remove common subtitle indicators
+      .replace(/\s+(the|a|an)\s+/g, ' ')
+      .replace(/\s+(part|episode|chapter)\s*\d*/g, '')
+      .trim();
     
     // Default: use the cleaned base name
     return baseName || 'unknown';
