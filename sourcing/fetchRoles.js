@@ -142,6 +142,7 @@ class RoleFetcher {
   
   /**
    * Diversify roles by detecting and limiting franchise dominance
+   * FIXED VERSION - Properly handles franchise vs standalone detection
    */
   static diversifyByFranchise(roles) {
     logger.info('🎯 Applying franchise diversification...');
@@ -149,7 +150,10 @@ class RoleFetcher {
     // Step 1: Detect franchises automatically
     const franchises = this.detectFranchises(roles);
     
-    // Step 2: Select best roles from each franchise + standalone roles
+    // Step 2: Create a set of all franchise names for filtering
+    const franchiseNames = new Set(franchises.map(f => f.name));
+    
+    // Step 3: Select best roles from each franchise + standalone roles
     const selectedRoles = [];
     const usedRoleIds = new Set();
     
@@ -161,14 +165,30 @@ class RoleFetcher {
       logger.info(`📁 ${franchise.name} franchise: Taking ${selectedFromFranchise.length}/${franchise.roles.length} roles`);
       
       selectedFromFranchise.forEach(role => {
+        // Set the franchise name properly
+        role.franchiseName = franchise.name;
         selectedRoles.push(role);
         usedRoleIds.add(role.name);
       });
     });
     
-    // Add standalone roles (not part of any franchise)
-    const standaloneRoles = roles.filter(role => !usedRoleIds.has(role.name));
-    selectedRoles.push(...standaloneRoles);
+    // Add TRUE standalone roles (not part of any detected franchise)
+    const standaloneRoles = roles.filter(role => {
+      // Skip if already used
+      if (usedRoleIds.has(role.name)) return false;
+      
+      // Check if this role belongs to any detected franchise
+      const roleFranchise = this.extractBaseFranchiseName(role.name);
+      const belongsToFranchise = franchiseNames.has(roleFranchise);
+      
+      return !belongsToFranchise;
+    });
+    
+    // Add standalone roles to selection
+    standaloneRoles.forEach(role => {
+      role.franchiseName = null; // Mark as truly standalone
+      selectedRoles.push(role);
+    });
     
     // Sort by priority: Known for first, then by vote count
     const finalRoles = selectedRoles.sort((a, b) => {
