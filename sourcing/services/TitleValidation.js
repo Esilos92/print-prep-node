@@ -20,10 +20,16 @@ class TitleValidation {
     // Reject if ends with generic terms - PREVENTS "Cartoon Network's animated"
     if (invalidSuffixes.some(suffix => titleLower.endsWith(suffix))) return false;
     
-    // ADDITIONAL FIX: Reject incomplete titles (less than 2 substantial words)
+    // FIXED: Allow single substantial words for show names
     const words = title.split(/\s+/).filter(word => word.length > 2);
-    if (words.length < 2) {
-      logger.info(`🚫 Rejected incomplete title: "${title}" (only ${words.length} substantial words)`);
+    if (words.length < 1) { // Changed from < 2 to < 1
+      logger.info(`🚫 Rejected empty title: "${title}"`);
+      return false;
+    }
+    
+    // Additional check: Single words should be substantial (4+ characters for show names)
+    if (words.length === 1 && words[0].length < 4) {
+      logger.info(`🚫 Rejected short single word: "${title}" (${words[0].length} characters)`);
       return false;
     }
     
@@ -42,8 +48,8 @@ class TitleValidation {
     // Don't include if it contains the actor's name (likely a bio page)
     if (titleLower.includes(celebrityName.toLowerCase())) return false;
     
-    // Must contain at least one letter and be a substantial word
-    if (!/[a-zA-Z]/.test(title) || title.split(' ').length < 2) return false;
+    // Must contain at least one letter and be substantial
+    if (!/[a-zA-Z]/.test(title) || title.trim().length < 4) return false;
     
     // Must not be just generic phrases - ADDITIONAL PROTECTION
     const genericPhrases = [
