@@ -47,50 +47,56 @@ Format your response as a JSON array with this exact structure:
 Provide exactly 5 roles, ordered from most autograph-worthy/fan-recognizable to least.`,
 
   /**
-   * Search term optimization prompt - STRICT production photo targeting
+   * Search term optimization prompt - production photos AND official movie posters
    */
-  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at finding PROFESSIONAL PRODUCTION PHOTOS from TV shows and movies, avoiding all merchandise, fan art, and convention content.
+  OPTIMIZE_SEARCH: (character, title, medium) => `You are an expert at finding PROFESSIONAL PRODUCTION PHOTOS and HIGH-RESOLUTION OFFICIAL MOVIE POSTERS from TV shows and movies for autograph sales.
 
-For "${character}" from "${title}" (${medium}), create 5 search terms that find ONLY authentic production content with the actual actor/character visible.
+For "${character}" from "${title}" (${medium}), create 6 search terms that find authentic production content and official promotional materials.
 
-MANDATORY REQUIREMENTS - MUST include these exclusion terms:
-- Add "-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -dvd -cover -poster -comic -fan -art -edit -meme" to EVERY search term
-- Add "production OR promotional OR official OR press" to prioritize professional content
-- Focus on the actual actor's name + character name + show/movie name
+MANDATORY EXCLUSIONS - Add to ALL terms:
+- "-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -fan -art -edit -meme -comic -dvd -case"
 
-GROUP PHOTOS (Terms 1-3):
+GROUP PHOTOS (Terms 1-2):
 ${medium.includes('voice') ? 
   `- "${title} main characters official artwork -funko -pop -toy -merchandise -fan -art"
-  - "${title} character group promotional art -action -figure -convention -edit"  
-  - "${character} with other ${title} characters official -comic -meme -poster"` :
-  `- "${title} cast group production photo -funko -pop -toy -merchandise -convention"
-  - "William Shatner ${character} with cast promotional -action -figure -signed -dvd"
-  - "${title} main cast press photo -convention -autograph -poster -fan -art"`
+  - "${title} character group promotional art -action -figure -convention -edit"` :
+  `- "${title} cast group production photo -funko -pop -toy -merchandise -convention"  
+  - "${title} main cast press photo -convention -autograph -fan -art"`
 }
 
-SOLO PHOTOS (Terms 4-5):
+SOLO PHOTOS (Terms 3-4):
 ${medium.includes('voice') ? 
   `- "${character} ${title} official character art -funko -pop -toy -merchandise -fan"
   - "${character} ${title} promotional artwork -action -figure -convention -edit"` :
   `- "William Shatner ${character} production still -funko -pop -toy -merchandise -convention"
-  - "William Shatner ${title} promotional photo -action -figure -signed -dvd -poster"`
+  - "William Shatner ${title} promotional photo -action -figure -signed -fan -art"`
 }
 
-CRITICAL EXCLUSIONS FOR ALL TERMS:
-- NO merchandise: -funko -pop -action -figure -toy -collectible -statue
-- NO fan content: -fan -art -edit -meme -comic -cartoon -animation  
-- NO convention content: -convention -autograph -signed -meet -greet
-- NO packaging: -dvd -cover -poster -box -case -package
-- NO other shows: -"game of thrones" -friends -"other characters"
+OFFICIAL MOVIE POSTERS (Terms 5-6) - HIGH AUTOGRAPH VALUE:
+${medium.includes('voice') ? 
+  `- "${title} official movie poster high resolution -funko -pop -toy -merchandise -fan"
+  - "${title} theatrical poster official artwork -action -figure -convention -edit"` :
+  `- "${title} official movie poster theatrical release -funko -pop -toy -merchandise -fan"
+  - "${title} original cinema poster high resolution -action -figure -convention -signed"`
+}
 
 INCLUDE ONLY:
-- Production stills from actual episodes/movies
+- Production stills from actual episodes/movies  
 - Official promotional photos from the show/movie
 - Press photos with the actual actors
-- Behind-the-scenes photos from production
+- Official theatrical movie posters (high resolution)
+- Original cinema release posters
+- Studio promotional poster artwork
 
-Return 5 search terms with proper exclusions:
-["term with exclusions", "term with exclusions", "term with exclusions", "term with exclusions", "term with exclusions"]`,
+EXCLUDE:
+- Fan-made posters, reproductions, bootlegs
+- Merchandise packaging or toy boxes
+- Convention promotional materials
+- Low-resolution or watermarked images
+- DVD/Blu-ray covers (different from theatrical posters)
+
+Return 6 search terms with proper exclusions:
+["group term", "group term", "solo term", "solo term", "poster term", "poster term"]`,
 
   /**
    * Performer type detection prompt - broader scope
