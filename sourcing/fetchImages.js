@@ -54,10 +54,12 @@ class ImageFetcher {
   }
   
   /**
-   * Search Bing Image API
+   * Search Azure AI Services Image API (new format)
    */
   static async searchBingImages(query) {
-    const url = 'https://api.bing.microsoft.com/v7.0/images/search';
+    // Use configured endpoint (Azure AI Services format)
+    const url = config.api.bingEndpoint;
+    
     const params = {
       q: query,
       count: config.image.maxImagesPerRole,
@@ -73,24 +75,55 @@ class ImageFetcher {
     
     const headers = {
       'Ocp-Apim-Subscription-Key': config.api.bingImageKey,
-      'User-Agent': 'PrintPrepNode/1.0'
+      'User-Agent': 'PrintPrepNode/1.0',
+      'Accept': 'application/json'
     };
     
     try {
-      const response = await axios.get(url, { params, headers });
+      const response = await axios.get(url, { 
+        params, 
+        headers,
+        timeout: 15000
+      });
       
-      return response.data.value.map(image => ({
-        url: image.contentUrl,
-        thumbnailUrl: image.thumbnailUrl,
-        width: image.width,
-        height: image.height,
-        size: image.contentSize,
-        name: image.name,
-        hostPageUrl: image.hostPageUrl
+      // Handle both old v7 and new AI Services response formats
+      const images = response.data.value || response.data.images || [];
+      
+      return images.map(image => ({
+        url: image.contentUrl || image.url,
+        thumbnailUrl: image.thumbnailUrl || image.thumbnail?.url,
+        width: image.width || 0,
+        height: image.height || 0,
+        size: image.contentSize || 0,
+        name: image.name || 'untitled',
+        hostPageUrl: image.hostPageUrl || image.webSearchUrl
       }));
       
     } catch (error) {
-      logger.error('Bing Image API error:', error.response?.data || error.message);
+      logger.error('Azure AI Services Image API error:', error.response?.data || error.message);
+      
+      // If the endpoint fails, try fallback search
+      if (error.response?.status === 404 || error.response?.status === 403) {
+        logger.warn('Primary endpoint failed, trying fallback...');
+        return await this.fallbackImageSearch(query);
+      }
+      
+      return [];
+    }
+  }
+  
+  /**
+   * Fallback image search using alternative approach
+   */
+  static async fallbackImageSearch(query) {
+    try {
+      // You can implement alternative image sources here
+      // For now, return empty array and log the need for manual intervention
+      logger.warn('Fallback search not implemented. Consider adding alternative image sources.');
+      return [];
+      
+    } catch (error) {
+      logger.error('Fallback search failed:', error.message);
       return [];
     }
   }
