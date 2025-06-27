@@ -14,27 +14,29 @@ class ImageFetcher {
       logger.info(`🖼️ Fetching images for ${celebrityName} in ${role.name}...`);
       
       const maxImages = config.image.maxImagesPerRole || 50;
-      const query = this.buildSpecificQuery(celebrityName, role);
       
-      logger.info(`Search query: "${query}"`);
+      // Use your working search approach but with enhanced queries
+      const allImages = [];
       
-      const serpAPIParams = this.getEnhancedSerpAPIParams(query);
-      const response = await this.callSerpAPI(serpAPIParams);
+      // Search 1: Specific role query (enhanced)
+      const roleQuery = this.buildSpecificQuery(celebrityName, role);
+      logger.info(`Search query: "${roleQuery}"`);
       
-      if (!response.images_results || response.images_results.length === 0) {
-        logger.warn(`No images found for query: ${query}`);
-        return [];
+      const roleImages = await this.searchSerpAPI(roleQuery, 30);
+      allImages.push(...roleImages);
+      
+      // Search 2: General celebrity + headshot (if we need more)
+      if (allImages.length < maxImages) {
+        const portraitQuery = `${celebrityName} headshot portrait`;
+        const portraitImages = await this.searchSerpAPI(portraitQuery, 20);
+        allImages.push(...portraitImages);
       }
       
-      logger.info(`Found ${response.images_results.length} potential images`);
+      // Remove duplicates
+      const uniqueImages = this.removeDuplicateImages(allImages);
       
-      // Filter by person verification and source reliability
-      const verifiedImages = this.filterAndVerifyImages(
-        response.images_results, 
-        celebrityName, 
-        role
-      );
-      
+      // Apply person verification (NEW)
+      const verifiedImages = this.filterAndVerifyImages(uniqueImages, celebrityName, role);
       logger.info(`${verifiedImages.length} images passed verification`);
       
       // Download the verified images
@@ -55,7 +57,7 @@ class ImageFetcher {
   }
   
   /**
-   * Build highly specific search queries for better person targeting
+   * Build specific query (same as enhanced version)
    */
   static buildSpecificQuery(celebrityName, role) {
     const name = celebrityName;
@@ -63,74 +65,98 @@ class ImageFetcher {
     const character = role.character;
     const year = role.year;
     
-    // Build increasingly specific search terms
-    let query;
-    
     if (character && character !== 'Unknown role') {
-      // Most specific: Name + Character + Title
-      query = `"${name}" "${character}" "${roleTitle}"`;
+      return `${name} ${character} ${roleTitle}`;
     } else if (year) {
-      // Very specific: Name + Title + Year
-      query = `"${name}" "${roleTitle}" ${year}`;
+      return `${name} ${roleTitle} ${year}`;
     } else {
-      // Good specificity: Name + Title + "actor"
-      query = `"${name}" "${roleTitle}" actor`;
+      return `${name} ${roleTitle}`;
     }
-    
-    return query;
   }
   
   /**
-   * Enhanced SerpAPI parameters for better person identification
+   * Search SerpAPI using YOUR WORKING PARAMETERS
    */
-  static getEnhancedSerpAPIParams(query) {
-    return {
-      api_key: config.api.serpApiKey,
-      engine: "google_images",
-      q: query,
-      
-      // PERSON-SPECIFIC FILTERS
-      imgtype: "face",           // Focus on faces/people
-      imgsz: "medium,large,xlarge", // Larger images = better face detail
-      // Removed imgc: "color" to allow B&W photos for older celebrities
-      
-      // CONTENT QUALITY FILTERS
-      safe: "active",            // Family-safe content
-      
-      // Better quality images
-      tbs: "isz:m",             // Medium+ size images
-      
-      num: 50,                  // Maximum results
-      start: 0
-    };
-  }
-  
-  /**
-   * Call SerpAPI with enhanced parameters
-   */
-  static async callSerpAPI(params) {
-    const url = config.api.serpEndpoint || 'https://serpapi.com/search.json';
-    
+  static async searchSerpAPI(query, maxResults = 20) {
     try {
-      const response = await axios.get(url, {
-        params: params,
+      const params = {
+        api_key: config.api.serpApiKey,
+        engine: 'google_images',
+        q: query,
+        num: Math.min(maxResults, 100),
+        ijn: 0,
+        // Use your working parameters
+        tbs: 'isz:l,sur:fmc', // Large images, free for commercial use
+        safe: 'active',
+        nfpr: 1
+      };
+
+      const response = await axios.get(config.api.serpEndpoint, { 
+        params,
         timeout: 30000
       });
-      
-      return response.data;
-    } catch (error) {
-      if (error.response?.status === 429) {
-        throw new Error('SerpAPI rate limit exceeded');
-      } else if (error.response?.status === 401) {
-        throw new Error('SerpAPI authentication failed - check API key');
-      } else {
-        throw new Error(`SerpAPI request failed: ${error.message}`);
+
+      if (!response.data || !response.data.images_results) {
+        logger.warn(`No images found in SerpAPI response for: ${query}`);
+        return [];
       }
+
+      // Convert to our format
+      const images = response.data.images_results.map((img, index) => ({
+        original: img.original || img.thumbnail,
+        thumbnail: img.thumbnail,
+        title: img.title || `Image ${index + 1}`,
+        source: img.source || 'Unknown',
+        link: img.link || '',
+        position: img.position || index + 1,
+        // Keep original format for compatibility
+        url: img.original || img.thumbnail,
+        thumbnailUrl: img.thumbnail,
+        sourceUrl: img.link || '',
+        width: img.original_width || null,
+        height: img.original_height || null,
+        searchQuery: query
+      }));
+
+      logger.info(`Found ${images.length} images for: ${query}`);
+      return images;
+
+    } catch (error) {
+      if (error.response) {
+        logger.error(`SerpAPI HTTP Error ${error.response.status}: ${error.response.data?.error || error.message}`);
+        
+        if (error.response.status === 401) {
+          throw new Error('Invalid SerpAPI key. Check your SERP_API_KEY in .env file');
+        }
+        if (error.response.status === 403) {
+          throw new Error('SerpAPI quota exceeded or access denied');
+        }
+      } else {
+        logger.error(`SerpAPI Request Error: ${error.message}`);
+      }
+      
+      return [];
     }
   }
   
   /**
-   * Filter and verify images to ensure correct person
+   * Remove duplicates (from your working version)
+   */
+  static removeDuplicateImages(images) {
+    const seen = new Set();
+    return images.filter(img => {
+      const urlKey = (img.url || img.original).split('?')[0].toLowerCase();
+      
+      if (seen.has(urlKey)) {
+        return false;
+      }
+      seen.add(urlKey);
+      return true;
+    });
+  }
+  
+  /**
+   * Filter and verify images (NEW - person verification)
    */
   static filterAndVerifyImages(images, celebrityName, role) {
     return images
@@ -155,7 +181,6 @@ class ImageFetcher {
         return true;
       })
       .sort((a, b) => {
-        // Sort by combined score: person verification + source reliability
         const scoreA = a.personVerification.confidence + a.reliabilityScore;
         const scoreB = b.personVerification.confidence + b.reliabilityScore;
         return scoreB - scoreA;
@@ -163,50 +188,29 @@ class ImageFetcher {
   }
   
   /**
-   * Score image source reliability
+   * Score image source reliability (NEW)
    */
   static scoreImageSource(imageData, celebrityName) {
     const url = (imageData.source || '').toLowerCase();
     const title = (imageData.title || '').toLowerCase();
-    const snippet = (imageData.snippet || '').toLowerCase();
     
     let score = 0;
     
-    // HIGH RELIABILITY SOURCES (+3 points each)
+    // High reliability sources
     const highReliabilitySources = [
-      'imdb.com',           // Internet Movie Database
-      'wikipedia.org',      // Wikipedia
-      'gettyimages.com',    // Getty Images
-      'shutterstock.com',   // Shutterstock
-      'alamyimages.com',    // Alamy
-      'rottentomatoes.com', // Rotten Tomatoes
-      'themoviedb.org'      // The Movie Database
+      'imdb.com', 'wikipedia.org', 'gettyimages.com', 'shutterstock.com'
     ];
     
-    // MEDIUM RELIABILITY SOURCES (+2 points each)
+    // Medium reliability sources
     const mediumReliabilitySources = [
-      'fanpop.com',         // Fan sites with moderation
-      'flickr.com',         // Flickr
-      'fandom.com',         // Fandom wikis
-      'tvguide.com',        // TV Guide
-      'eonline.com',        // E! Online
-      'people.com',         // People Magazine
-      'variety.com',        // Variety
-      'hollywoodreporter.com' // Hollywood Reporter
+      'fanpop.com', 'flickr.com', 'tvguide.com', 'people.com'
     ];
     
-    // LOW RELIABILITY SOURCES (-1 point each)
+    // Low reliability sources
     const lowReliabilitySources = [
-      'tumblr.com',         // User-generated, unmoderated
-      'reddit.com',         // Reddit posts
-      'facebook.com',       // Facebook posts
-      'twitter.com',        // Twitter posts
-      'instagram.com',      // Instagram posts
-      'tiktok.com',         // TikTok
-      'pinterest.com'       // Pinterest (mixed quality)
+      'tumblr.com', 'reddit.com', 'facebook.com', 'twitter.com'
     ];
     
-    // Score based on source
     highReliabilitySources.forEach(source => {
       if (url.includes(source)) score += 3;
     });
@@ -219,27 +223,14 @@ class ImageFetcher {
       if (url.includes(source)) score -= 1;
     });
     
-    // Bonus for professional photo indicators
-    const professionalIndicators = [
-      'headshot', 'portrait', 'professional', 'official', 
-      'premiere', 'red carpet', 'getty', 'wireimage', 'press'
-    ];
-    
-    professionalIndicators.forEach(indicator => {
-      if (title.includes(indicator) || snippet.includes(indicator)) {
-        score += 1;
-      }
-    });
-    
     return score;
   }
   
   /**
-   * Validate that the image contains the correct person
+   * Validate person in image (NEW)
    */
   static validatePersonInImage(imageData, celebrityName, role) {
     const title = (imageData.title || '').toLowerCase();
-    const snippet = (imageData.snippet || '').toLowerCase();
     const source = (imageData.source || '').toLowerCase();
     
     const name = celebrityName.toLowerCase();
@@ -247,129 +238,78 @@ class ImageFetcher {
     const lastName = nameWords[nameWords.length - 1];
     const firstName = nameWords[0];
     
-    // POSITIVE INDICATORS
     let confidence = 0;
     
     // Strong name matches
     if (title.includes(name)) confidence += 5;
-    if (snippet.includes(name)) confidence += 3;
     
-    // Partial name matches (first + last name)
+    // Partial name matches
     if (title.includes(lastName) && title.includes(firstName)) confidence += 4;
-    if (snippet.includes(lastName) && snippet.includes(firstName)) confidence += 2;
     
     // Character context
     if (role.character && role.character !== 'Unknown role') {
       const character = role.character.toLowerCase();
-      if (title.includes(character) || snippet.includes(character)) confidence += 3;
+      if (title.includes(character)) confidence += 3;
     }
     
-    // Role/title context
-    const roleWords = role.name.toLowerCase().split(' ').slice(0, 3); // First 3 words
-    roleWords.forEach(word => {
-      if (word.length > 3 && (title.includes(word) || snippet.includes(word))) {
-        confidence += 1;
-      }
-    });
-    
     // Professional context
-    const professionalTerms = ['actor', 'star', 'celebrity', 'portrait', 'headshot'];
+    const professionalTerms = ['actor', 'star', 'celebrity'];
     professionalTerms.forEach(term => {
-      if (title.includes(term) || snippet.includes(term)) confidence += 1;
+      if (title.includes(term)) confidence += 1;
     });
     
-    // NEGATIVE INDICATORS (likely wrong person)
+    // Negative indicators
     let penalties = 0;
-    
-    // Common name confusions
-    const confusionNames = this.getNameConfusions(celebrityName);
-    confusionNames.forEach(confusionName => {
-      if (title.includes(confusionName) || snippet.includes(confusionName)) {
-        penalties += 3;
-      }
-    });
-    
-    // Wrong media type indicators
-    const wrongMediaTypes = ['cartoon', 'animation', 'drawing', 'painting', 'artwork', 'sketch'];
-    wrongMediaTypes.forEach(type => {
+    const wrongTypes = ['cartoon', 'animation', 'drawing'];
+    wrongTypes.forEach(type => {
       if (title.includes(type)) penalties += 2;
-    });
-    
-    // Wrong profession indicators
-    const wrongProfessions = ['musician', 'singer', 'athlete', 'politician'];
-    wrongProfessions.forEach(profession => {
-      if (title.includes(profession) && !title.includes('actor')) penalties += 1;
     });
     
     const finalScore = confidence - penalties;
     
     return {
-      isValid: finalScore >= 3,
+      isValid: finalScore >= 2, // Lower threshold since we're more conservative
       confidence: finalScore,
       reasons: {
-        nameMatch: title.includes(name) || snippet.includes(name),
-        characterMatch: role.character && title.includes(role.character.toLowerCase()),
-        professionalContext: confidence > 2,
-        penalties: penalties,
-        details: `Title: "${title.substring(0, 50)}..."`
+        nameMatch: title.includes(name),
+        characterMatch: role.character && title.includes(role.character.toLowerCase())
       }
     };
   }
   
   /**
-   * Get common name confusions for specific celebrities
-   */
-  static getNameConfusions(celebrityName) {
-    const name = celebrityName.toLowerCase();
-    
-    // Common confusions by celebrity
-    const confusionMap = {
-      'william shatner': ['william shakespeare', 'bill gates', 'will smith', 'billy crystal'],
-      'chris evans': ['chris pratt', 'chris pine', 'chris hemsworth', 'evans blue'],
-      'harrison ford': ['harrison wells', 'gerald ford', 'ford motor'],
-      'robert downey': ['robert downey sr', 'robert de niro'],
-      'mark hamill': ['mark wahlberg', 'mark ruffalo'],
-      'carrie fisher': ['carrie underwood', 'fisher price']
-    };
-    
-    return confusionMap[name] || [];
-  }
-  
-  /**
-   * Download verified images
+   * Download images (adapted from your working version)
    */
   static async downloadImages(images, workDir, celebrityName, role) {
     const downloadDir = path.join(workDir, 'downloaded');
     await fs.mkdir(downloadDir, { recursive: true });
     
     const downloadedImages = [];
-    let successCount = 0;
     
     for (let i = 0; i < images.length; i++) {
       const image = images[i];
       
       try {
-        const filename = this.generateSafeFilename(role.name, i + 1, image.original);
+        const filename = this.generateSafeFilename(role.name, i + 1, image.url || image.original);
         const filepath = path.join(downloadDir, filename);
         
-        const success = await this.downloadSingleImage(image.original, filepath);
+        const success = await this.downloadSingleImage(image.url || image.original, filepath);
         
         if (success) {
           downloadedImages.push({
             filename: filename,
             filepath: filepath,
-            originalUrl: image.original,
+            originalUrl: image.url || image.original,
             role: role.name,
             character: role.character,
             title: image.title,
             source: image.source,
-            reliabilityScore: image.reliabilityScore,
-            verificationScore: image.personVerification.confidence,
+            reliabilityScore: image.reliabilityScore || 0,
+            verificationScore: image.personVerification?.confidence || 0,
             tags: [role.media_type || 'unknown', 'serpapi']
           });
           
-          successCount++;
-          logger.info(`✅ Downloaded: ${filename} (verification: ${image.personVerification.confidence}, reliability: ${image.reliabilityScore})`);
+          logger.info(`✅ Downloaded: ${filename} (verification: ${image.personVerification?.confidence || 0})`);
         }
         
       } catch (error) {
@@ -377,12 +317,11 @@ class ImageFetcher {
       }
     }
     
-    logger.info(`Successfully downloaded ${successCount}/${images.length} images for ${role.name}`);
     return downloadedImages;
   }
   
   /**
-   * Download a single image file
+   * Download single image (from your working version)
    */
   static async downloadSingleImage(url, filepath) {
     try {
@@ -405,13 +344,12 @@ class ImageFetcher {
       });
       
     } catch (error) {
-      logger.warn(`Failed to download ${url}:`, error.message);
       return false;
     }
   }
   
   /**
-   * Generate safe filename for downloaded image
+   * Generate safe filename (from your working version)
    */
   static generateSafeFilename(roleName, index, originalUrl) {
     const cleanRoleName = roleName
@@ -424,7 +362,7 @@ class ImageFetcher {
   }
   
   /**
-   * Extract file extension from URL
+   * Get image extension
    */
   static getImageExtension(url) {
     const extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
@@ -435,7 +373,7 @@ class ImageFetcher {
       }
     }
     
-    return 'jpg'; // Default fallback
+    return 'jpg';
   }
 }
 
