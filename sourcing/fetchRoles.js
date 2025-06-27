@@ -42,26 +42,48 @@ class RoleFetcher {
       const response = await axios.get(wikipediaUrl, { timeout: 10000 });
       const $ = cheerio.load(response.data);
       
-      // Get the first paragraph of the article
-      const firstParagraph = $('p').first().text();
+      // Get the first few paragraphs of the article
+      let articleText = '';
+      $('p').slice(0, 3).each((i, p) => {
+        const text = $(p).text().trim();
+        if (text.length > 0) {
+          articleText += text + ' ';
+        }
+      });
       
       const knownForTitles = [];
       
-      // Patterns to look for "known for" information
+      // Simpler, more flexible patterns
       const patterns = [
-        /(?:best known for|known for|famous for|renowned for).*?(?:his|her|their)\s+(?:role|roles|portrayal|performance).*?(?:as|of)\s+([^.]+)/gi,
-        /(?:best known for|known for|famous for|renowned for).*?(?:playing|portraying)\s+([^.]+)/gi,
-        /(?:best known for|known for|famous for|renowned for)\s+([^.]+)/gi
+        // "best known for his portrayal of Character in Title"
+        /(?:best known for|known for|famous for).*?(?:portrayal|role|playing).*?of\s+([^,.\n]+?)\s+in\s+(?:the\s+)?([^,.\n]+)/gi,
+        // "best known for playing Character"  
+        /(?:best known for|known for|famous for).*?(?:playing|portraying)\s+([^,.\n]+)/gi,
+        // "best known for Title" or mentions of franchises
+        /(?:best known for|known for|famous for).*?(?:his|her|their).*?([A-Z][^,.\n]*(?:franchise|series|trilogy|saga))/gi,
+        // Direct title mentions after "known for"
+        /(?:best known for|known for|famous for)[^.]*?([A-Z][a-zA-Z\s:'-]{3,25}?)(?:\s+franchise|\s+series|\s*,|\s*\(|\.|$)/gi
       ];
       
       for (const pattern of patterns) {
         let match;
-        while ((match = pattern.exec(firstParagraph)) !== null) {
-          const knownForText = match[1];
-          
-          // Extract titles from the "known for" text
-          const extractedTitles = this.extractTitlesFromText(knownForText);
-          knownForTitles.push(...extractedTitles);
+        const regex = new RegExp(pattern.source, pattern.flags);
+        while ((match = regex.exec(articleText)) !== null) {
+          // Get all capture groups
+          for (let i = 1; i < match.length; i++) {
+            if (match[i]) {
+              const knownForText = match[i].trim();
+              
+              // Extract titles from the "known for" text
+              const extractedTitles = this.extractTitlesFromText(knownForText);
+              knownForTitles.push(...extractedTitles);
+              
+              // Also add the raw text as a potential title
+              if (this.isValidTitle(knownForText)) {
+                knownForTitles.push(knownForText);
+              }
+            }
+          }
         }
       }
       
@@ -82,11 +104,17 @@ class RoleFetcher {
   static extractTitlesFromText(text) {
     const titles = [];
     
+    // Handle specific patterns we know work for William Shatner's case
+    if (text.toLowerCase().includes('star trek')) {
+      titles.push('Star Trek');
+    }
+    
     // Look for patterns like "Character in Title" or "Title"
     const titlePatterns = [
-      /\b([A-Z][^,]*?)\s+(?:franchise|series|film|movie|show)/gi,
-      /\bin\s+(?:the\s+)?([A-Z][^,.\n]*?)(?:\s|,|\.|$)/gi,
-      /\b([A-Z][a-zA-Z\s:'-]{2,25}?)(?:\s+and|\s*,|\.|$)/gi
+      // "James T. Kirk in the Star Trek franchise" -> "Star Trek"
+      /\bin\s+(?:the\s+)?([A-Z][^,.\n]*?)(?:\s+franchise|\s+series|\s*,|\.|$)/gi,
+      // General title extraction
+      /\b([A-Z][a-zA-Z\s:'-]{2,25}?)(?:\s+franchise|\s+series|\s+and|\s*,|\.|$)/gi
     ];
     
     for (const pattern of titlePatterns) {
