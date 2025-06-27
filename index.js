@@ -1,5 +1,5 @@
 // Updated to use AI-powered celebrity role discovery
-import { fetchCelebrityRoles } from './sourcing/main.js';
+const { fetchCelebrityRoles } = require('./sourcing/main.js');
 const { fetchImages } = require('./sourcing/fetchImages');
 const { validateImages } = require('./sourcing/validateImages');
 const { resizeImages } = require('./sourcing/resizeImages');
