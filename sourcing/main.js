@@ -6,17 +6,15 @@ class CelebrityRoleOrchestrator {
   constructor() {
     this.roleFetcher = new AIRoleFetcher();
     this.searchOptimizer = new SearchOptimizer();
-    this.cache = new Map(); // Simple in-memory cache
+    this.cache = new Map();
   }
 
   /**
-   * Main function - replaces your old fetchRoles.js entirely
-   * Gets celebrity roles and optimized search terms using AI
-   * NOW PASSES CELEBRITY NAME TO SEARCH OPTIMIZER
+   * Main function - gets celebrity roles and character image search terms
    */
   async getCelebrityRoles(celebrityName) {
     try {
-      console.log(`\n🎬 Starting AI-powered role fetch for: ${celebrityName}`);
+      console.log(`\n🎬 Starting character image search for: ${celebrityName}`);
       
       // Check cache first
       if (this.cache.has(celebrityName)) {
@@ -31,52 +29,50 @@ class CelebrityRoleOrchestrator {
         throw new Error(`No roles found for ${celebrityName}`);
       }
 
-      // Step 2: UPDATED - Add celebrity name to each role for ChatGPT
+      // Step 2: Add celebrity name to each role for search optimization
       const rolesWithCelebrity = roles.map(role => ({
         ...role,
-        celebrity: celebrityName,  // Add celebrity name to each role
-        actorName: celebrityName   // Also add as actorName for compatibility
+        celebrity: celebrityName,
+        actorName: celebrityName
       }));
 
-      // Step 3: AI optimizes search terms for each role using ChatGPT template
+      // Step 3: Generate character image search terms for each role
       const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithCelebrity);
 
-      // Step 4: Add metadata and final processing
+      // Step 4: Process and format final results
       const finalResults = this.processResults(celebrityName, optimizedRoles);
 
       // Cache results
       this.cache.set(celebrityName, finalResults);
 
-      console.log(`✅ Successfully processed ${finalResults.roles.length} roles for ${celebrityName}`);
+      console.log(`✅ Successfully processed ${finalResults.roles.length} character image searches for ${celebrityName}`);
       return finalResults;
 
     } catch (error) {
-      console.error(`❌ Failed to get roles for ${celebrityName}:`, error.message);
-      
-      // Try fallback approach
+      console.error(`❌ Failed to get character images for ${celebrityName}:`, error.message);
       return this.handleFailure(celebrityName, error);
     }
   }
 
   /**
-   * Process and format final results - UPDATED to show ChatGPT terms
+   * Process and format final results
    */
   processResults(celebrityName, roles) {
     return {
       celebrity: celebrityName,
       totalRoles: roles.length,
       timestamp: new Date().toISOString(),
-      source: 'ai_powered_with_chatgpt_template',  // Updated source indicator
+      source: 'character_image_focused',
       roles: roles.map((role, index) => ({
         ...role,
-        priority: index + 1, // 1 = highest priority
-        finalSearchTerms: this.searchOptimizer.getBestSearchTerms(role, 6), // Get all 6 ChatGPT terms
+        priority: index + 1,
+        finalSearchTerms: this.searchOptimizer.getBestSearchTerms(role, 6), // Get all 6 character image terms
         imageSearchReady: true,
         searchOptimization: {
-          chatgptTemplateTerms: role.searchTerms?.chatgpt_template?.length || 0,
-          chatgptTerms: role.searchTerms?.chatgpt?.length || 0,
+          characterImageTerms: role.searchTerms?.character_images?.length || 0,
           fallbackTerms: role.searchTerms?.basic?.length || 0,
-          totalTerms: role.searchTerms?.all?.length || 0
+          totalTerms: role.searchTerms?.all?.length || 0,
+          focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6
         }
       })),
       summary: this.generateSummary(roles)
@@ -84,15 +80,15 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Generate summary of role types found - UPDATED
+   * Generate summary with character image stats
    */
   generateSummary(roles) {
     const mediumCounts = {};
-    let totalChatGPTTerms = 0;
+    let totalCharacterImageTerms = 0;
     
     roles.forEach(role => {
       mediumCounts[role.medium] = (mediumCounts[role.medium] || 0) + 1;
-      totalChatGPTTerms += role.searchTerms?.chatgpt?.length || 0;
+      totalCharacterImageTerms += role.searchTerms?.character_images?.length || 0;
     });
 
     const primaryMedium = Object.keys(mediumCounts).reduce((a, b) => 
@@ -104,40 +100,37 @@ class CelebrityRoleOrchestrator {
       mediumBreakdown: mediumCounts,
       hasVoiceRoles: roles.some(r => r.medium.includes('voice')),
       hasLiveActionRoles: roles.some(r => r.medium.includes('live_action')),
-      chatgptOptimization: {
-        totalTemplateTermsGenerated: totalChatGPTTerms,
-        averageTermsPerRole: Math.round(totalChatGPTTerms / roles.length),
-        templateOptimizationSuccess: totalChatGPTTerms > 0
+      characterImageOptimization: {
+        totalCharacterImageTerms: totalCharacterImageTerms,
+        expectedTerms: roles.length * 6,
+        characterImageSuccessRate: Math.round((totalCharacterImageTerms / (roles.length * 6)) * 100),
+        fullyOptimizedRoles: roles.filter(r => (r.searchTerms?.character_images?.length || 0) === 6).length
       }
     };
   }
 
   /**
-   * Handle failures with fallback strategies - UNCHANGED
+   * Handle failures with fallback strategies
    */
   async handleFailure(celebrityName, originalError) {
     console.log(`🔄 Attempting fallback strategies for ${celebrityName}`);
 
     try {
-      // Fallback 1: Try with simplified prompt
       const simplifiedRoles = await this.trySimplifiedFetch(celebrityName);
       if (simplifiedRoles && simplifiedRoles.length > 0) {
         console.log(`✅ Fallback successful with ${simplifiedRoles.length} roles`);
         
-        // Add celebrity name to fallback roles too
         const rolesWithCelebrity = simplifiedRoles.map(role => ({
           ...role,
           celebrity: celebrityName,
           actorName: celebrityName
         }));
         
-        // Optimize fallback roles with ChatGPT template too
+        // Still try to optimize for character images
         const optimizedFallbackRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithCelebrity);
-        
         return this.processResults(celebrityName, optimizedFallbackRoles);
       }
 
-      // Fallback 2: Return basic structure with error info
       return this.createErrorResponse(celebrityName, originalError);
 
     } catch (fallbackError) {
@@ -147,23 +140,24 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Simplified fetch for difficult cases - UNCHANGED
+   * Simplified fetch for difficult cases
    */
   async trySimplifiedFetch(celebrityName) {
-    const simplifiedPrompt = `List 3-5 most famous roles for "${celebrityName}". 
-    
-    Format: [{"character": "Name", "title": "Show/Movie", "medium": "type"}]`;
+    const simplifiedPrompt = `List 3-5 most famous roles for "${celebrityName}". Format: [{"character": "Name", "title": "Show/Movie", "medium": "type"}]`;
 
     try {
-      const completion = await this.roleFetcher.openai.chat.completions.create({
-        model: PROMPT_CONFIG.MODELS.FALLBACK,
-        messages: [{ role: "user", content: simplifiedPrompt }],
-        temperature: 0.5,
-        max_tokens: 500
-      });
+      if (this.roleFetcher.hasOpenAI) {
+        const completion = await this.roleFetcher.openai.chat.completions.create({
+          model: PROMPT_CONFIG.MODELS.FALLBACK || "gpt-3.5-turbo",
+          messages: [{ role: "user", content: simplifiedPrompt }],
+          temperature: 0.5,
+          max_tokens: 500
+        });
 
-      const response = completion.choices[0].message.content;
-      return this.roleFetcher.parseAndValidateResponse(response, celebrityName);
+        const response = completion.choices[0].message.content;
+        return this.roleFetcher.parseAndValidateResponse(response, celebrityName);
+      }
+      return null;
     } catch (error) {
       console.error('Simplified fetch failed:', error.message);
       return null;
@@ -171,7 +165,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Create error response structure - UNCHANGED
+   * Create error response structure
    */
   createErrorResponse(celebrityName, error) {
     return {
@@ -181,7 +175,7 @@ class CelebrityRoleOrchestrator {
       source: 'error',
       error: {
         message: error.message,
-        type: 'ai_fetch_failed'
+        type: 'character_image_fetch_failed'
       },
       roles: [],
       summary: {
@@ -189,17 +183,18 @@ class CelebrityRoleOrchestrator {
         mediumBreakdown: {},
         hasVoiceRoles: false,
         hasLiveActionRoles: false,
-        chatgptOptimization: {
-          totalTemplateTermsGenerated: 0,
-          averageTermsPerRole: 0,
-          templateOptimizationSuccess: false
+        characterImageOptimization: {
+          totalCharacterImageTerms: 0,
+          expectedTerms: 0,
+          characterImageSuccessRate: 0,
+          fullyOptimizedRoles: 0
         }
       }
     };
   }
 
   /**
-   * Get search terms for your existing fetchImages.js - UPDATED for ChatGPT
+   * Get search terms for image fetching integration
    */
   getSearchTermsForImages(results) {
     if (!results.roles || results.roles.length === 0) {
@@ -210,16 +205,16 @@ class CelebrityRoleOrchestrator {
       character: role.character,
       title: role.title,
       medium: role.medium,
-      celebrity: role.celebrity,                    // Include celebrity name
-      searchTerms: role.finalSearchTerms || [],     // These now use ChatGPT template
-      chatgptTemplateTerms: role.searchTerms?.chatgpt_template || [], // NEW: Direct access to template terms
-      chatgptTerms: role.searchTerms?.chatgpt || [], // Keep for compatibility
-      priority: role.priority
+      celebrity: role.celebrity,
+      searchTerms: role.finalSearchTerms || [],
+      characterImageTerms: role.searchTerms?.character_images || [],
+      priority: role.priority,
+      focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6
     }));
   }
 
   /**
-   * NEW: Get detailed search analytics
+   * Get detailed search analytics
    */
   getSearchAnalytics(results) {
     if (!results.roles) return null;
@@ -227,39 +222,42 @@ class CelebrityRoleOrchestrator {
     const analytics = {
       totalRoles: results.roles.length,
       totalSearchTerms: 0,
-      chatgptTemplateTermsGenerated: 0,
-      chatgptTermsGenerated: 0,
+      characterImageTermsGenerated: 0,
       fallbackTermsUsed: 0,
-      templateOptimizationRate: 0
+      characterImageOptimizationRate: 0,
+      fullyOptimizedRoles: 0
     };
 
     results.roles.forEach(role => {
       if (role.searchTerms) {
         analytics.totalSearchTerms += role.searchTerms.all?.length || 0;
-        analytics.chatgptTemplateTermsGenerated += role.searchTerms.chatgpt_template?.length || 0;
-        analytics.chatgptTermsGenerated += role.searchTerms.chatgpt?.length || 0;
+        analytics.characterImageTermsGenerated += role.searchTerms.character_images?.length || 0;
         analytics.fallbackTermsUsed += role.searchTerms.basic?.length || 0;
+        
+        if ((role.searchTerms.character_images?.length || 0) === 6) {
+          analytics.fullyOptimizedRoles++;
+        }
       }
     });
 
-    analytics.templateOptimizationRate = analytics.totalSearchTerms > 0 
-      ? Math.round((analytics.chatgptTemplateTermsGenerated / analytics.totalSearchTerms) * 100) 
+    analytics.characterImageOptimizationRate = analytics.totalSearchTerms > 0 
+      ? Math.round((analytics.characterImageTermsGenerated / analytics.totalSearchTerms) * 100) 
       : 0;
 
     return analytics;
   }
 
   /**
-   * System health check - UPDATED for ChatGPT
+   * System health check with character image focus
    */
   async systemHealthCheck() {
-    console.log('🔍 Running AI system health check...');
+    console.log('🔍 Running character image system health check...');
     
     const checks = {
       aiConnection: false,
       roleFetcher: false,
       searchOptimizer: false,
-      chatgptIntegration: false
+      characterImageIntegration: false
     };
 
     try {
@@ -272,13 +270,13 @@ class CelebrityRoleOrchestrator {
       // Test search optimizer
       checks.searchOptimizer = await this.searchOptimizer.testOptimizer();
       
-      // NEW: Test ChatGPT integration specifically
-      checks.chatgptIntegration = await this.testChatGPTIntegration();
+      // Test character image integration
+      checks.characterImageIntegration = await this.testCharacterImageIntegration();
 
       const allPassed = Object.values(checks).every(check => check === true);
       
       console.log('Health Check Results:', checks);
-      console.log(allPassed ? '✅ All systems operational including ChatGPT' : '⚠️ Some systems have issues');
+      console.log(allPassed ? '✅ All systems operational for character image searches' : '⚠️ Some systems have issues');
       
       return { passed: allPassed, details: checks };
 
@@ -289,32 +287,32 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * NEW: Test ChatGPT integration specifically
+   * Test character image integration specifically
    */
-  async testChatGPTIntegration() {
+  async testCharacterImageIntegration() {
     try {
       const testRole = {
-        character: "Captain Kirk",
-        title: "Star Trek",
+        character: "Test Character",
+        title: "Test Show",
         medium: "live_action_tv",
-        celebrity: "William Shatner",
-        actorName: "William Shatner"
+        celebrity: "Test Actor",
+        actorName: "Test Actor"
       };
       
-      const optimized = await this.searchOptimizer.optimizeRoleWithChatGPTTemplate(testRole);
-      return optimized.searchTerms?.chatgpt_template?.length === 6;
+      const optimized = await this.searchOptimizer.optimizeRoleForCharacterImages(testRole);
+      return optimized.searchTerms?.character_images?.length === 6;
     } catch (error) {
-      console.error('ChatGPT integration test failed:', error.message);
+      console.error('Character image integration test failed:', error.message);
       return false;
     }
   }
 
   /**
-   * Test role fetcher with known celebrity - UNCHANGED
+   * Test role fetcher
    */
   async testRoleFetcher() {
     try {
-      const testResult = await this.roleFetcher.fetchRoles("Robert Downey Jr");
+      const testResult = await this.roleFetcher.fetchRoles("Test Celebrity");
       return testResult && testResult.length > 0;
     } catch (error) {
       console.error('Role fetcher test failed:', error.message);
@@ -323,7 +321,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Clear cache - UNCHANGED
+   * Clear cache
    */
   clearCache() {
     this.cache.clear();
@@ -331,7 +329,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Get cache statistics - UNCHANGED
+   * Get cache statistics
    */
   getCacheStats() {
     return {
@@ -342,8 +340,7 @@ class CelebrityRoleOrchestrator {
 }
 
 /**
- * Main execution function - replaces your old fetchRoles.js
- * This is what gets called from your index.js or main application
+ * Main execution function
  */
 async function fetchCelebrityRoles(celebrityName) {
   const orchestrator = new CelebrityRoleOrchestrator();
@@ -351,10 +348,10 @@ async function fetchCelebrityRoles(celebrityName) {
 }
 
 /**
- * Initialize and test the system - UPDATED
+ * Initialize and test the system
  */
 async function initializeSystem() {
-      console.log('🚀 Initializing AI-powered celebrity role system with ChatGPT template...');
+  console.log('🚀 Initializing character image search system...');
   
   const orchestrator = new CelebrityRoleOrchestrator();
   const healthCheck = await orchestrator.systemHealthCheck();
@@ -363,11 +360,11 @@ async function initializeSystem() {
     console.warn('⚠️ System initialization completed with warnings');
     console.warn('Check your OpenAI API key and internet connection');
     
-    if (!healthCheck.details.chatgptIntegration) {
-      console.warn('⚠️ ChatGPT template integration failed - search terms will use fallback methods');
+    if (!healthCheck.details.characterImageIntegration) {
+      console.warn('⚠️ Character image integration failed - search terms will use fallback methods');
     }
   } else {
-    console.log('✅ AI system fully operational with ChatGPT template integration');
+    console.log('✅ Character image search system fully operational');
   }
   
   return healthCheck;
