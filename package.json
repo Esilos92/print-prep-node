@@ -11,7 +11,7 @@
     "axios": "^1.6.0",
     "sharp": "^0.32.0",
     "image-hash": "^4.0.0",
-    "blockhash-js": "^1.1.0",
+    "blockhash": "^0.2.0",
     "adm-zip": "^0.5.10",
     "googleapis": "^128.0.0",
     "dotenv": "^16.3.1",
