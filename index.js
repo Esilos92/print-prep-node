@@ -44,7 +44,8 @@ async function main() {
     
     // Step 4: Resize images
     logger.info('📐 Step 4: Resizing images...');
-    const resizedImages = await resizeImages(validImages, workDir);
+    // UPDATED: Pass celebrityName to resizeImages for proper filename generation
+    const resizedImages = await resizeImages(validImages, workDir, celebrityName);
     logger.info(`Resized ${resizedImages.length} images`);
     
     // Step 5: Generate manifest
