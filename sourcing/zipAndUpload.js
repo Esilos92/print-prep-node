@@ -87,7 +87,8 @@ class ZipUploader {
       const response = await drive.files.create({
         resource: fileMetadata,
         media: media,
-        fields: 'id,webViewLink'
+        fields: 'id,webViewLink',
+        supportsAllDrives: true
       });
       
       logger.success(`File uploaded successfully: ${response.data.id}`);
