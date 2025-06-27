@@ -482,23 +482,24 @@ class RoleFetcher {
       ];
       
       for (const pattern of titlePatterns) {
-      let match;
-      while ((match = pattern.exec(text)) !== null) {
-        let title = match[1].trim();
-        
-        // Clean up the extracted title
-        title = title.replace(/^(the|a|an)\s+/i, '');
-        title = title.replace(/\s+(and|or|,).*$/i, '');
-        title = title.trim();
-        
-        // Filter out obvious non-titles
-        if (this.isValidTitle(title)) {
-          titles.push(title);
+        let match;
+        while ((match = pattern.exec(combined)) !== null) {
+          let extractedTitle = match[1].trim();
+          
+          // Clean up the extracted title
+          extractedTitle = extractedTitle.replace(/^(the|a|an)\s+/i, '');
+          extractedTitle = extractedTitle.replace(/\s+(and|or|,).*$/i, '');
+          extractedTitle = extractedTitle.trim();
+          
+          // Filter out obvious non-titles
+          if (this.isValidTitle(extractedTitle)) {
+            extractedTitles.push(extractedTitle);
+          }
         }
       }
     }
     
-    return titles;
+    return extractedTitles;
   }
   
   /**
@@ -712,28 +713,6 @@ class RoleFetcher {
         searchTerms: [celebrityName, 'portrait', 'photo shoot']
       }
     ];
-  }
-}
-
-module.exports = { fetchRoles: RoleFetcher.fetchRoles.bind(RoleFetcher) }; of titlePatterns) {
-        let match;
-        while ((match = pattern.exec(combined)) !== null) {
-          let extractedTitle = match[1].trim();
-          
-          // Clean up the extracted title
-          extractedTitle = extractedTitle.replace(/\s+(and|or|,).*$/i, '');
-          extractedTitle = extractedTitle.replace(/^(the|a|an)\s+/i, '');
-          extractedTitle = extractedTitle.trim();
-          
-          // Validate the extracted title
-          if (this.isValidExtractedTitle(extractedTitle, celebrityName)) {
-            extractedTitles.push(extractedTitle);
-          }
-        }
-      }
-    }
-    
-    return extractedTitles;
   }
 
   /**
@@ -1630,4 +1609,25 @@ module.exports = { fetchRoles: RoleFetcher.fetchRoles.bind(RoleFetcher) }; of ti
       /\b([A-Z][a-zA-Z\s:'-]{2,25}?)(?:\s+franchise|\s+series|\s+and|\s*,|\.|$)/gi
     ];
     
-    for (const pattern
+    for (const pattern of titlePatterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        let title = match[1].trim();
+        
+        // Clean up the extracted title
+        title = title.replace(/^(the|a|an)\s+/i, '');
+        title = title.replace(/\s+(and|or|,).*$/i, '');
+        title = title.trim();
+        
+        // Filter out obvious non-titles
+        if (this.isValidTitle(title)) {
+          titles.push(title);
+        }
+      }
+    }
+    
+    return titles;
+  }
+}
+
+module.exports = { fetchRoles: RoleFetcher.fetchRoles.bind(RoleFetcher) };
