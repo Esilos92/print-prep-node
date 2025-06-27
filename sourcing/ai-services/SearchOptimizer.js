@@ -88,7 +88,9 @@ class SearchOptimizer {
     }
 
     try {
-      const prompt = PROMPTS.OPTIMIZE_SEARCH(role.character, role.title, role.medium);
+      // Get the actor name from the role or try to extract it
+      const actorName = role.actorName || this.extractActorName(role);
+      const prompt = PROMPTS.OPTIMIZE_SEARCH(role.character, role.title, role.medium, actorName);
       
       const completion = await this.openai.chat.completions.create({
         model: PROMPT_CONFIG.MODELS.PRIMARY,
@@ -104,6 +106,14 @@ class SearchOptimizer {
       console.error(`AI search term generation failed for ${role.character}:`, error.message);
       return [];
     }
+  }
+
+  /**
+   * Extract actor name from role data or use fallback
+   */
+  extractActorName(role) {
+    // Try to get actor name from various possible fields
+    return role.actor || role.actorName || role.performer || 'ACTOR_NAME';
   }
 
   /**
@@ -132,52 +142,56 @@ class SearchOptimizer {
   }
 
   /**
-   * Generate medium-specific search terms with STRICT exclusions
+   * Generate medium-specific search terms with poster inclusion
    */
   generateMediumSpecificTerms(role) {
     const { character, title, medium } = role;
     const terms = [];
     
-    // Universal exclusions for all search terms
-    const exclusions = "-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -dvd -cover -poster -fan -art -edit -meme";
+    // Universal exclusions (removed -poster to allow official movie posters)
+    const exclusions = "-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -dvd -case -fan -art -edit -meme";
 
     switch (medium) {
       case 'live_action_movie':
         terms.push(`"${title}" cast production photo ${exclusions}`);
+        terms.push(`"${title}" official movie poster theatrical ${exclusions}`);
         terms.push(`"William Shatner" "${character}" "${title}" promotional ${exclusions}`);
-        terms.push(`"${title}" behind scenes cast photo ${exclusions}`);
+        terms.push(`"${title}" original cinema poster high resolution ${exclusions}`);
         break;
 
       case 'live_action_tv':
         terms.push(`"${title}" main cast promotional photo ${exclusions}`);
+        terms.push(`"${title}" official promotional poster ${exclusions}`);
         terms.push(`"William Shatner" "${character}" production still ${exclusions}`);
-        terms.push(`"${title}" cast group press photo ${exclusions}`);
         break;
 
       case 'voice_anime':
         terms.push(`"${title}" main characters official artwork ${exclusions}`);
+        terms.push(`"${title}" official anime poster ${exclusions}`);
         terms.push(`"${character}" "${title}" official anime art ${exclusions}`);
-        terms.push(`"${title}" character group promotional ${exclusions}`);
         break;
 
       case 'voice_cartoon':
         terms.push(`"${title}" main characters official art ${exclusions}`);
+        terms.push(`"${title}" official cartoon poster ${exclusions}`);
         terms.push(`"${character}" "${title}" official character ${exclusions}`);
-        terms.push(`"${title}" character ensemble official ${exclusions}`);
         break;
 
       case 'voice_game':
         terms.push(`"${title}" main characters official game art ${exclusions}`);
+        terms.push(`"${title}" official game poster ${exclusions}`);
         terms.push(`"${character}" "${title}" official character art ${exclusions}`);
         break;
 
       case 'voice_movie':
         terms.push(`"${title}" animated characters promotional ${exclusions}`);
+        terms.push(`"${title}" official animated movie poster ${exclusions}`);
         terms.push(`"${character}" "${title}" official animation art ${exclusions}`);
         break;
 
       default:
         terms.push(`"${title}" cast promotional photo ${exclusions}`);
+        terms.push(`"${title}" official poster ${exclusions}`);
         terms.push(`"${character}" "${title}" official image ${exclusions}`);
         break;
     }
