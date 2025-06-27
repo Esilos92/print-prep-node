@@ -8,18 +8,18 @@ const { sanitizeFilename } = require('../utils/helpers');
 class ImageFetcher {
   
   /**
-   * Fetch images for a specific role using Bing Image Search API
+   * Fetch images for a specific role using SerpAPI Google Images
    */
   static async fetchImages(celebrityName, role, workDir) {
     try {
-      if (!config.api.bingImageKey) {
-        throw new Error('Bing Image Search API key not configured');
+      if (!config.api.serpApiKey) {
+        throw new Error('SerpAPI key not configured');
       }
       
       const searchQuery = this.buildSearchQuery(celebrityName, role);
       logger.info(`Searching images for: ${searchQuery}`);
       
-      const imageUrls = await this.searchBingImages(searchQuery);
+      const imageUrls = await this.searchSerpImages(searchQuery);
       logger.info(`Found ${imageUrls.length} image URLs`);
       
       const downloadedImages = await this.downloadImages(imageUrls, role, workDir);
@@ -54,27 +54,23 @@ class ImageFetcher {
   }
   
   /**
-   * Search Azure AI Services Image API (new format)
+   * Search SerpAPI Google Images
    */
-  static async searchBingImages(query) {
-    // Use configured endpoint (Azure AI Services format)
-    const url = config.api.bingEndpoint;
+  static async searchSerpImages(query) {
+    const url = config.api.serpEndpoint;
     
     const params = {
+      api_key: config.api.serpApiKey,
+      engine: 'google_images',
       q: query,
-      count: config.image.maxImagesPerRole,
-      offset: 0,
-      mkt: 'en-US',
-      safeSearch: 'Moderate',
-      imageType: 'Photo',
-      size: 'Large', // Large or Wallpaper for high-res
-      aspect: 'All',
-      color: 'All',
-      freshness: 'All'
+      num: config.image.maxImagesPerRole,
+      ijn: 0, // Image page number
+      tbs: 'isz:l,sur:fmc', // Large images, free for commercial use
+      safe: 'active',
+      nfpr: 1 // No auto-correction
     };
     
     const headers = {
-      'Ocp-Apim-Subscription-Key': config.api.bingImageKey,
       'User-Agent': 'PrintPrepNode/1.0',
       'Accept': 'application/json'
     };
@@ -86,24 +82,43 @@ class ImageFetcher {
         timeout: 15000
       });
       
-      // Handle both old v7 and new AI Services response formats
-      const images = response.data.value || response.data.images || [];
+      // Handle SerpAPI response format
+      const images = response.data.images_results || [];
       
       return images.map(image => ({
-        url: image.contentUrl || image.url,
-        thumbnailUrl: image.thumbnailUrl || image.thumbnail?.url,
-        width: image.width || 0,
-        height: image.height || 0,
-        size: image.contentSize || 0,
-        name: image.name || 'untitled',
-        hostPageUrl: image.hostPageUrl || image.webSearchUrl
+        url: image.original || image.thumbnail,
+        thumbnailUrl: image.thumbnail,
+        width: image.original_width || 0,
+        height: image.original_height || 0,
+        size: image.original_width && image.original_height ? 
+              `${image.original_width}x${image.original_height}` : 0,
+        name: image.title || 'untitled',
+        hostPageUrl: image.link || '',
+        source: image.source || 'Unknown',
+        position: image.position || 0,
+        serpApiData: {
+          relatedContentId: image.related_content_id,
+          isProduct: image.is_product || false,
+          license: image.license_details_url || null
+        }
       }));
       
     } catch (error) {
-      logger.error('Azure AI Services Image API error:', error.response?.data || error.message);
+      logger.error('SerpAPI error:', error.response?.data || error.message);
+      
+      // Handle specific SerpAPI errors
+      if (error.response?.status === 401) {
+        logger.error('Invalid SerpAPI key. Check your SERP_API_KEY in config.');
+        return [];
+      }
+      
+      if (error.response?.status === 403) {
+        logger.error('SerpAPI quota exceeded or access denied.');
+        return [];
+      }
       
       // If the endpoint fails, try fallback search
-      if (error.response?.status === 404 || error.response?.status === 403) {
+      if (error.response?.status === 404 || error.response?.status === 500) {
         logger.warn('Primary endpoint failed, trying fallback...');
         return await this.fallbackImageSearch(query);
       }
