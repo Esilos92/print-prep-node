@@ -49,23 +49,52 @@ class RoleFetcher {
       
       const personId = searchResponse.data.results[0].id;
       
-      // Get person's movie credits
-      const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/movie_credits?api_key=${config.api.tmdbKey}`;
+      // Get person's COMBINED credits (both movies and TV)
+      const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/combined_credits?api_key=${config.api.tmdbKey}`;
       const creditsResponse = await axios.get(creditsUrl);
       
-      const roles = creditsResponse.data.cast
-        .filter(movie => movie.popularity > 5) // Filter for popular movies
-        .sort((a, b) => b.popularity - a.popularity)
-        .slice(0, 5)
-        .map(movie => ({
-          name: movie.title,
-          character: movie.character,
-          year: movie.release_date ? new Date(movie.release_date).getFullYear() : null,
-          tags: ['movie', 'tmdb'],
-          searchTerms: [movie.title, movie.character, celebrityName].filter(Boolean)
-        }));
+      const allCredits = creditsResponse.data.cast || [];
+      
+      // Process and sort all credits (movies and TV)
+      const roles = allCredits
+        .filter(credit => {
+          // Filter for substantial roles with good popularity
+          const hasTitle = credit.title || credit.name;
+          const hasPopularity = credit.popularity && credit.popularity > 3;
+          const hasVotes = credit.vote_count && credit.vote_count > 50;
+          return hasTitle && (hasPopularity || hasVotes);
+        })
+        .map(credit => {
+          // Normalize the data structure for both movies and TV
+          const isMovie = credit.media_type === 'movie';
+          const title = isMovie ? credit.title : credit.name;
+          const releaseDate = isMovie ? credit.release_date : credit.first_air_date;
+          
+          return {
+            name: title,
+            character: credit.character || 'Unknown role',
+            year: releaseDate ? new Date(releaseDate).getFullYear() : null,
+            media_type: credit.media_type,
+            popularity: credit.popularity || 0,
+            vote_count: credit.vote_count || 0,
+            tags: [credit.media_type, 'tmdb'],
+            searchTerms: [title, credit.character, celebrityName].filter(Boolean)
+          };
+        })
+        .sort((a, b) => {
+          // Sort by popularity first, then by vote count
+          if (b.popularity !== a.popularity) {
+            return b.popularity - a.popularity;
+          }
+          return b.vote_count - a.vote_count;
+        })
+        .slice(0, 5);
       
       logger.info(`Found ${roles.length} roles from TMDb`);
+      roles.forEach(role => {
+        logger.info(`- ${role.name} (${role.media_type}) - ${role.character} [Pop: ${role.popularity.toFixed(1)}]`);
+      });
+      
       return roles;
       
     } catch (error) {
