@@ -498,4 +498,4 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
   }
 }
 
-export default AIRoleFetcher;
+module.exports = AIRoleFetcher;
