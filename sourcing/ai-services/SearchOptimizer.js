@@ -3,9 +3,24 @@ const { PROMPTS, PROMPT_CONFIG } = require('../config/prompts.js');
 
 class SearchOptimizer {
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
+    this.openai = null;
+    this.hasOpenAI = false;
+    this.initializeOpenAI();
+  }
+
+  initializeOpenAI() {
+    try {
+      if (process.env.OPENAI_API_KEY) {
+        this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        this.hasOpenAI = true;
+        console.log('✅ OpenAI initialized for search optimization');
+      } else {
+        console.log('ℹ️ OpenAI not configured for search optimization, using basic terms');
+      }
+    } catch (error) {
+      console.log('⚠️ OpenAI initialization failed for search optimization, using basic terms');
+      this.hasOpenAI = false;
+    }
   }
 
   /**
@@ -64,9 +79,14 @@ class SearchOptimizer {
   }
 
   /**
-   * Generate AI-powered search terms
+   * Generate AI-powered search terms (only if OpenAI available)
    */
   async generateAISearchTerms(role) {
+    if (!this.hasOpenAI) {
+      console.log(`⚠️ No OpenAI for AI search terms, using basic terms for ${role.character}`);
+      return [];
+    }
+
     try {
       const prompt = PROMPTS.OPTIMIZE_SEARCH(role.character, role.title, role.medium);
       
@@ -241,7 +261,7 @@ class SearchOptimizer {
   }
 
   /**
-   * Test the search optimizer
+   * Test the search optimizer (works without OpenAI)
    */
   async testOptimizer() {
     const testRole = {
