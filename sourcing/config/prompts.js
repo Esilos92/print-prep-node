@@ -6,32 +6,45 @@
 export const PROMPTS = {
   
   /**
-   * Main role fetching prompt - handles ANY celebrity type
+   * Main role fetching prompt - handles ANY celebrity type with autograph focus
    */
-  FETCH_ROLES: (actorName) => `You are an entertainment industry expert. For the performer "${actorName}", provide their TOP 5 most iconic and recognizable roles from ANY medium.
+  FETCH_ROLES: (actorName) => `You are an entertainment industry expert specializing in celebrity autograph and fan convention analysis. For the performer "${actorName}", provide their TOP 5 most iconic and recognizable CHARACTER ROLES that fans would want autographs for.
 
-IMPORTANT GUIDELINES:
-- Include ALL types of roles: live-action movies, TV shows, voice acting, etc.
-- Choose roles that are most recognizable and would have good image search results
-- Prioritize iconic characters/roles over minor appearances
-- Include character name for fictional roles, or role description for non-fiction
-- For voice actors: include both English dub and Japanese roles if applicable
-- For live-action: include both movies and significant TV roles
-- Mixed performers: balance between their different mediums
+CRITICAL REQUIREMENTS - ONLY include roles that meet ALL of these criteria:
+- NAMED CHARACTER ROLES (not hosting, presenting, or "various characters")
+- ROLES WITH GOOD VISUAL REPRESENTATION (characters that have clear, searchable images)
+- FAN-FAVORITE ROLES (characters that convention attendees would recognize)
+- SPECIFIC CHARACTER NAMES (avoid "Various Characters" or "Multiple Roles")
+
+PRIORITIZE:
+- Main characters over minor appearances
+- Named characters over unnamed roles
+- Popular franchises with strong fan bases
+- Roles with distinctive character designs or memorable performances
+- Characters that would be recognizable from photos/images
+
+AVOID:
+- TV hosting, game show hosting, or presenting roles
+- "Various characters" or "multiple characters" entries
+- Minor voice work without specific character names
+- Reality TV appearances
+- Narrator or voice-over work without character identity
+- Behind-the-scenes or producer credits
 
 Format your response as a JSON array with this exact structure:
 [
   {
-    "character": "Character/Role Name",
+    "character": "Specific Character Name (not 'Various Characters')",
     "title": "Show/Movie/Production Title", 
     "medium": "live_action_movie|live_action_tv|voice_anime|voice_cartoon|voice_game|voice_movie",
     "year": "YYYY",
-    "description": "Brief 1-2 sentence description of the character/role",
-    "popularity": "high|medium|low"
+    "description": "Brief 1-2 sentence description focusing on why fans love this character",
+    "popularity": "high|medium|low",
+    "autograph_appeal": "high|medium|low"
   }
 ]
 
-Provide exactly 5 roles, ordered from most iconic/recognizable to least iconic.`,
+Provide exactly 5 roles, ordered from most autograph-worthy/fan-recognizable to least.`,
 
   /**
    * Search term optimization prompt - adapts to medium type
