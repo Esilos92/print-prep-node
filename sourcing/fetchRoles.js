@@ -158,8 +158,28 @@ class RoleFetcher {
         logger.info(`🎯 Hail Mary found ${hailMaryRoles.length} additional roles`);
       }
       
-      // Step 4: Convert to role objects
-      const finalRoles = verifiedRoles.slice(0, 8).map((title, index) => {
+      // Step 4: Convert to role objects with DEDUPLICATION
+      const uniqueVerifiedRoles = [...new Set(verifiedRoles)]; // Remove exact duplicates
+      
+      // Additional deduplication: remove partial matches
+      const deduplicatedRoles = [];
+      for (const role of uniqueVerifiedRoles) {
+        // Check if this role is a substring of any existing role
+        const isPartialDuplicate = deduplicatedRoles.some(existingRole => {
+          return existingRole.toLowerCase().includes(role.toLowerCase()) || 
+                 role.toLowerCase().includes(existingRole.toLowerCase());
+        });
+        
+        if (!isPartialDuplicate) {
+          deduplicatedRoles.push(role);
+        } else {
+          logger.info(`🚫 Removed partial duplicate: "${role}"`);
+        }
+      }
+      
+      logger.info(`🔄 Deduplication: ${verifiedRoles.length} → ${uniqueVerifiedRoles.length} → ${deduplicatedRoles.length} roles`);
+      
+      const finalRoles = deduplicatedRoles.slice(0, 5).map((title, index) => {
         const isVoiceRole = this.detectVoiceRole(title, celebrityName);
         
         return {
@@ -169,7 +189,7 @@ class RoleFetcher {
           media_type: isVoiceRole ? 'tv' : 'movie',
           popularity: 100 - (index * 10),
           vote_count: 1000 - (index * 100),
-          isKnownFor: knownForTitles.includes(title),
+          isKnownFor: knownForTitles.includes(title) || filteredTitles.includes(title),
           isVoiceRole: isVoiceRole,
           characterName: isVoiceRole ? this.extractCharacterName(title, celebrityName) : null,
           tags: ['comprehensive_fallback', isVoiceRole ? 'voice_role' : 'live_action'],
@@ -366,6 +386,13 @@ class RoleFetcher {
     
     // Reject if ends with generic terms - PREVENTS "Cartoon Network's animated"
     if (invalidSuffixes.some(suffix => titleLower.endsWith(suffix))) return false;
+    
+    // ADDITIONAL FIX: Reject incomplete titles (less than 2 substantial words)
+    const words = title.split(/\s+/).filter(word => word.length > 2);
+    if (words.length < 2) {
+      logger.info(`🚫 Rejected incomplete title: "${title}" (only ${words.length} substantial words)`);
+      return false;
+    }
     
     // Filter out common non-title words
     const excludeWords = [
