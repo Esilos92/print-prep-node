@@ -85,7 +85,7 @@ class ImageFetcher {
    */
   static getEnhancedSerpAPIParams(query) {
     return {
-      api_key: config.api.serpKey,
+      api_key: config.api.serpApiKey,
       engine: "google_images",
       q: query,
       
