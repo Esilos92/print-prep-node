@@ -19,9 +19,22 @@ class RoleFetcher {
       // Get more roles from TMDb for franchise detection (up to 20)
       let allRoles = await this.fetchFromTMDb(celebrityName, knownForTitles, 20);
       
+      // CRITICAL FIX: Validate TMDb results against Wikipedia
+      if (allRoles.length > 0 && knownForTitles.length > 0) {
+        const tmdbMatchesWikipedia = this.validateTMDbAgainstWikipedia(allRoles, knownForTitles);
+        
+        if (!tmdbMatchesWikipedia) {
+          logger.warn(`🚨 TMDb found "${celebrityName}" but results don't match Wikipedia known roles`);
+          logger.warn(`TMDb titles: ${allRoles.map(r => r.name).slice(0, 3).join(', ')}`);
+          logger.warn(`Wikipedia known for: ${knownForTitles.join(', ')}`);
+          logger.warn(`🔄 Treating as TMDb failure - using Wikipedia fallback`);
+          allRoles = []; // Clear TMDb results to trigger fallback
+        }
+      }
+      
       // CRITICAL FIX: TMDb Fallback Implementation
       if (allRoles.length === 0) {
-        logger.warn('🚨 TMDb returned zero results - implementing Wikipedia fallback');
+        logger.warn('🚨 TMDb returned zero results OR wrong person - implementing Wikipedia fallback');
         allRoles = await this.createWikipediaFallbackRoles(celebrityName, knownForTitles);
         
         if (allRoles.length === 0) {
@@ -46,8 +59,48 @@ class RoleFetcher {
   }
 
   /**
+   * CRITICAL FIX: Validate TMDb results against Wikipedia to catch wrong person
+   */
+  static validateTMDbAgainstWikipedia(tmdbRoles, knownForTitles) {
+    if (knownForTitles.length === 0) {
+      return true; // No Wikipedia data to validate against
+    }
+    
+    // Check if ANY TMDb role matches ANY Wikipedia known-for title
+    const hasMatch = tmdbRoles.some(tmdbRole => {
+      return knownForTitles.some(knownTitle => {
+        return this.matchesKnownForTitles(tmdbRole.name, [knownTitle]);
+      });
+    });
+    
+    // Also check for partial matches on character names for voice actors
+    const hasCharacterMatch = tmdbRoles.some(tmdbRole => {
+      if (!tmdbRole.character || tmdbRole.character === 'Unknown role') return false;
+      
+      return knownForTitles.some(knownTitle => {
+        const titleLower = knownTitle.toLowerCase();
+        const characterLower = tmdbRole.character.toLowerCase();
+        
+        // Check if character name appears in known title
+        return titleLower.includes(characterLower) || characterLower.includes(titleLower);
+      });
+    });
+    
+    const isValid = hasMatch || hasCharacterMatch;
+    
+    if (!isValid) {
+      logger.info('🔍 TMDb validation failed:');
+      logger.info(`  TMDb roles: ${tmdbRoles.slice(0, 3).map(r => `${r.name} (${r.character})`).join(', ')}`);
+      logger.info(`  Wikipedia known for: ${knownForTitles.join(', ')}`);
+      logger.info('  No matches found - likely wrong person with same name');
+    }
+    
+    return isValid;
+  }
+
+  /**
    * CRITICAL FIX: Create roles directly from Wikipedia when TMDb fails
-   * This solves the Dana Snyder case where TMDb has no data
+   * This solves the Dana Snyder case where TMDb has no data OR wrong person
    */
   static async createWikipediaFallbackRoles(celebrityName, knownForTitles) {
     try {
@@ -56,11 +109,24 @@ class RoleFetcher {
       // Get expanded Wikipedia role data
       const wikipediaRoles = await this.fetchExpandedWikipediaRoles(celebrityName);
       
-      // Combine known-for titles with discovered roles
-      const allDiscoveredTitles = [...knownForTitles, ...wikipediaRoles];
+      // For voice actors, try BehindTheVoiceActors.com as additional source
+      let behindVoiceActorsRoles = [];
+      if (this.isLikelyVoiceActor(knownForTitles)) {
+        behindVoiceActorsRoles = await this.fetchFromBehindTheVoiceActors(celebrityName);
+      }
+      
+      // Combine all sources with priority: known-for > BehindTheVoiceActors > Wikipedia
+      const allDiscoveredTitles = [
+        ...knownForTitles,                    // Highest priority
+        ...behindVoiceActorsRoles,           // Voice actor database  
+        ...wikipediaRoles                     // General Wikipedia
+      ];
+      
+      // Remove duplicates while preserving order
+      const uniqueTitles = [...new Set(allDiscoveredTitles)];
       
       // Convert to role objects with proper structure
-      const fallbackRoles = allDiscoveredTitles.map((title, index) => {
+      const fallbackRoles = uniqueTitles.slice(0, 10).map((title, index) => {
         const isVoiceRole = this.detectVoiceRole(title, celebrityName);
         
         return {
@@ -83,7 +149,8 @@ class RoleFetcher {
       fallbackRoles.forEach((role, i) => {
         const voiceMarker = role.isVoiceRole ? ' (VOICE)' : '';
         const knownMarker = role.isKnownFor ? ' ⭐' : '';
-        logger.info(`  ${i + 1}. ${role.name}${voiceMarker}${knownMarker}`);
+        const sourceMarker = behindVoiceActorsRoles.includes(role.name) ? ' [BTVA]' : '';
+        logger.info(`  ${i + 1}. ${role.name}${voiceMarker}${knownMarker}${sourceMarker}`);
       });
       
       return fallbackRoles;
@@ -91,6 +158,87 @@ class RoleFetcher {
     } catch (error) {
       logger.error('Wikipedia fallback creation failed:', error.message);
       return [];
+    }
+  }
+
+  /**
+   * Check if this appears to be a voice actor based on known titles
+   */
+  static isLikelyVoiceActor(knownForTitles) {
+    if (!knownForTitles || knownForTitles.length === 0) return false;
+    
+    const voiceActorIndicators = [
+      'adult swim', 'cartoon network', 'animated', 'voice', 'character',
+      'aqua teen', 'robot chicken', 'family guy', 'simpsons', 'south park'
+    ];
+    
+    return knownForTitles.some(title => {
+      const titleLower = title.toLowerCase();
+      return voiceActorIndicators.some(indicator => titleLower.includes(indicator));
+    });
+  }
+
+  /**
+   * EXPERIMENTAL: Fetch from BehindTheVoiceActors.com for voice actor roles
+   */
+  static async fetchFromBehindTheVoiceActors(celebrityName) {
+    try {
+      logger.info('🎤 Attempting BehindTheVoiceActors.com lookup...');
+      
+      // Create URL-friendly name
+      const urlName = celebrityName.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+      
+      const btvaUrl = `https://www.behindthevoiceactors.com/voice-actors/${urlName}/`;
+      
+      const response = await axios.get(btvaUrl, { 
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      const $ = cheerio.load(response.data);
+      const roles = [];
+      
+      // Look for voice acting credits
+      $('.voice-acting table tr').each((i, row) => {
+        const cells = $(row).find('td');
+        if (cells.length >= 2) {
+          const character = $(cells[0]).text().trim();
+          const show = $(cells[1]).text().trim();
+          
+          if (character && show && character !== 'Character' && show !== 'Show/Movie') {
+            const roleTitle = `${show}: ${character}`;
+            if (roleTitle.length > 5 && roleTitle.length < 100) {
+              roles.push(roleTitle);
+            }
+          }
+        }
+      });
+      
+      // Also check for popular roles section
+      $('.popular-roles .role').each((i, elem) => {
+        const roleText = $(elem).text().trim();
+        if (roleText && roleText.length > 3 && roleText.length < 100) {
+          roles.push(roleText);
+        }
+      });
+      
+      const uniqueRoles = [...new Set(roles)].slice(0, 8); // Top 8 voice roles
+      
+      if (uniqueRoles.length > 0) {
+        logger.info(`🎤 BehindTheVoiceActors found ${uniqueRoles.length} roles: ${uniqueRoles.slice(0, 3).join(', ')}`);
+      } else {
+        logger.info('🎤 BehindTheVoiceActors: No roles found');
+      }
+      
+      return uniqueRoles;
+      
+    } catch (error) {
+      logger.info(`🎤 BehindTheVoiceActors lookup failed: ${error.message}`);
+      return []; // Fail silently, this is experimental
     }
   }
 
