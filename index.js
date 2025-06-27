@@ -16,7 +16,7 @@ async function main() {
       logger.error('Please provide a celebrity name as an argument');
       process.exit(1);
     }
-
+    
     logger.info(`🚀 Starting image sourcing for: ${celebrityName}`);
     
     // Create temporary working directory
@@ -75,33 +75,3 @@ if (require.main === module) {
 }
 
 module.exports = { main };
-
-// ===== utils/config.js =====
-require('dotenv').config();
-
-const config = {
-  api: {
-    bingImageKey: process.env.BING_IMAGE_API_KEY,
-    tmdbKey: process.env.TMDB_API_KEY,
-  },
-  
-  googleDrive: {
-    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID,
-    credentialsPath: './credentials/google-drive-creds.json'
-  },
-  
-  image: {
-    minDimensions: {
-      '8x10': {
-        width: parseInt(process.env.MIN_WIDTH_8X10) || 2400,
-        height: parseInt(process.env.MIN_HEIGHT_8X10) || 3000
-      },
-      '11x17': {
-        width: parseInt(process.env.MIN_WIDTH_11X17) || 3300,
-        height: parseInt(process.env.MIN_HEIGHT_11X17) || 5100
-      }
-    },
-    maxImagesPerRole: parseInt(process.env.MAX_IMAGES_PER_ROLE) || 50,
-    dedupThreshold: parseFloat(process.env.DEDUP_THRESHOLD) || 0.85
-  }
-};
