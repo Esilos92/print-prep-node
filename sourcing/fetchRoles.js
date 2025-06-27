@@ -59,43 +59,327 @@ class RoleFetcher {
   }
 
   /**
-   * CRITICAL FIX: Validate TMDb results against Wikipedia to catch wrong person
+   * Fetch top 5 iconic roles for a celebrity with franchise diversification and comprehensive fallback
    */
-  static validateTMDbAgainstWikipedia(tmdbRoles, knownForTitles) {
-    if (knownForTitles.length === 0) {
-      return true; // No Wikipedia data to validate against
-    }
-    
-    // Check if ANY TMDb role matches ANY Wikipedia known-for title
-    const hasMatch = tmdbRoles.some(tmdbRole => {
-      return knownForTitles.some(knownTitle => {
-        return this.matchesKnownForTitles(tmdbRole.name, [knownTitle]);
-      });
-    });
-    
-    // Also check for partial matches on character names for voice actors
-    const hasCharacterMatch = tmdbRoles.some(tmdbRole => {
-      if (!tmdbRole.character || tmdbRole.character === 'Unknown role') return false;
+  static async fetchRoles(celebrityName) {
+    try {
+      logger.info(`Fetching roles for: ${celebrityName}`);
       
-      return knownForTitles.some(knownTitle => {
-        const titleLower = knownTitle.toLowerCase();
-        const characterLower = tmdbRole.character.toLowerCase();
+      // Get Wikipedia "best known for" information first
+      const knownForTitles = await this.getKnownForTitles(celebrityName);
+      logger.info(`Wikipedia "known for": ${knownForTitles.join(', ') || 'None found'}`);
+      
+      // Get more roles from TMDb for franchise detection (up to 20)
+      let allRoles = await this.fetchFromTMDb(celebrityName, knownForTitles, 20);
+      
+      // CRITICAL FIX: Validate TMDb results against Wikipedia
+      if (allRoles.length > 0 && knownForTitles.length > 0) {
+        const tmdbMatchesWikipedia = this.validateTMDbAgainstWikipedia(allRoles, knownForTitles);
         
-        // Check if character name appears in known title
-        return titleLower.includes(characterLower) || characterLower.includes(titleLower);
+        if (!tmdbMatchesWikipedia) {
+          logger.warn(`🚨 TMDb found "${celebrityName}" but results don't match Wikipedia known roles`);
+          logger.warn(`TMDb titles: ${allRoles.map(r => r.name).slice(0, 3).join(', ')}`);
+          logger.warn(`Wikipedia known for: ${knownForTitles.join(', ')}`);
+          logger.warn(`🔄 Treating as TMDb failure - using Wikipedia fallback`);
+          allRoles = []; // Clear TMDb results to trigger fallback
+        }
+      }
+      
+      // ENHANCED FALLBACK CHAIN
+      if (allRoles.length === 0) {
+        logger.warn('🚨 TMDb returned zero results OR wrong person - implementing enhanced fallback chain');
+        allRoles = await this.executeComprehensiveFallback(celebrityName, knownForTitles);
+        
+        if (allRoles.length === 0) {
+          logger.warn('All fallback methods failed, using generic fallback');
+          return this.getFallbackRoles(celebrityName);
+        }
+        
+        logger.info(`✅ Fallback chain successful: ${allRoles.length} roles found`);
+        return allRoles.slice(0, 5);
+      }
+      
+      // Apply franchise diversification
+      const diversifiedRoles = this.diversifyByFranchise(allRoles);
+      
+      return diversifiedRoles.slice(0, 5); // Top 5 diversified roles
+      
+    } catch (error) {
+      logger.error('Error fetching roles:', error.message);
+      // Return fallback generic roles
+      return this.getFallbackRoles(celebrityName);
+    }
+  }
+
+  /**
+   * COMPREHENSIVE FALLBACK CHAIN: Wikipedia → Verification → Google Hail Mary
+   */
+  static async executeComprehensiveFallback(celebrityName, knownForTitles) {
+    try {
+      logger.info('🔄 Starting comprehensive fallback chain...');
+      
+      // Step 1: Get Wikipedia + BTVA data
+      const wikipediaRoles = await this.fetchExpandedWikipediaRoles(celebrityName);
+      
+      let behindVoiceActorsRoles = [];
+      if (this.isLikelyVoiceActor(knownForTitles)) {
+        behindVoiceActorsRoles = await this.fetchFromBehindTheVoiceActors(celebrityName);
+      }
+      
+      // Combine all sources
+      const potentialTitles = [
+        ...knownForTitles,
+        ...behindVoiceActorsRoles,
+        ...wikipediaRoles
+      ];
+      
+      const uniqueTitles = [...new Set(potentialTitles)];
+      logger.info(`📋 Found ${uniqueTitles.length} potential titles from Wikipedia/BTVA`);
+      
+      // Step 2: Google verify each potential role
+      const verifiedRoles = [];
+      for (const title of uniqueTitles.slice(0, 10)) { // Check top 10
+        const isVerified = await this.googleVerifyRole(celebrityName, title);
+        if (isVerified) {
+          verifiedRoles.push(title);
+          logger.info(`✅ Verified: ${title}`);
+        } else {
+          logger.info(`❌ Not verified: ${title}`);
+        }
+        
+        // Stop early if we have enough verified roles
+        if (verifiedRoles.length >= 4) break;
+      }
+      
+      logger.info(`🔍 Google verification: ${verifiedRoles.length} roles confirmed`);
+      
+      // Step 3: If we don't have enough (3-4), trigger Google Hail Mary
+      if (verifiedRoles.length < 3) {
+        logger.warn(`🚨 Only ${verifiedRoles.length} verified roles - triggering Google Hail Mary search`);
+        const hailMaryRoles = await this.googleHailMarySearch(celebrityName);
+        verifiedRoles.push(...hailMaryRoles);
+        logger.info(`🎯 Hail Mary found ${hailMaryRoles.length} additional roles`);
+      }
+      
+      // Step 4: Convert to role objects
+      const finalRoles = verifiedRoles.slice(0, 8).map((title, index) => {
+        const isVoiceRole = this.detectVoiceRole(title, celebrityName);
+        
+        return {
+          name: title,
+          character: isVoiceRole ? this.extractCharacterName(title, celebrityName) : 'Unknown role',
+          year: null,
+          media_type: isVoiceRole ? 'tv' : 'movie',
+          popularity: 100 - (index * 10),
+          vote_count: 1000 - (index * 100),
+          isKnownFor: knownForTitles.includes(title),
+          isVoiceRole: isVoiceRole,
+          characterName: isVoiceRole ? this.extractCharacterName(title, celebrityName) : null,
+          tags: ['comprehensive_fallback', isVoiceRole ? 'voice_role' : 'live_action'],
+          source: 'comprehensive_fallback',
+          searchTerms: [title, celebrityName, isVoiceRole ? this.extractCharacterName(title, celebrityName) : null].filter(Boolean)
+        };
       });
-    });
+      
+      logger.info(`🎭 Comprehensive fallback created ${finalRoles.length} verified roles:`);
+      finalRoles.forEach((role, i) => {
+        const voiceMarker = role.isVoiceRole ? ' (VOICE)' : '';
+        const knownMarker = role.isKnownFor ? ' ⭐' : '';
+        logger.info(`  ${i + 1}. ${role.name}${voiceMarker}${knownMarker}`);
+      });
+      
+      return finalRoles;
+      
+    } catch (error) {
+      logger.error('Comprehensive fallback failed:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * GOOGLE VERIFICATION: Verify each potential role with Google search
+   */
+  static async googleVerifyRole(celebrityName, roleName) {
+    try {
+      const verificationQuery = `"${celebrityName}" "${roleName}"`;
+      
+      const params = {
+        api_key: config.api.serpApiKey,
+        engine: 'google',
+        q: verificationQuery,
+        num: 5 // Just need a few results
+      };
+
+      const response = await axios.get(config.api.serpEndpoint, { 
+        params,
+        timeout: 10000
+      });
+
+      if (!response.data?.organic_results) {
+        return false;
+      }
+
+      // Check if results contain both actor name and role
+      const results = response.data.organic_results;
+      const hasGoodMatch = results.some(result => {
+        const title = (result.title || '').toLowerCase();
+        const snippet = (result.snippet || '').toLowerCase();
+        const combined = title + ' ' + snippet;
+        
+        const hasActor = combined.includes(celebrityName.toLowerCase());
+        const hasRole = combined.includes(roleName.toLowerCase());
+        
+        // Look for connection indicators
+        const connectionWords = ['stars', 'starring', 'cast', 'voice', 'plays', 'role', 'character'];
+        const hasConnection = connectionWords.some(word => combined.includes(word));
+        
+        return hasActor && hasRole && hasConnection;
+      });
+
+      // Small delay to be respectful to the API
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return hasGoodMatch;
+      
+    } catch (error) {
+      logger.warn(`Google verification failed for "${roleName}": ${error.message}`);
+      return false; // Assume false on error to be conservative
+    }
+  }
+
+  /**
+   * GOOGLE HAIL MARY: Last resort Google search for actor roles
+   */
+  static async googleHailMarySearch(celebrityName) {
+    try {
+      logger.info('🎯 Executing Google Hail Mary search...');
+      
+      const hailMaryQueries = [
+        `"${celebrityName}" movies roles filmography`,
+        `"${celebrityName}" actor "known for" films`,
+        `"${celebrityName}" voice actor characters shows`,
+        `"${celebrityName}" television series cast member`
+      ];
+
+      const extractedRoles = [];
+      
+      for (const query of hailMaryQueries) {
+        try {
+          const params = {
+            api_key: config.api.serpApiKey,
+            engine: 'google',
+            q: query,
+            num: 10
+          };
+
+          const response = await axios.get(config.api.serpEndpoint, { 
+            params,
+            timeout: 15000
+          });
+
+          if (response.data?.organic_results) {
+            const roles = this.extractRolesFromGoogleResults(response.data.organic_results, celebrityName);
+            extractedRoles.push(...roles);
+          }
+
+          // Delay between searches
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+        } catch (error) {
+          logger.warn(`Hail Mary query failed: ${query} - ${error.message}`);
+        }
+        
+        // Stop if we have enough
+        if (extractedRoles.length >= 8) break;
+      }
+
+      // Remove duplicates and return top results
+      const uniqueRoles = [...new Set(extractedRoles)];
+      logger.info(`🎯 Hail Mary extracted: ${uniqueRoles.slice(0, 5).join(', ')}`);
+      
+      return uniqueRoles.slice(0, 6); // Return top 6
+      
+    } catch (error) {
+      logger.error('Google Hail Mary search failed:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Extract movie/show titles from Google search results
+   */
+  static extractRolesFromGoogleResults(results, celebrityName) {
+    const extractedTitles = [];
     
-    const isValid = hasMatch || hasCharacterMatch;
-    
-    if (!isValid) {
-      logger.info('🔍 TMDb validation failed:');
-      logger.info(`  TMDb roles: ${tmdbRoles.slice(0, 3).map(r => `${r.name} (${r.character})`).join(', ')}`);
-      logger.info(`  Wikipedia known for: ${knownForTitles.join(', ')}`);
-      logger.info('  No matches found - likely wrong person with same name');
+    for (const result of results) {
+      const title = result.title || '';
+      const snippet = result.snippet || '';
+      const combined = title + ' ' + snippet;
+      
+      // Look for title patterns in the text
+      const titlePatterns = [
+        // "in Movie Name" or "in TV Show"
+        /\bin\s+([A-Z][^,.\n()]{2,30}?)(?:\s*[,.(]|$)/g,
+        // "Movie Name starring" or "starring in Movie Name"
+        /(?:^|\s)([A-Z][^,.\n()]{2,30}?)\s+starring/g,
+        /starring\s+in\s+([A-Z][^,.\n()]{2,30}?)(?:\s*[,.(]|$)/g,
+        // "cast of Movie Name" or "Movie Name cast"
+        /cast\s+of\s+([A-Z][^,.\n()]{2,30}?)(?:\s*[,.(]|$)/g,
+        /([A-Z][^,.\n()]{2,30}?)\s+cast/g,
+        // "Movie Name (Year)" pattern
+        /([A-Z][^,.\n()]{2,30}?)\s*\(\d{4}\)/g,
+        // "known for Movie Name"
+        /known\s+for\s+([A-Z][^,.\n()]{2,30}?)(?:\s*[,.(]|$)/g
+      ];
+      
+      for (const pattern of titlePatterns) {
+        let match;
+        while ((match = pattern.exec(combined)) !== null) {
+          let extractedTitle = match[1].trim();
+          
+          // Clean up the extracted title
+          extractedTitle = extractedTitle.replace(/\s+(and|or|,).*$/i, '');
+          extractedTitle = extractedTitle.replace(/^(the|a|an)\s+/i, '');
+          extractedTitle = extractedTitle.trim();
+          
+          // Validate the extracted title
+          if (this.isValidExtractedTitle(extractedTitle, celebrityName)) {
+            extractedTitles.push(extractedTitle);
+          }
+        }
+      }
     }
     
-    return isValid;
+    return extractedTitles;
+  }
+
+  /**
+   * Validate extracted title from Google results
+   */
+  static isValidExtractedTitle(title, celebrityName) {
+    if (!title || title.length < 3 || title.length > 50) return false;
+    
+    // Filter out common non-title words
+    const excludeWords = [
+      'actor', 'actress', 'voice', 'character', 'role', 'cast', 'starring',
+      'movie', 'film', 'show', 'series', 'television', 'tv', 'episode',
+      'season', 'year', 'years', 'career', 'work', 'performance', 'latest',
+      'news', 'interview', 'photos', 'images', 'biography', 'wikipedia'
+    ];
+    
+    const titleLower = title.toLowerCase();
+    
+    // Don't include if it's just an excluded word
+    if (excludeWords.includes(titleLower)) return false;
+    
+    // Don't include if it contains the actor's name (likely a bio page)
+    if (titleLower.includes(celebrityName.toLowerCase())) return false;
+    
+    // Must contain at least one letter
+    if (!/[a-zA-Z]/.test(title)) return false;
+    
+    // Looks like a valid title
+    return true;
   }
 
   /**
