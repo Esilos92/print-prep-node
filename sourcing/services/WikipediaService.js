@@ -171,11 +171,16 @@ class WikipediaService {
     try {
       logger.info('🎤 Attempting BehindTheVoiceActors.com lookup...');
       
-      // Multiple URL variations to try
+      // Multiple URL variations to try - FIXED CASING
       const nameVariations = [
-        celebrityName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-        celebrityName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''),
-        celebrityName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+        // BTVA uses Title-Case format: "David-Matranga"
+        celebrityName.replace(/\s+/g, '-'), // Keep original case
+        celebrityName.toLowerCase().replace(/\s+/g, '-'), // Our old attempt
+        celebrityName.toUpperCase().replace(/\s+/g, '-'), // All caps
+        celebrityName.replace(/\s+/g, '_'), // Underscores with original case
+        celebrityName.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''), // No spaces/special chars
+        // Handle common name formats
+        celebrityName.split(' ').map(name => name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()).join('-')
       ];
       
       for (const urlName of nameVariations) {
