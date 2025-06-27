@@ -1,6 +1,6 @@
-import AIRoleFetcher from './ai-services/AIRoleFetcher.js';
-import SearchOptimizer from './ai-services/SearchOptimizer.js';
-import { PROMPTS, PROMPT_CONFIG } from './config/prompts.js';
+const AIRoleFetcher = require('./ai-services/AIRoleFetcher.js');
+const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
+const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
 
 class CelebrityRoleOrchestrator {
   constructor() {
@@ -249,7 +249,7 @@ class CelebrityRoleOrchestrator {
  * Main execution function - replaces your old fetchRoles.js
  * This is what gets called from your index.js or main application
  */
-export async function fetchCelebrityRoles(celebrityName) {
+async function fetchCelebrityRoles(celebrityName) {
   const orchestrator = new CelebrityRoleOrchestrator();
   return await orchestrator.getCelebrityRoles(celebrityName);
 }
@@ -257,7 +257,7 @@ export async function fetchCelebrityRoles(celebrityName) {
 /**
  * Initialize and test the system
  */
-export async function initializeSystem() {
+async function initializeSystem() {
   console.log('🚀 Initializing AI-powered celebrity role system...');
   
   const orchestrator = new CelebrityRoleOrchestrator();
@@ -273,4 +273,8 @@ export async function initializeSystem() {
   return healthCheck;
 }
 
-export default CelebrityRoleOrchestrator;
+module.exports = { 
+  fetchCelebrityRoles, 
+  initializeSystem, 
+  CelebrityRoleOrchestrator 
+};
