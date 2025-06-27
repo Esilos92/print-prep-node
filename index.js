@@ -94,7 +94,7 @@ async function main() {
     
     // Add system metadata to manifest
     manifest.system = {
-      version: 'SERPAPI-ENHANCED-V3-STREAMLINED',
+      version: 'SERPAPI-ENHANCED-V4-FINAL-FIXED',
       timestamp: new Date().toISOString(),
       totalRoles: roles.length,
       totalOriginalImages: allImages.length,
@@ -103,7 +103,12 @@ async function main() {
       validationPass: 'streamlined_boolean_validation',
       tmdbFallbackUsed: roles.some(r => r.source === 'wikipedia_fallback'),
       voiceRolesFound: roles.filter(r => r.isVoiceRole).length,
-      liveActionRolesFound: roles.filter(r => !r.isVoiceRole).length
+      liveActionRolesFound: roles.filter(r => !r.isVoiceRole).length,
+      criticalFixes: [
+        'isValidExtractedTitle_function_fixed',
+        'preposition_filtering_enabled',
+        'garbage_title_prevention_active'
+      ]
     };
     
     await fs.writeFile(
@@ -126,6 +131,7 @@ async function main() {
     logger.info(`TMDb Fallback Used: ${manifest.system.tmdbFallbackUsed ? 'YES' : 'NO'}`);
     logger.info(`Voice Roles: ${manifest.system.voiceRolesFound}`);
     logger.info(`Live Action Roles: ${manifest.system.liveActionRolesFound}`);
+    logger.info(`Critical Fixes Applied: ${manifest.system.criticalFixes.join(', ')}`);
     logger.info(`Google Drive Link: ${uploadResult.webViewLink}`);
     
     // Cleanup temporary files
