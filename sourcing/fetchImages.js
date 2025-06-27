@@ -3,10 +3,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
+const AIImageVerifier = require('./AIImageVerifier'); // NEW: AI verification
 
 class ImageFetcher {
   
   constructor() {
+    // Initialize AI verifier
+    this.aiVerifier = new AIImageVerifier();
+    
     // Essential domain filtering - WORKING, keep this
     this.watermarkedDomains = [
       'alamy.com', 'alamyimages.fr', 'alamy.de', 'alamy.es',
@@ -34,11 +38,11 @@ class ImageFetcher {
   }
   
   /**
-   * Main entry point - fetch images for celebrity and role
+   * Main entry point - fetch images for celebrity and role WITH AI VERIFICATION
    */
   static async fetchImages(celebrityName, role, workDir) {
     try {
-      logger.info(`🖼️ Fetching images for ${celebrityName} in ${role.name}...`);
+      logger.info(`🖼️ Fetching and verifying images for ${celebrityName} in ${role.name}...`);
       
       const fetcher = new ImageFetcher();
       const maxImages = config.image.maxImagesPerRole || 50;
@@ -61,14 +65,14 @@ class ImageFetcher {
         }
       }
       
-      // Remove duplicates and apply validation
+      // Remove duplicates and apply basic validation
       const uniqueImages = fetcher.removeDuplicates(allImages);
       const validImages = fetcher.validateImages(uniqueImages, celebrityName, role);
       const diversifiedImages = fetcher.diversifyContentTypes(validImages);
       
-      logger.info(`${diversifiedImages.length} images passed all filters`);
+      logger.info(`${diversifiedImages.length} images passed basic filters`);
       
-      // Download the final set
+      // Download the images first
       const downloadedImages = await fetcher.downloadImages(
         diversifiedImages.slice(0, maxImages), 
         workDir, 
@@ -76,12 +80,42 @@ class ImageFetcher {
         role
       );
       
-      logger.info(`✅ Downloaded ${downloadedImages.length} images for ${role.name}`);
-      return downloadedImages;
+      logger.info(`📥 Downloaded ${downloadedImages.length} images`);
+      
+      // NEW: AI VERIFICATION STEP
+      logger.info(`🤖 Starting AI verification of downloaded images...`);
+      const verificationResults = await fetcher.aiVerifier.verifyImages(
+        downloadedImages,
+        celebrityName,
+        role.character || role.characterName || 'Unknown',
+        role.title || role.name,
+        role.medium || role.media_type || 'unknown'
+      );
+      
+      // Keep only verified valid images
+      const finalValidImages = verificationResults.valid;
+      
+      // Clean up invalid images
+      await fetcher.cleanupInvalidImages(verificationResults.invalid);
+      
+      logger.info(`✅ Final result: ${finalValidImages.length} AI-verified images`);
+      logger.info(`💰 Verification cost: $${verificationResults.totalCost.toFixed(4)}`);
+      logger.info(`📊 Services used:`, verificationResults.serviceUsage);
+      
+      return {
+        images: finalValidImages,
+        verification: {
+          totalProcessed: downloadedImages.length,
+          validCount: finalValidImages.length,
+          invalidCount: verificationResults.invalid.length,
+          cost: verificationResults.totalCost,
+          serviceUsage: verificationResults.serviceUsage
+        }
+      };
       
     } catch (error) {
       logger.error(`Error fetching images for ${role.name}:`, error.message);
-      return [];
+      return { images: [], verification: null };
     }
   }
   
@@ -474,6 +508,20 @@ class ImageFetcher {
     }
     
     return downloadedImages;
+  }
+  
+  /**
+   * NEW: Clean up invalid images after AI verification
+   */
+  async cleanupInvalidImages(invalidImages) {
+    for (const invalidImage of invalidImages) {
+      try {
+        await fs.unlink(invalidImage.filepath);
+        logger.info(`🗑️ Removed invalid image: ${invalidImage.filename} (${invalidImage.reason})`);
+      } catch (error) {
+        logger.warn(`⚠️ Failed to remove ${invalidImage.filename}: ${error.message}`);
+      }
+    }
   }
   
   /**
