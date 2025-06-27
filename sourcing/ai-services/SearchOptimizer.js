@@ -132,49 +132,53 @@ class SearchOptimizer {
   }
 
   /**
-   * Generate medium-specific search terms
+   * Generate medium-specific search terms with STRICT exclusions
    */
   generateMediumSpecificTerms(role) {
     const { character, title, medium } = role;
     const terms = [];
+    
+    // Universal exclusions for all search terms
+    const exclusions = "-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -dvd -cover -poster -fan -art -edit -meme";
 
     switch (medium) {
       case 'live_action_movie':
-        terms.push(`${character} ${title} movie`);
-        terms.push(`${character} ${title} film`);
-        if (role.year) terms.push(`${character} ${title} ${role.year}`);
+        terms.push(`"${title}" cast production photo ${exclusions}`);
+        terms.push(`"William Shatner" "${character}" "${title}" promotional ${exclusions}`);
+        terms.push(`"${title}" behind scenes cast photo ${exclusions}`);
         break;
 
       case 'live_action_tv':
-        terms.push(`${character} ${title} TV show`);
-        terms.push(`${character} ${title} series`);
+        terms.push(`"${title}" main cast promotional photo ${exclusions}`);
+        terms.push(`"William Shatner" "${character}" production still ${exclusions}`);
+        terms.push(`"${title}" cast group press photo ${exclusions}`);
         break;
 
       case 'voice_anime':
-        terms.push(`${character} ${title} anime`);
-        terms.push(`${character} anime character`);
-        terms.push(`${title} ${character} anime`);
+        terms.push(`"${title}" main characters official artwork ${exclusions}`);
+        terms.push(`"${character}" "${title}" official anime art ${exclusions}`);
+        terms.push(`"${title}" character group promotional ${exclusions}`);
         break;
 
       case 'voice_cartoon':
-        terms.push(`${character} ${title} cartoon`);
-        terms.push(`${character} cartoon character`);
-        terms.push(`${title} ${character} cartoon`);
+        terms.push(`"${title}" main characters official art ${exclusions}`);
+        terms.push(`"${character}" "${title}" official character ${exclusions}`);
+        terms.push(`"${title}" character ensemble official ${exclusions}`);
         break;
 
       case 'voice_game':
-        terms.push(`${character} ${title} game`);
-        terms.push(`${character} video game character`);
+        terms.push(`"${title}" main characters official game art ${exclusions}`);
+        terms.push(`"${character}" "${title}" official character art ${exclusions}`);
         break;
 
       case 'voice_movie':
-        terms.push(`${character} ${title} animated movie`);
-        terms.push(`${character} animated character`);
+        terms.push(`"${title}" animated characters promotional ${exclusions}`);
+        terms.push(`"${character}" "${title}" official animation art ${exclusions}`);
         break;
 
       default:
-        // Generic terms for unknown mediums
-        terms.push(`${character} ${title} character`);
+        terms.push(`"${title}" cast promotional photo ${exclusions}`);
+        terms.push(`"${character}" "${title}" official image ${exclusions}`);
         break;
     }
 
@@ -228,22 +232,28 @@ class SearchOptimizer {
   }
 
   /**
-   * Get best search terms for a role (prioritized)
+   * Get best search terms for a role (AI-PRIORITIZED)
    */
-  getBestSearchTerms(role, maxTerms = 3) {
+  getBestSearchTerms(role, maxTerms = 5) {
     if (!role.searchTerms) {
       // If no search terms exist, generate basic ones
       const basic = this.generateBasicTerms(role);
       const specific = this.generateMediumSpecificTerms(role);
-      return [...basic, ...specific].slice(0, maxTerms);
+      return [...specific, ...basic].slice(0, maxTerms); // Prioritize specific over basic
     }
 
-    // Prioritize AI terms, then specific, then basic
+    // HEAVILY PRIORITIZE AI TERMS
     const { ai, specific, basic } = role.searchTerms;
-    const allTerms = [...(ai || []), ...(specific || []), ...(basic || [])];
+    
+    // Use more AI terms, fewer basic terms
+    const prioritizedTerms = [
+      ...(ai || []),           // AI terms first (group-focused)
+      ...(specific || []),     // Medium-specific terms second (also group-focused)
+      ...(basic || []).slice(0, 1) // Only 1 basic term as fallback
+    ];
     
     // Remove duplicates and return top terms
-    const uniqueTerms = [...new Set(allTerms)];
+    const uniqueTerms = [...new Set(prioritizedTerms)];
     return uniqueTerms.slice(0, maxTerms);
   }
 
