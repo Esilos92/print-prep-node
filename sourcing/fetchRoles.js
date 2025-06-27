@@ -68,18 +68,19 @@ class RoleFetcher {
     try {
       logger.info('🔄 Starting comprehensive fallback chain...');
       
-      // Step 1: Get Wikipedia + BTVA data
+      // Step 1: Get Wikipedia + Enhanced anime sources
       const wikipediaRoles = await WikipediaService.fetchExpandedWikipediaRoles(celebrityName);
       
-      let behindVoiceActorsRoles = [];
+      let animeVoiceRoles = [];
       if (VoiceActorUtils.isLikelyVoiceActor(knownForTitles)) {
-        behindVoiceActorsRoles = await WikipediaService.fetchFromBehindTheVoiceActors(celebrityName);
+        // Use enhanced anime voice role discovery
+        animeVoiceRoles = await WikipediaService.fetchAnimeVoiceRoles(celebrityName);
       }
       
       // Combine all sources
       const potentialTitles = [
         ...knownForTitles,
-        ...behindVoiceActorsRoles,
+        ...animeVoiceRoles,
         ...wikipediaRoles
       ];
       
