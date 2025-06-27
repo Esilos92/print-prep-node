@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
-const AIImageVerifier = require('./AIImageVerifier'); // NEW: AI verification
+const AIImageVerifier = require('./ai-services/AIImageVerifier'); 
 
 class ImageFetcher {
   
