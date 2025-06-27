@@ -112,6 +112,46 @@ class RoleFetcher {
   }
 
   /**
+   * CRITICAL FIX: Validate TMDb results against Wikipedia to catch wrong person
+   */
+  static validateTMDbAgainstWikipedia(tmdbRoles, knownForTitles) {
+    if (knownForTitles.length === 0) {
+      return true; // No Wikipedia data to validate against
+    }
+    
+    // Check if ANY TMDb role matches ANY Wikipedia known-for title
+    const hasMatch = tmdbRoles.some(tmdbRole => {
+      return knownForTitles.some(knownTitle => {
+        return this.matchesKnownForTitles(tmdbRole.name, [knownTitle]);
+      });
+    });
+    
+    // Also check for partial matches on character names for voice actors
+    const hasCharacterMatch = tmdbRoles.some(tmdbRole => {
+      if (!tmdbRole.character || tmdbRole.character === 'Unknown role') return false;
+      
+      return knownForTitles.some(knownTitle => {
+        const titleLower = knownTitle.toLowerCase();
+        const characterLower = tmdbRole.character.toLowerCase();
+        
+        // Check if character name appears in known title
+        return titleLower.includes(characterLower) || characterLower.includes(titleLower);
+      });
+    });
+    
+    const isValid = hasMatch || hasCharacterMatch;
+    
+    if (!isValid) {
+      logger.info('🔍 TMDb validation failed:');
+      logger.info(`  TMDb roles: ${tmdbRoles.slice(0, 3).map(r => `${r.name} (${r.character})`).join(', ')}`);
+      logger.info(`  Wikipedia known for: ${knownForTitles.join(', ')}`);
+      logger.info('  No matches found - likely wrong person with same name');
+    }
+    
+    return isValid;
+  }
+
+  /**
    * COMPREHENSIVE FALLBACK CHAIN: Wikipedia → Verification → Google Hail Mary
    */
   static async executeComprehensiveFallback(celebrityName, knownForTitles) {
