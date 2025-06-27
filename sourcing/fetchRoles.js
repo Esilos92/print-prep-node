@@ -6,7 +6,7 @@ const logger = require('../utils/logger');
 class RoleFetcher {
   
   /**
-   * Fetch top 5 iconic roles for a celebrity
+   * Fetch top 5 iconic roles for a celebrity with franchise diversification
    */
   static async fetchRoles(celebrityName) {
     try {
@@ -16,21 +16,275 @@ class RoleFetcher {
       const knownForTitles = await this.getKnownForTitles(celebrityName);
       logger.info(`Wikipedia "known for": ${knownForTitles.join(', ') || 'None found'}`);
       
-      // Try TMDb first, fallback to Wikipedia
-      let roles = await this.fetchFromTMDb(celebrityName, knownForTitles);
+      // Get more roles from TMDb for franchise detection (up to 20)
+      let allRoles = await this.fetchFromTMDb(celebrityName, knownForTitles, 20);
       
-      if (roles.length === 0) {
+      if (allRoles.length === 0) {
         logger.warn('TMDb returned no results, trying Wikipedia');
-        roles = await this.fetchFromWikipedia(celebrityName);
+        allRoles = await this.fetchFromWikipedia(celebrityName);
+        return allRoles.slice(0, 5);
       }
+  
+  /**
+   * Enhanced talk show and guest appearance detection
+   */
+  static isTalkShowOrGuestAppearance(title, character) {
+    if (!title) return false;
+    
+    const titleLower = title.toLowerCase();
+    const characterLower = (character || '').toLowerCase();
+    
+    // Talk show title patterns - be specific to avoid false positives
+    const talkShowPatterns = [
+      // Late night shows
+      'tonight show', 'late show', 'late late show', 'late night',
+      'jimmy fallon', 'jimmy kimmel', 'stephen colbert', 'craig ferguson',
+      'conan', 'seth meyers', 'james corden',
       
-      return roles.slice(0, 5); // Top 5 roles
+      // Daytime shows
+      'kelly clarkson show', 'ellen degeneres show', 'the ellen show',
+      'oprah winfrey show', 'the view', 'the talk', 'live with kelly',
+      'good morning america', 'today show', 'this morning',
+      
+      // Comedy/variety shows  
+      'saturday night live', 'snl', 'daily show', 'real time with bill maher',
+      'comedy central presents', 'last week tonight',
+      
+      // Award shows (but be careful - some actors host legitimately)
+      'academy awards', 'golden globe awards', 'emmy awards', 'tony awards',
+      'peoples choice awards', 'critics choice awards', 'sag awards',
+      
+      // Game shows
+      'jeopardy!', 'wheel of fortune', 'family feud', 'celebrity family feud',
+      'hollywood squares', 'match game',
+      
+      // News/interview shows  
+      'anderson cooper', '60 minutes', 'dateline', '20/20'
+    ];
+    
+    // Check if title matches talk show patterns
+    const isTalkShowTitle = talkShowPatterns.some(pattern => titleLower.includes(pattern));
+    
+    // Guest character patterns - these indicate guest appearances
+    const guestCharacters = [
+      'self', 'himself', 'herself', 'guest', 'host', 'presenter', 
+      'interviewee', 'panelist', 'contestant', 'themselves'
+    ];
+    
+    // Check for exact guest character matches
+    const isGuestCharacter = guestCharacters.some(guestType => {
+      return characterLower === guestType || 
+             characterLower === `self - ${guestType}` ||
+             characterLower.includes(`(${guestType})`) ||
+             characterLower.startsWith(guestType + ' ') ||
+             characterLower.endsWith(' ' + guestType);
+    });
+    
+    // Additional red flags for guest appearances
+    const hasGuestIndicators = titleLower.includes('celebrity') && 
+                              (titleLower.includes('special') || titleLower.includes('edition'));
+    
+    // White list check - make sure we don't filter actual acting roles
+    const isLikelyActingRole = this.isLikelyActingRole(title, character);
+    
+    // Final determination
+    const isFiltered = (isTalkShowTitle || isGuestCharacter || hasGuestIndicators) && !isLikelyActingRole;
+    
+    if (isFiltered) {
+      logger.debug(`🚫 Filtered talk show/guest: "${title}" (${character})`);
+    }
+    
+    return isFiltered;
+  }
+  
+  /**
+   * Check if this is likely a legitimate acting role vs guest appearance
+   */
+  static isLikelyActingRole(title, character) {
+    if (!title || !character) return false;
+    
+    const titleLower = title.toLowerCase();
+    const characterLower = character.toLowerCase();
+    
+    // Legitimate acting roles usually have:
+    // 1. Character names that aren't "self" variants
+    const hasRealCharacterName = !characterLower.includes('self') && 
+                                !characterLower.includes('himself') &&
+                                !characterLower.includes('herself') &&
+                                characterLower !== 'guest' &&
+                                characterLower !== 'host';
+    
+    // 2. Title doesn't look like a talk show format
+    const isNotTalkShowFormat = !titleLower.match(/\b(show|live|tonight|morning|today)\b/) ||
+                               titleLower.includes('movie') ||
+                               titleLower.includes('film') ||
+                               titleLower.includes('series');
+    
+    // 3. Character has substance (not just single words)
+    const hasSubstantialCharacter = character && character.length > 3 && 
+                                  character.includes(' ') && // Multi-word character names
+                                  !character.toLowerCase().includes('unknown');
+    
+    return hasRealCharacterName && (isNotTalkShowFormat || hasSubstantialCharacter);
+  }
+      
+      // Apply franchise diversification
+      const diversifiedRoles = this.diversifyByFranchise(allRoles);
+      
+      return diversifiedRoles.slice(0, 5); // Top 5 diversified roles
       
     } catch (error) {
       logger.error('Error fetching roles:', error.message);
       // Return fallback generic roles
       return this.getFallbackRoles(celebrityName);
     }
+  }
+  
+  /**
+   * Diversify roles by detecting and limiting franchise dominance
+   */
+  static diversifyByFranchise(roles) {
+    logger.info('🎯 Applying franchise diversification...');
+    
+    // Step 1: Detect franchises automatically
+    const franchises = this.detectFranchises(roles);
+    
+    // Step 2: Select best roles from each franchise + standalone roles
+    const selectedRoles = [];
+    const usedRoleIds = new Set();
+    
+    // Add franchise roles (max 2 per franchise)
+    franchises.forEach(franchise => {
+      const maxFromFranchise = franchise.roles.length >= 5 ? 2 : 1; // Big franchises get 2 slots
+      const selectedFromFranchise = franchise.roles.slice(0, maxFromFranchise);
+      
+      logger.info(`📁 ${franchise.name} franchise: Taking ${selectedFromFranchise.length}/${franchise.roles.length} roles`);
+      
+      selectedFromFranchise.forEach(role => {
+        selectedRoles.push(role);
+        usedRoleIds.add(role.name);
+      });
+    });
+    
+    // Add standalone roles (not part of any franchise)
+    const standaloneRoles = roles.filter(role => !usedRoleIds.has(role.name));
+    selectedRoles.push(...standaloneRoles);
+    
+    // Sort by priority: Known for first, then by vote count
+    const finalRoles = selectedRoles.sort((a, b) => {
+      if (a.isKnownFor && !b.isKnownFor) return -1;
+      if (!a.isKnownFor && b.isKnownFor) return 1;
+      return b.vote_count - a.vote_count;
+    });
+    
+    logger.info('🎬 Final diversified selection:');
+    finalRoles.slice(0, 5).forEach((role, i) => {
+      const knownForMarker = role.isKnownFor ? ' ⭐ KNOWN FOR' : '';
+      const franchiseInfo = role.franchiseName ? ` [${role.franchiseName} franchise]` : ' [standalone]';
+      logger.info(`  ${i + 1}. ${role.name}${franchiseInfo}${knownForMarker}`);
+    });
+    
+    return finalRoles;
+  }
+  
+  /**
+   * Automatically detect franchises by grouping similar titles
+   */
+  static detectFranchises(roles) {
+    const groups = {};
+    
+    // Group roles by base title
+    roles.forEach(role => {
+      const baseTitle = this.extractBaseFranchiseName(role.name);
+      
+      if (!groups[baseTitle]) {
+        groups[baseTitle] = [];
+      }
+      
+      groups[baseTitle].push({
+        ...role,
+        franchiseName: baseTitle
+      });
+    });
+    
+    // Identify franchises (3+ related titles)
+    const franchises = Object.entries(groups)
+      .filter(([name, roleGroup]) => roleGroup.length >= 3)
+      .map(([name, roleGroup]) => ({
+        name: name,
+        roles: roleGroup.sort((a, b) => {
+          // Sort by known-for first, then vote count
+          if (a.isKnownFor && !b.isKnownFor) return -1;
+          if (!a.isKnownFor && b.isKnownFor) return 1;
+          return b.vote_count - a.vote_count;
+        })
+      }));
+    
+    if (franchises.length > 0) {
+      logger.info('🔍 Detected franchises:');
+      franchises.forEach(franchise => {
+        logger.info(`  📁 ${franchise.name}: ${franchise.roles.length} titles`);
+      });
+    }
+    
+    return franchises;
+  }
+  
+  /**
+   * Extract base franchise name from a title
+   */
+  static extractBaseFranchiseName(title) {
+    if (!title) return 'unknown';
+    
+    const titleLower = title.toLowerCase();
+    
+    // Clean up the title and extract base name
+    let baseName = titleLower
+      // Remove numbers and colons (Star Trek II: Wrath of Khan -> Star Trek)
+      .split(/[:\-\d]/)[0]
+      // Remove common subtitle indicators
+      .replace(/\s+(the|a|an)\s+/g, ' ')
+      .replace(/\s+(part|episode|chapter)\s*\d*/g, '')
+      .trim();
+    
+    // Handle special cases for better grouping
+    const specialCases = {
+      'captain america': 'marvel',
+      'iron man': 'marvel', 
+      'thor': 'marvel',
+      'avengers': 'marvel',
+      'spider-man': 'marvel',
+      'x-men': 'marvel',
+      'guardians of the galaxy': 'marvel',
+      'doctor strange': 'marvel',
+      'black panther': 'marvel',
+      'ant-man': 'marvel',
+      
+      'star wars': 'star wars',
+      'empire strikes back': 'star wars',
+      'return of the jedi': 'star wars',
+      'phantom menace': 'star wars',
+      'attack of the clones': 'star wars',
+      'revenge of the sith': 'star wars',
+      
+      'fast & furious': 'fast furious',
+      'fast five': 'fast furious',
+      '2 fast 2 furious': 'fast furious',
+      'furious': 'fast furious',
+      
+      'harry potter': 'harry potter',
+      'fantastic beasts': 'harry potter'
+    };
+    
+    // Check for special case matches
+    for (const [pattern, franchise] of Object.entries(specialCases)) {
+      if (titleLower.includes(pattern)) {
+        return franchise;
+      }
+    }
+    
+    // Default: use the cleaned base name
+    return baseName || 'unknown';
   }
   
   /**
@@ -104,7 +358,7 @@ class RoleFetcher {
   static extractTitlesFromText(text) {
     const titles = [];
     
-    // Handle specific patterns we know work for William Shatner's case
+    // Handle specific patterns we know work for common cases
     if (text.toLowerCase().includes('star trek')) {
       titles.push('Star Trek');
     }
@@ -159,7 +413,7 @@ class RoleFetcher {
   /**
    * Fetch roles from TMDb API with Wikipedia prioritization
    */
-  static async fetchFromTMDb(celebrityName, knownForTitles = []) {
+  static async fetchFromTMDb(celebrityName, knownForTitles = [], maxResults = 5) {
     if (!config.api.tmdbKey) {
       logger.warn('TMDb API key not configured');
       return [];
@@ -188,19 +442,12 @@ class RoleFetcher {
           const title = credit.title || credit.name || '';
           const character = credit.character || '';
           
-          // Filter OUT talk shows and guest appearances
-          const isTalkShow = title.toLowerCase().includes('tonight show') ||
-                           title.toLowerCase().includes('late show') ||
-                           title.toLowerCase().includes('late late show') ||
-                           title.toLowerCase().includes('colbert') ||
-                           title.toLowerCase().includes('ferguson') ||
-                           title.toLowerCase().includes('kelly clarkson') ||
-                           character.toLowerCase().includes('self') ||
-                           character.toLowerCase().includes('guest');
+          // Enhanced talk show and guest appearance filtering
+          const isTalkShow = this.isTalkShowOrGuestAppearance(title, character);
           
           // Keep substantial acting roles with good vote counts
           const hasTitle = title.length > 0;
-          const hasVotes = credit.vote_count && credit.vote_count > 50; // Lower threshold
+          const hasVotes = credit.vote_count && credit.vote_count > 50;
           const isActingRole = character && character !== 'Self' && !character.includes('Unknown');
           
           return hasTitle && !isTalkShow && (hasVotes || isActingRole);
@@ -227,25 +474,13 @@ class RoleFetcher {
           };
         })
         .sort((a, b) => {
-          // Prioritize Wikipedia "known for" titles
-          if (a.isKnownFor && !b.isKnownFor) return -1;
-          if (!a.isKnownFor && b.isKnownFor) return 1;
-          
-          // Then sort by VOTE COUNT first (long-term popularity), then by popularity
-          if (b.vote_count !== a.vote_count) {
-            return b.vote_count - a.vote_count;
-          }
-          return b.popularity - a.popularity;
-        })
-        .slice(0, 5);
+          // Sort by vote count primarily (for initial franchise detection)
+          return b.vote_count - a.vote_count;
+        });
       
-      logger.info(`Found ${roles.length} roles from TMDb`);
-      roles.forEach(role => {
-        const knownForMarker = role.isKnownFor ? ' ⭐ KNOWN FOR' : '';
-        logger.info(`- ${role.name} (${role.media_type}) - ${role.character} [Votes: ${role.vote_count}, Pop: ${role.popularity.toFixed(1)}]${knownForMarker}`);
-      });
+      logger.info(`Found ${roles.length} total roles from TMDb, analyzing top ${Math.min(maxResults, roles.length)}...`);
       
-      return roles;
+      return roles.slice(0, maxResults);
       
     } catch (error) {
       logger.error('TMDb API error:', error.message);
