@@ -131,6 +131,32 @@ class ImageFetcher {
    * Generate search queries using your optimized search terms
    */
   generateSearchQueries(celebrityName, role) {
+    // DEBUG: Let's see what we're getting
+    console.log('🐛 DEBUG: =================================');
+    console.log('🐛 DEBUG: Role object structure in fetchImages:');
+    console.log('🐛 DEBUG: Role keys:', Object.keys(role));
+    console.log('🐛 DEBUG: Role name/title fields:', {
+      name: role.name,
+      title: role.title,
+      character: role.character,
+      characterName: role.characterName
+    });
+    console.log('🐛 DEBUG: Has finalSearchTerms:', !!role.finalSearchTerms);
+    if (role.finalSearchTerms) {
+      console.log('🐛 DEBUG: finalSearchTerms length:', role.finalSearchTerms.length);
+      console.log('🐛 DEBUG: First finalSearchTerm:', role.finalSearchTerms[0]);
+    }
+    console.log('🐛 DEBUG: Has searchTerms:', !!role.searchTerms);
+    if (role.searchTerms) {
+      console.log('🐛 DEBUG: SearchTerms keys:', Object.keys(role.searchTerms));
+      console.log('🐛 DEBUG: character_images length:', role.searchTerms.character_images?.length);
+      if (role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
+        console.log('🐛 DEBUG: First character_image term:', role.searchTerms.character_images[0]);
+      }
+    }
+    console.log('🐛 DEBUG: Full role object:', JSON.stringify(role, null, 2));
+    console.log('🐛 DEBUG: =================================');
+    
     // PRIORITY 1: Use the optimized character image search terms if available
     if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
       logger.info(`🎯 Using AI-optimized character image search terms (${role.finalSearchTerms.length} terms)`);
@@ -150,7 +176,8 @@ class ImageFetcher {
     }
     
     // FALLBACK: Generate basic queries (this is what you're seeing now)
-    logger.warn(`⚠️ No optimized search terms found, using basic fallback for ${role.name || role.title}`);
+    const roleName = role.name || role.title || role.character || 'Unknown Role';
+    logger.warn(`⚠️ No optimized search terms found, using basic fallback for ${roleName}`);
     
     const watermarkExclusions = this.watermarkedDomains.map(d => `-site:${d}`).join(' ');
     const contentExclusions = this.contentExclusions.join(' ');
@@ -158,25 +185,33 @@ class ImageFetcher {
     
     const queries = [];
     
-    if (role.isVoiceRole) {
-      logger.info(`🎭 Voice role fallback: targeting character images for ${role.name}`);
+    // Check if it's a voice role - use multiple possible field names
+    const isVoiceRole = role.isVoiceRole || 
+                       role.medium?.includes('voice') || 
+                       role.media_type?.includes('voice') ||
+                       role.medium?.includes('animation');
+    
+    if (isVoiceRole) {
+      logger.info(`🎭 Voice role fallback: targeting character images for ${roleName}`);
       
-      if (role.characterName && role.characterName !== 'Unknown Character') {
-        queries.push(`"${role.characterName}" "${role.name}" character image ${allExclusions}`);
-        queries.push(`"${role.characterName}" "${role.name}" scene still ${allExclusions}`);
+      const characterName = role.character || role.characterName;
+      if (characterName && characterName !== 'Unknown Character') {
+        queries.push(`"${characterName}" "${roleName}" character image ${allExclusions}`);
+        queries.push(`"${characterName}" "${roleName}" scene still ${allExclusions}`);
       }
-      queries.push(`"${role.name}" character images official ${allExclusions}`);
+      queries.push(`"${roleName}" character images official ${allExclusions}`);
       
     } else {
-      logger.info(`🎬 Live action fallback: targeting actor images for ${role.name}`);
+      logger.info(`🎬 Live action fallback: targeting actor images for ${roleName}`);
       
-      queries.push(`"${celebrityName}" "${role.name}" scene still ${allExclusions}`);
+      queries.push(`"${celebrityName}" "${roleName}" scene still ${allExclusions}`);
       
-      if (role.character && role.character !== 'Unknown role') {
-        queries.push(`"${celebrityName}" "${role.character}" "${role.name}" scene ${allExclusions}`);
+      const characterName = role.character || role.characterName;
+      if (characterName && characterName !== 'Unknown role') {
+        queries.push(`"${celebrityName}" "${characterName}" "${roleName}" scene ${allExclusions}`);
       }
       
-      queries.push(`"${celebrityName}" "${role.name}" promotional photo ${allExclusions}`);
+      queries.push(`"${celebrityName}" "${roleName}" promotional photo ${allExclusions}`);
     }
 
     return queries.slice(0, 3);
