@@ -47,7 +47,7 @@ class ImageFetcher {
       logger.info(`🖼️ Fetching and verifying images for ${celebrityName} in ${role.name}...`);
       
       const fetcher = new ImageFetcher();
-      const maxImages = config.image.maxImagesPerRole || 60; // TINY INCREASE from 50 to 60
+      const maxImages = config.image.maxImagesPerRole || 70; // Increased from 60 to 70
       
       // Generate streamlined search queries
       const searchQueries = fetcher.generateSearchQueries(celebrityName, role);
@@ -504,7 +504,7 @@ class ImageFetcher {
   }
 
   /**
-   * Calculate quality score for image prioritization - Enhanced for older content
+   * Calculate quality score for image prioritization - BALANCED approach
    */
   calculateQualityScore(image) {
     let score = 0;
@@ -513,54 +513,53 @@ class ImageFetcher {
     
     // SIZE BONUS: Larger images get higher scores (better for upscaling)
     const estimatedSize = (image.width || 400) * (image.height || 300);
-    score += Math.min(estimatedSize / 100000, 50); // Cap at 50 points
+    score += Math.min(estimatedSize / 100000, 40); // Reduced cap from 50 to 40
     
-    // SOURCE BONUS: Preferred domains get big boost
+    // SOURCE BONUS: Preferred domains get boost but not huge
     if (this.preferredDomains.some(domain => url.includes(domain))) {
-      score += 30;
+      score += 25; // Reduced from 30
     }
     
-    // HD/REMASTERED BONUS: Prioritize high quality content
+    // HD/REMASTERED BONUS: Nice to have but not essential
     if (this.detectHDContent(image)) {
-      score += 40; // Big bonus for HD/remastered content
+      score += 20; // Reduced from 40 - don't over-prioritize HD
     }
     
-    // CONTENT BONUS: Scene stills and promotional photos are gold
-    if (title.includes('still') || title.includes('scene')) score += 20;
-    if (title.includes('promotional') || title.includes('press')) score += 15;
-    if (title.includes('official')) score += 15;
-    if (title.includes('hd') || title.includes('high res')) score += 10;
+    // CONTENT BONUS: Scene stills and promotional photos are good
+    if (title.includes('still') || title.includes('scene')) score += 15; // Reduced from 20
+    if (title.includes('promotional') || title.includes('press')) score += 12; // Reduced from 15
+    if (title.includes('official')) score += 12; // Reduced from 15
+    if (title.includes('hd') || title.includes('high res')) score += 8; // Reduced from 10
     
-    // OLDER CONTENT LENIENCY: Don't heavily penalize older content
+    // LENIENCY: Don't penalize older content OR smaller images too harshly
     const olderContentIndicators = ['vhs', 'dvd', 'tv rip', '80s', '90s', 'vintage'];
     const isOlderContent = olderContentIndicators.some(indicator => 
       title.includes(indicator) || url.includes(indicator)
     );
     
     if (isOlderContent) {
-      score += 10; // Small bonus to help older content compete
-      // Don't apply harsh penalties for resolution on older content
-    } else {
-      // PENALTY: Low quality indicators (only for modern content)
-      if (title.includes('thumbnail') || title.includes('small')) score -= 20;
-      if (title.includes('low res') || title.includes('pixelated')) score -= 15;
+      score += 15; // Increased bonus for older content
     }
+    
+    // REDUCED PENALTIES: Don't be too harsh on lower quality
+    if (title.includes('thumbnail') || title.includes('small')) score -= 10; // Reduced from 20
+    if (title.includes('low res') || title.includes('pixelated')) score -= 8; // Reduced from 15
     
     return score;
   }
   
   /**
-   * RELAXED: Content diversification with higher limits
+   * BALANCED: Content diversification - more inclusive limits
    */
   diversifyContentTypesRelaxed(images) {
     const contentTypeLimits = {
-      poster: 6,         // TINY INCREASE from 5
-      behind_scenes: 10, // TINY INCREASE from 8  
-      press: 18,         // TINY INCREASE from 15
-      movie_still: 25,   // TINY INCREASE from 20
-      cast_group: 18,    // TINY INCREASE from 15
-      portrait: 10,      // TINY INCREASE from 8
-      general: 30        // TINY INCREASE from 25
+      poster: 8,         // Increased from 6
+      behind_scenes: 12, // Increased from 10
+      press: 22,         // Increased from 18
+      movie_still: 30,   // Increased from 25 - Joseph has lots of movie stills
+      cast_group: 22,    // Increased from 18
+      portrait: 12,      // Increased from 10
+      general: 35        // Increased from 30
     };
 
     const contentTypeCounts = {};
@@ -569,7 +568,7 @@ class ImageFetcher {
     for (const image of images) {
       const contentType = this.detectContentType(image);
       const currentCount = contentTypeCounts[contentType] || 0;
-      const limit = contentTypeLimits[contentType] || 15;
+      const limit = contentTypeLimits[contentType] || 20; // Increased default limit
 
       if (currentCount < limit) {
         diversifiedImages.push({
@@ -583,7 +582,7 @@ class ImageFetcher {
         logger.info(`⏭️ Skipped ${contentType}: limit reached (${limit})`);
       }
 
-      if (diversifiedImages.length >= 80) break; // TINY INCREASE from 75
+      if (diversifiedImages.length >= 90) break; // Increased from 80
     }
 
     logger.info(`Content distribution: ${Object.entries(contentTypeCounts)
