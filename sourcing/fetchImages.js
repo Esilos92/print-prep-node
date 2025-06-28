@@ -323,8 +323,129 @@ class ImageFetcher {
   }
   
   /**
-   * NEW: Prioritize image quality for better upscaling potential
+   * Validate images
    */
+  validateImages(images, celebrityName, role) {
+    return images.filter(image => {
+      const validation = this.simpleValidation(image, celebrityName, role);
+      
+      if (!validation.isValid) {
+        logger.warn(`❌ ${image.title}: ${validation.reason}`);
+        return false;
+      }
+      
+      return true;
+    });
+  }
+  
+  /**
+   * Simple validation
+   */
+  simpleValidation(image, celebrityName, role) {
+    const title = (image.title || '').toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
+    
+    const strictRejects = [
+      'comic con', 'convention', 'podcast', 'interview graphic',
+      'promotional graphic', 'vhs', 'dvd', 'blu ray', 'box art',
+      'vs', 'versus', 'side by side', 'comparison', 'meme', 'parody'
+    ];
+    
+    for (const reject of strictRejects) {
+      if (title.includes(reject) || url.includes(reject)) {
+        return { isValid: false, reason: `Rejected content: ${reject}` };
+      }
+    }
+    
+    const wrongActors = [
+      'sandra bullock', 'benjamin bratt', 'michael caine', 'candice bergen'
+    ];
+    
+    const targetActor = celebrityName.toLowerCase();
+    const hasTargetActor = title.includes(targetActor);
+    let hasWrongActor = false;
+    
+    for (const wrongActor of wrongActors) {
+      if (title.includes(wrongActor)) {
+        hasWrongActor = true;
+        if (!hasTargetActor) {
+          return { isValid: false, reason: `Wrong actor only: ${wrongActor}` };
+        }
+      }
+    }
+    
+    if (role.isVoiceRole) {
+      return this.validateVoiceRole(image, role);
+    } else {
+      return this.validateLiveAction(image, celebrityName, role);
+    }
+  }
+  
+  /**
+   * Voice role validation
+   */
+  validateVoiceRole(image, role) {
+    const title = (image.title || '').toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
+    
+    const characterKeywords = ['character', 'animated', 'animation', 'scene', 'still'];
+    const hasCharacterContext = characterKeywords.some(k => title.includes(k) || url.includes(k));
+    
+    if (role.characterName && role.characterName !== 'Unknown Character') {
+      const character = role.characterName.toLowerCase();
+      if (title.includes(character)) {
+        return { isValid: true, reason: 'Character name match' };
+      }
+    }
+    
+    const roleWords = role.name.toLowerCase().split(' ').filter(w => w.length > 3);
+    const hasRoleContext = roleWords.some(word => title.includes(word));
+    
+    if (hasCharacterContext || hasRoleContext) {
+      return { isValid: true, reason: 'Voice role context found' };
+    }
+    
+    return { isValid: false, reason: 'No voice role context' };
+  }
+  
+  /**
+   * Live action validation
+   */
+  validateLiveAction(image, celebrityName, role) {
+    const title = (image.title || '').toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
+    
+    const groupIndicators = [
+      'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
+      'with', 'co-star', 'behind the scenes', 'on set'
+    ];
+    
+    const roleWords = role.name.toLowerCase().split(' ').filter(w => w.length > 3);
+    
+    const actorName = celebrityName.toLowerCase();
+    const actorWords = actorName.split(' ');
+    const lastName = actorWords[actorWords.length - 1];
+    
+    const hasFullName = title.includes(actorName);
+    const hasLastName = title.includes(lastName);
+    
+    const hasGroupContext = groupIndicators.some(indicator => title.includes(indicator));
+    const hasRoleContext = roleWords.some(word => title.includes(word));
+    
+    if (hasFullName || hasLastName) {
+      return { isValid: true, reason: 'Actor name match' };
+    }
+    
+    if (hasGroupContext && hasRoleContext) {
+      return { isValid: true, reason: 'Group shot with role context' };
+    }
+    
+    if (hasRoleContext) {
+      return { isValid: true, reason: 'Role context present' };
+    }
+    
+    return { isValid: false, reason: 'No actor or role context' };
+  }
   prioritizeImageQuality(images) {
     return images
       .map(image => ({
