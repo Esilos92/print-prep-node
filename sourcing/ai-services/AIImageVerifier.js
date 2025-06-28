@@ -122,28 +122,48 @@ class AIImageVerifier {
   }
 
   /**
-   * OpenAI Vision verification (Primary)
+   * OpenAI Vision verification (Primary) - More lenient for targeted searches
    */
   async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `Analyze this image carefully. I need to verify if this shows ${isAnimated ? `the character ${character}` : `${celebrityName} playing the character ${character}`} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'TV show'} "${title}".
+    const prompt = `You're analyzing an image from a highly targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-${isAnimated ? `NOTE: This is animated content. ACCEPT group shots - if multiple characters from ${title} appear and ${character} is among them, mark as VALID. Only reject if it's clearly from a different show or has completely different characters.` : `NOTE: This is live-action content. Must be specifically ${celebrityName} - not someone with a similar name.`}
+IMPORTANT: This image came from a very specific search, so be LENIENT - only reject obvious problems.
 
-RESPOND WITH EXACTLY ONE OF THESE:
-- VALID: Shows ${isAnimated ? `${character} from ${title} (solo or in group shots)` : `${celebrityName} as ${character} from ${title}`}
-- INVALID_WRONG_PERSON: Shows different actor/person (live-action only)
-- INVALID_WRONG_CHARACTER: Shows ${isAnimated ? 'characters from different show' : `${celebrityName} but as different character`}
-- INVALID_MERCHANDISE: Shows toys, figures, collectibles, or merchandise packaging
-- INVALID_FAN_ART: Shows clearly amateur fan art only
-- INVALID_FRAMED: Shows a framed photo or picture on wall
-- INVALID_EVENT_PHOTO: Shows convention, interview, or event photo
-- INVALID_OTHER: Shows something else entirely
+${isAnimated ? 
+`For animated content - ACCEPT if:
+- Shows ${character} from ${title} (solo or in groups)
+- Shows other characters from ${title} with ${character} visible
+- Different art styles of the same character/show
+- High-quality fan art of the correct character
+- Any variation that appears to be from ${title}
 
-Focus on: ${isAnimated ? `Is this from the right show (${title}) and does it include ${character}?` : `Is this the right person playing the right character from the right show/movie?`}`;
+REJECT only if:
+- Clearly from a different animated show/movie
+- Obviously wrong characters entirely
+- Toys/merchandise/packaging` :
+
+`For live-action - ACCEPT if:
+- Appears to be ${celebrityName} from ${title}
+- Could reasonably be ${celebrityName} (different angles/lighting OK)
+- Group shots from ${title} that may include ${celebrityName}
+- Behind-the-scenes from ${title}
+- Promotional materials from ${title}
+
+REJECT only if:
+- Clearly a completely different person
+- Obviously from a different movie/show
+- Toys/merchandise/packaging`}
+
+RESPOND WITH EXACTLY ONE WORD:
+- VALID: If it could reasonably be the right ${isAnimated ? 'character' : 'person'} from the right ${isAnimated ? 'show' : 'show/movie'}
+- INVALID_MERCHANDISE: If it's clearly toys/collectibles/packaging
+- INVALID_OTHER: If it's clearly something completely unrelated
+
+Be generous with VALID - this search was already highly filtered.`;
 
     const completion = await this.openai.chat.completions.create({
       model: "gpt-4o",
@@ -160,7 +180,7 @@ Focus on: ${isAnimated ? `Is this from the right show (${title}) and does it inc
           }
         ]
       }],
-      max_tokens: 50,
+      max_tokens: 20,
       temperature: 0.1
     });
 
@@ -169,51 +189,51 @@ Focus on: ${isAnimated ? `Is this from the right show (${title}) and does it inc
   }
 
   /**
-   * Claude Vision verification (Fallback)
+   * Claude Vision verification (Fallback) - Much more lenient
    */
   async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `Analyze this image. Does it show ${isAnimated ? `the character ${character}` : `EXACTLY ${celebrityName}`} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'show'} "${title}"?
+    const prompt = `This image came from a targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
+
+LENIENT VERIFICATION MODE: Since this search was highly specific, be generous with approval.
 
 ${isAnimated ? 
-`IMPORTANT: This is animated content. For animation:
-- ACCEPT if it shows ${character} from ${title} (even in group shots with other characters)
-- ACCEPT if it shows multiple characters from ${title} and ${character} appears to be among them
-- ACCEPT any art style variations of the correct character/show
-- ONLY REJECT if it's clearly the wrong show/movie or completely different characters` :
-`IMPORTANT: For live-action, this must be specifically ${celebrityName} - not someone with a similar name or appearance.`}
+`ACCEPT if this appears to be from ${title} and shows:
+- ${character} (any art style, solo or in groups)
+- Other characters from ${title} (${character} may be visible)
+- Scenes that look like they're from ${title}
+- Fan art of ${character} from ${title}
 
-BE LENIENT with:
-- Art style variations (for animation)
-- Group shots with multiple characters (for animation)
-- Different ages/looks of the same actor (for live-action)
-- High-quality fan art of the correct character
-- Official promotional materials
-- Compression artifacts (JPEG compression but still high res)
-- Slightly soft focus if content is clearly correct
+REJECT only obviously wrong content:
+- Clearly different animated show
+- Toys/merchandise
+- Completely unrelated images` :
 
-BE STRICT with:
-${isAnimated ? 
-`- Must be from the correct show/movie: ${title}
-- Reject if completely different animated show
-- Reject if obviously wrong characters` :
-`- Must be the EXACT person: ${celebrityName} (not similar names)
-- Must be the EXACT character: ${character} from ${title}
-- Reject if different person with similar name`}
+`ACCEPT if this could be from ${title} with ${celebrityName}:
+- Appears to be ${celebrityName} (any angle, lighting, age)
+- Group shots from ${title} (${celebrityName} may be present)
+- Behind-the-scenes from ${title}
+- Promotional content from ${title}
+- Anyone who could reasonably be ${celebrityName}
+
+REJECT only obviously wrong content:
+- Clearly different person AND different movie
+- Toys/merchandise  
+- Completely unrelated images`}
+
+When in doubt, choose VALID - the search was already filtered.
 
 Respond with exactly one word:
-- VALID if it shows ${isAnimated ? `${character} from ${title} (solo or in group)` : `exactly ${celebrityName} as ${character} from ${title}`}
-- INVALID_WRONG_CHARACTER if wrong character${isAnimated ? ' or wrong show' : ''}
-- INVALID_WRONG_PERSON if different person (live-action only)
-- INVALID_MERCHANDISE if toys/packaging
-- INVALID_OTHER if unrelated`;
+- VALID (if it could reasonably be the right content)
+- INVALID_MERCHANDISE (if toys/collectibles)
+- INVALID_OTHER (if completely unrelated)`;
 
     const requestBody = {
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 20,
+      max_tokens: 10,
       temperature: 0.1,
       messages: [{
         role: 'user',
@@ -309,30 +329,20 @@ Respond with exactly one word:
   }
 
   /**
-   * Keyword-based verification (Final fallback)
+   * Keyword-based verification (Final fallback) - More lenient
    */
   async verifyWithKeywords(imagePath, celebrityName, character, title) {
     const filename = path.basename(imagePath).toLowerCase();
     
-    // Check for obvious bad indicators in filename
-    const badKeywords = ['funko', 'pop', 'toy', 'figure', 'framed', 'frame', 'convention', 'signed', 'autograph', 'fan', 'art', 'render'];
-    const hasBadKeywords = badKeywords.some(keyword => filename.includes(keyword));
+    // Only reject obvious merchandise/junk
+    const obviousBadKeywords = ['funko', 'pop', 'toy', 'figure', 'collectible', 'merchandise', 'packaging'];
+    const hasObviousBad = obviousBadKeywords.some(keyword => filename.includes(keyword));
     
-    if (hasBadKeywords) {
+    if (hasObviousBad) {
       return this.verificationResults.INVALID_MERCHANDISE;
     }
 
-    // Check for good indicators
-    const characterName = character.toLowerCase().replace(/\s+/g, '');
-    const titleName = title.toLowerCase().replace(/\s+/g, '');
-    const hasCharacter = filename.includes(characterName) || filename.includes(character.toLowerCase());
-    const hasTitle = filename.includes(titleName) || filename.includes(title.toLowerCase());
-
-    if (hasCharacter && hasTitle) {
-      return this.verificationResults.VALID;
-    }
-
-    // Default to valid for keyword verification (let other filters handle it)
+    // For targeted searches, default to valid
     return this.verificationResults.VALID;
   }
 
@@ -347,8 +357,12 @@ Respond with exactly one word:
   parseVerificationResponse(response) {
     const upperResponse = response.toUpperCase();
     
-    if (upperResponse.includes('VALID') && !upperResponse.includes('INVALID')) {
+    // Be more lenient in parsing - default to valid for ambiguous responses
+    if (upperResponse.includes('VALID') || upperResponse.includes('ACCEPT') || upperResponse.includes('YES')) {
       return this.verificationResults.VALID;
+    }
+    if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY')) {
+      return this.verificationResults.INVALID_MERCHANDISE;
     }
     if (upperResponse.includes('WRONG_PERSON')) {
       return this.verificationResults.INVALID_WRONG_PERSON;
@@ -356,22 +370,19 @@ Respond with exactly one word:
     if (upperResponse.includes('WRONG_CHARACTER')) {
       return this.verificationResults.INVALID_WRONG_CHARACTER;
     }
-    if (upperResponse.includes('MERCHANDISE')) {
-      return this.verificationResults.INVALID_MERCHANDISE;
-    }
     if (upperResponse.includes('EVENT_PHOTO')) {
       return this.verificationResults.INVALID_EVENT_PHOTO;
     }
-    if (upperResponse.includes('INVALID_OTHER')) {
+    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('UNRELATED')) {
       return this.verificationResults.INVALID_OTHER;
     }
     
-    // For ambiguous cases, be moderately lenient but not too much
+    // DEFAULT TO VALID for targeted searches - let borderline cases through
     return this.verificationResults.VALID;
   }
 
   analyzeGoogleVisionResults(labels, textDetections, celebrityName, character, title) {
-    // Check for merchandise indicators
+    // Only reject obvious merchandise
     const merchandiseLabels = ['toy', 'figurine', 'collectible', 'product', 'packaging'];
     const hasMerchandise = labels.some(label => 
       merchandiseLabels.some(merch => label.description.toLowerCase().includes(merch))
@@ -381,17 +392,7 @@ Respond with exactly one word:
       return this.verificationResults.INVALID_MERCHANDISE;
     }
 
-    // Check for frame indicators
-    const frameLabels = ['picture frame', 'framing', 'wall', 'hanging'];
-    const hasFrame = labels.some(label => 
-      frameLabels.some(frame => label.description.toLowerCase().includes(frame))
-    );
-    
-    if (hasFrame) {
-      return this.verificationResults.INVALID_FRAMED;
-    }
-
-    // Default to valid for Google Vision
+    // Default to valid for targeted searches
     return this.verificationResults.VALID;
   }
 
