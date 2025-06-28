@@ -131,51 +131,31 @@ class ImageFetcher {
    * Generate search queries using your optimized search terms
    */
   generateSearchQueries(celebrityName, role) {
-    // DEBUG: Let's see what we're getting
-    console.log('🐛 DEBUG: =================================');
-    console.log('🐛 DEBUG: Role object structure in fetchImages:');
-    console.log('🐛 DEBUG: Role keys:', Object.keys(role));
-    console.log('🐛 DEBUG: Role name/title fields:', {
-      name: role.name,
-      title: role.title,
-      character: role.character,
-      characterName: role.characterName
-    });
-    console.log('🐛 DEBUG: Has finalSearchTerms:', !!role.finalSearchTerms);
-    if (role.finalSearchTerms) {
-      console.log('🐛 DEBUG: finalSearchTerms length:', role.finalSearchTerms.length);
-      console.log('🐛 DEBUG: First finalSearchTerm:', role.finalSearchTerms[0]);
-    }
-    console.log('🐛 DEBUG: Has searchTerms:', !!role.searchTerms);
-    if (role.searchTerms) {
-      console.log('🐛 DEBUG: SearchTerms keys:', Object.keys(role.searchTerms));
-      console.log('🐛 DEBUG: character_images length:', role.searchTerms.character_images?.length);
-      if (role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
-        console.log('🐛 DEBUG: First character_image term:', role.searchTerms.character_images[0]);
-      }
-    }
-    console.log('🐛 DEBUG: Full role object:', JSON.stringify(role, null, 2));
-    console.log('🐛 DEBUG: =================================');
-    
     // PRIORITY 1: Use the optimized character image search terms if available
     if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
       logger.info(`🎯 Using AI-optimized character image search terms (${role.finalSearchTerms.length} terms)`);
-      return role.finalSearchTerms; // Use the AI-optimized terms directly
+      return role.finalSearchTerms;
     }
     
-    // PRIORITY 2: Use character_images from search optimization
+    // PRIORITY 2: Use character_images from search optimization (object format)
     if (role.searchTerms && role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
       logger.info(`🎯 Using ChatGPT character image search terms (${role.searchTerms.character_images.length} terms)`);
       return role.searchTerms.character_images;
     }
     
-    // PRIORITY 3: Use any AI-generated terms
+    // PRIORITY 3: Use searchTerms as array (handles your current format!)
+    if (role.searchTerms && Array.isArray(role.searchTerms) && role.searchTerms.length > 0) {
+      logger.info(`🎯 Using optimized search terms array (${role.searchTerms.length} terms)`);
+      return role.searchTerms;
+    }
+    
+    // PRIORITY 4: Use any AI-generated terms
     if (role.searchTerms && role.searchTerms.ai && role.searchTerms.ai.length > 0) {
       logger.info(`🎯 Using AI-generated search terms (${role.searchTerms.ai.length} terms)`);
       return role.searchTerms.ai;
     }
     
-    // FALLBACK: Generate basic queries (this is what you're seeing now)
+    // FALLBACK: Generate basic queries (should NOT hit this now)
     const roleName = role.name || role.title || role.character || 'Unknown Role';
     logger.warn(`⚠️ No optimized search terms found, using basic fallback for ${roleName}`);
     
