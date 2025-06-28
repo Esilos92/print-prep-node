@@ -1,4 +1,55 @@
-const axios = require('axios');
+if (enableAIVerification) {
+        // AI VERIFICATION STEP
+        logger.info(`🤖 Starting AI verification of downloaded images...`);
+        try {
+          const verificationResults = await fetcher.aiVerifier.verifyImages(
+            downloadedImages,
+            celebrityName,
+            role.character || role.characterName || 'Unknown',
+            role.title || role.name,
+            role.medium || role.media_type || 'unknown'
+          );
+          
+          // DEBUG: Log what Claude rejected and why
+          if (verificationResults.invalid && verificationResults.invalid.length > 0) {
+            logger.info(`🔍 CLAUDE REJECTIONS DEBUG:`);
+            verificationResults.invalid.forEach((invalid, index) => {
+              logger.info(`❌ ${index + 1}. ${invalid.filename}`);
+              logger.info(`   Title: ${invalid.title || 'No title'}`);
+              logger.info(`   Source: ${invalid.sourceUrl || 'No source'}`);
+              logger.info(`   Reason: ${invalid.reason || 'No reason given'}`);
+              logger.info(`   ---`);
+            });
+          }
+          
+          // Keep only verified valid images
+          const finalValidImages = verificationResults.valid;
+          
+          // DEBUG: Log what Claude approved
+          logger.info(`✅ CLAUDE APPROVED ${finalValidImages.length} images:`);
+          finalValidImages.forEach((valid, index) => {
+            logger.info(`✅ ${index + 1}. ${valid.filename} - ${valid.title || 'No title'}`);
+          });
+          
+          // Clean up invalid images
+          await fetcher.cleanupInvalidImages(verificationResults.invalid);
+          
+          logger.info(`✅ Final result: ${finalValidImages.length} AI-verified images`);
+          logger.info(`💰 Verification cost: ${verificationResults.totalCost.toFixed(4)}`);
+          logger.info(`📊 Services used:`, verificationResults.serviceUsage);
+          
+          // Return the verified images (maintains compatibility)
+          return finalValidImages;
+          
+        } catch (verificationError) {
+          logger.warn(`⚠️ AI verification failed: ${verificationError.message}`);
+          logger.info(`📦 Returning ${downloadedImages.length} unverified images`);
+          return downloadedImages;
+        }
+      } else {
+        logger.info(`📦 AI verification disabled, returning ${downloadedImages.length} images`);
+        return downloadedImages;
+      }const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../utils/config');
@@ -200,7 +251,7 @@ class ImageFetcher {
   }
   
   /**
-   * Search SerpAPI with optimized parameters for quality + upscalable images
+   * Search SerpAPI with optimized parameters for quality + older content leniency
    */
   async searchSerpAPI(query, maxResults = 22) {
     try {
@@ -211,7 +262,7 @@ class ImageFetcher {
         num: Math.min(maxResults, 100),
         ijn: 0,
         safe: 'active',
-        imgsz: 'l', // BACK TO LARGE - better for upscaling
+        imgsz: 'l', // Large images - but we'll be lenient for older content
         imgtype: 'photo',
         // OPTIMIZATION: Add these for better quality
         imgc: 'color', // Color images tend to be higher quality
@@ -240,14 +291,23 @@ class ImageFetcher {
         height: img.original_height
       }));
 
-      // OPTIMIZATION: Prioritize larger images first (better for upscaling)
+      // OPTIMIZATION: Prioritize images but be lenient with older content
       const sortedImages = images.sort((a, b) => {
         const aSize = (a.width || 0) * (a.height || 0);
         const bSize = (b.width || 0) * (b.height || 0);
-        return bSize - aSize; // Larger first
+        
+        // Boost remastered/HD content
+        const aIsHD = this.detectHDContent(a);
+        const bIsHD = this.detectHDContent(b);
+        
+        if (aIsHD !== bIsHD) {
+          return bIsHD ? 1 : -1; // HD content first
+        }
+        
+        return bSize - aSize; // Then by size
       });
 
-      logger.info(`Found ${sortedImages.length} images for: ${query} (sorted by size)`);
+      logger.info(`Found ${sortedImages.length} images for: ${query} (sorted by quality)`);
       return sortedImages;
 
     } catch (error) {
@@ -261,6 +321,23 @@ class ImageFetcher {
       logger.error(`SerpAPI error: ${error.message}`);
       return [];
     }
+  }
+
+  /**
+   * NEW: Detect HD/remastered content for prioritization
+   */
+  detectHDContent(image) {
+    const title = (image.title || '').toLowerCase();
+    const url = (image.sourceUrl || '').toLowerCase();
+    
+    const hdIndicators = [
+      'hd', '1080p', '4k', 'uhd', 'blu-ray', 'bluray', 'remastered', 
+      'restored', 'digital', 'high resolution', 'high quality'
+    ];
+    
+    return hdIndicators.some(indicator => 
+      title.includes(indicator) || url.includes(indicator)
+    );
   }
   
   /**
@@ -456,7 +533,7 @@ class ImageFetcher {
   }
 
   /**
-   * Calculate quality score for image prioritization
+   * Calculate quality score for image prioritization - Enhanced for older content
    */
   calculateQualityScore(image) {
     let score = 0;
@@ -472,15 +549,31 @@ class ImageFetcher {
       score += 30;
     }
     
+    // HD/REMASTERED BONUS: Prioritize high quality content
+    if (this.detectHDContent(image)) {
+      score += 40; // Big bonus for HD/remastered content
+    }
+    
     // CONTENT BONUS: Scene stills and promotional photos are gold
     if (title.includes('still') || title.includes('scene')) score += 20;
     if (title.includes('promotional') || title.includes('press')) score += 15;
     if (title.includes('official')) score += 15;
     if (title.includes('hd') || title.includes('high res')) score += 10;
     
-    // PENALTY: Low quality indicators
-    if (title.includes('thumbnail') || title.includes('small')) score -= 20;
-    if (title.includes('low res') || title.includes('pixelated')) score -= 15;
+    // OLDER CONTENT LENIENCY: Don't heavily penalize older content
+    const olderContentIndicators = ['vhs', 'dvd', 'tv rip', '80s', '90s', 'vintage'];
+    const isOlderContent = olderContentIndicators.some(indicator => 
+      title.includes(indicator) || url.includes(indicator)
+    );
+    
+    if (isOlderContent) {
+      score += 10; // Small bonus to help older content compete
+      // Don't apply harsh penalties for resolution on older content
+    } else {
+      // PENALTY: Low quality indicators (only for modern content)
+      if (title.includes('thumbnail') || title.includes('small')) score -= 20;
+      if (title.includes('low res') || title.includes('pixelated')) score -= 15;
+    }
     
     return score;
   }
