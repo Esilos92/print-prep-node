@@ -36,10 +36,19 @@ class CelebrityRoleOrchestrator {
         actorName: celebrityName
       }));
 
+      console.log(`🔍 Optimizing search terms using ChatGPT template for ${rolesWithCelebrity.length} roles`);
+
       // Step 3: Generate character image search terms for each role
       const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithCelebrity);
 
-      // Step 4: Process and format final results
+      // Verify optimization worked
+      const successfulOptimizations = optimizedRoles.filter(role => 
+        role.searchTerms?.character_images?.length === 6
+      ).length;
+      
+      console.log(`✅ Successfully optimized ${successfulOptimizations}/${optimizedRoles.length} roles for character images`);
+
+      // Step 4: Process and format final results - FIXED: Use optimizedRoles
       const finalResults = this.processResults(celebrityName, optimizedRoles);
 
       // Cache results
@@ -55,18 +64,19 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Process and format final results
+   * Process and format final results - FIXED: Use optimized roles
    */
-  processResults(celebrityName, roles) {
+  processResults(celebrityName, optimizedRoles) {
     return {
       celebrity: celebrityName,
-      totalRoles: roles.length,
+      totalRoles: optimizedRoles.length,
       timestamp: new Date().toISOString(),
       source: 'character_image_focused',
-      roles: roles.map((role, index) => ({
+      roles: optimizedRoles.map((role, index) => ({
         ...role,
         priority: index + 1,
-        finalSearchTerms: this.searchOptimizer.getBestSearchTerms(role, 6), // Get all 6 character image terms
+        // FIXED: Use the optimized role object that already has searchTerms
+        finalSearchTerms: this.searchOptimizer.getBestSearchTerms(role, 6), // Now using optimized role
         imageSearchReady: true,
         searchOptimization: {
           characterImageTerms: role.searchTerms?.character_images?.length || 0,
@@ -75,18 +85,18 @@ class CelebrityRoleOrchestrator {
           focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6
         }
       })),
-      summary: this.generateSummary(roles)
+      summary: this.generateSummary(optimizedRoles) // FIXED: Use optimized roles
     };
   }
 
   /**
-   * Generate summary with character image stats
+   * Generate summary with character image stats - FIXED: Use optimized roles
    */
-  generateSummary(roles) {
+  generateSummary(optimizedRoles) {
     const mediumCounts = {};
     let totalCharacterImageTerms = 0;
     
-    roles.forEach(role => {
+    optimizedRoles.forEach(role => {
       mediumCounts[role.medium] = (mediumCounts[role.medium] || 0) + 1;
       totalCharacterImageTerms += role.searchTerms?.character_images?.length || 0;
     });
@@ -98,19 +108,19 @@ class CelebrityRoleOrchestrator {
     return {
       primaryMedium,
       mediumBreakdown: mediumCounts,
-      hasVoiceRoles: roles.some(r => r.medium.includes('voice')),
-      hasLiveActionRoles: roles.some(r => r.medium.includes('live_action')),
+      hasVoiceRoles: optimizedRoles.some(r => r.medium.includes('voice')),
+      hasLiveActionRoles: optimizedRoles.some(r => r.medium.includes('live_action')),
       characterImageOptimization: {
         totalCharacterImageTerms: totalCharacterImageTerms,
-        expectedTerms: roles.length * 6,
-        characterImageSuccessRate: Math.round((totalCharacterImageTerms / (roles.length * 6)) * 100),
-        fullyOptimizedRoles: roles.filter(r => (r.searchTerms?.character_images?.length || 0) === 6).length
+        expectedTerms: optimizedRoles.length * 6,
+        characterImageSuccessRate: Math.round((totalCharacterImageTerms / (optimizedRoles.length * 6)) * 100),
+        fullyOptimizedRoles: optimizedRoles.filter(r => (r.searchTerms?.character_images?.length || 0) === 6).length
       }
     };
   }
 
   /**
-   * Handle failures with fallback strategies
+   * Handle failures with fallback strategies - FIXED: Pass optimized roles through
    */
   async handleFailure(celebrityName, originalError) {
     console.log(`🔄 Attempting fallback strategies for ${celebrityName}`);
@@ -126,7 +136,7 @@ class CelebrityRoleOrchestrator {
           actorName: celebrityName
         }));
         
-        // Still try to optimize for character images
+        // Still try to optimize for character images - FIXED: Use optimized results
         const optimizedFallbackRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithCelebrity);
         return this.processResults(celebrityName, optimizedFallbackRoles);
       }
@@ -194,7 +204,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * Get search terms for image fetching integration
+   * Get search terms for image fetching integration - FIXED: Improved data structure
    */
   getSearchTermsForImages(results) {
     if (!results.roles || results.roles.length === 0) {
@@ -206,10 +216,14 @@ class CelebrityRoleOrchestrator {
       title: role.title,
       medium: role.medium,
       celebrity: role.celebrity,
-      searchTerms: role.finalSearchTerms || [],
+      name: role.title, // For compatibility with fetchImages
+      // PRIORITY FIELDS for fetchImages.js:
+      finalSearchTerms: role.finalSearchTerms || [], // Highest priority
+      searchTerms: role.searchTerms, // Contains character_images array
       characterImageTerms: role.searchTerms?.character_images || [],
       priority: role.priority,
-      focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6
+      focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6,
+      isVoiceRole: role.medium?.includes('voice') || false
     }));
   }
 
@@ -300,7 +314,15 @@ class CelebrityRoleOrchestrator {
       };
       
       const optimized = await this.searchOptimizer.optimizeRoleForCharacterImages(testRole);
-      return optimized.searchTerms?.character_images?.length === 6;
+      const success = optimized.searchTerms?.character_images?.length === 6;
+      
+      if (success) {
+        console.log('✅ Character image integration test passed');
+      } else {
+        console.log('❌ Character image integration test failed - not generating 6 terms');
+      }
+      
+      return success;
     } catch (error) {
       console.error('Character image integration test failed:', error.message);
       return false;
