@@ -122,7 +122,7 @@ class AIImageVerifier {
   }
 
   /**
-   * OpenAI Vision verification (Primary) - Enhanced for ensemble movies
+   * OpenAI Vision verification (Primary) - Age-aware and resolution-conscious
    */
   async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
@@ -131,39 +131,43 @@ class AIImageVerifier {
     
     const prompt = `You're analyzing an image for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-ENHANCED FACIAL VERIFICATION: Focus on identifying the specific person/character.
+AGE-AWARE FACIAL VERIFICATION: Account for actors aging across their careers.
 
 ${isAnimated ? 
-`STRICT REQUIREMENTS for animated content:
+`REQUIREMENTS for animated content:
 - ${character} must be clearly visible and recognizable in the image
 - Must be the specific character ${character}, not other characters from ${title}
-- Group shots OK only if ${character} is clearly identifiable among the group
+- Group shots OK if ${character} is clearly identifiable
 - Different art styles OK if it's clearly ${character}
 
 REJECT if:
 - ${character} is not visible or not clearly identifiable
 - Shows only other characters from ${title} without ${character}
 - Wrong animated show/movie entirely
-- Face/character too small to identify clearly
 - Toys/merchandise` :
 
-`STRICT REQUIREMENTS for live-action:
+`REQUIREMENTS for live-action:
 - ${celebrityName} must be clearly visible and facially recognizable
-- Face must be identifiable specifically as ${celebrityName} (not other actors)
-- Group shots OK only if ${celebrityName} is clearly visible and identifiable
-- Different ages/looks OK if face is recognizably ${celebrityName}
+- IMPORTANT: Consider age differences - ${celebrityName} may look significantly different across decades
+- Accept both young and mature versions of ${celebrityName} if identifiable as the same person
+- Child actors grown up are still the same person - focus on facial structure continuity
+- Group shots OK if ${celebrityName} is clearly visible and identifiable
+- Be more lenient with older movies/shows (lower image quality is expected)
 
 REJECT if:
 - ${celebrityName} is not visible or face not clearly identifiable
 - Shows only other actors from ${title} without ${celebrityName}
-- Face too small/obscured to identify as ${celebrityName}
-- Clearly a different person entirely
+- Face too small/obscured to identify (accounting for older film quality)
+- Clearly a completely different person (not just older/younger ${celebrityName})
 - Toys/merchandise`}
 
-SPECIAL NOTE FOR ENSEMBLE MOVIES: Many movies have large casts. Only accept if the TARGET person is clearly visible and identifiable, not just other actors from the same movie.
+SPECIAL CONSIDERATIONS:
+- For older movies/TV shows: Be more forgiving of lower resolution and film grain
+- For child actors: Look for facial structure similarities even if they've aged significantly
+- Prioritize: Remastered/Blu-ray quality > DVD quality > VHS/TV rips
 
 RESPOND WITH EXACTLY ONE WORD:
-- VALID: ${isAnimated ? character : celebrityName} is clearly present and facially/visually identifiable
+- VALID: ${isAnimated ? character : celebrityName} is clearly present and identifiable (any age)
 - INVALID_WRONG_PERSON: Different person/character shown instead
 - INVALID_NOT_VISIBLE: Target person present but not clearly identifiable
 - INVALID_MERCHANDISE: Toys/collectibles
@@ -193,7 +197,7 @@ RESPOND WITH EXACTLY ONE WORD:
   }
 
   /**
-   * Claude Vision verification (Fallback) - Enhanced facial recognition
+   * Claude Vision verification (Fallback) - Age-aware facial recognition
    */
   async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
@@ -202,39 +206,39 @@ RESPOND WITH EXACTLY ONE WORD:
     
     const prompt = `This image came from a search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-ENHANCED FACIAL VERIFICATION: Focus specifically on identifying the correct person.
+AGE-AWARE FACIAL VERIFICATION: Consider the actor's age across their career.
 
 ${isAnimated ? 
-`ACCEPT only if ${character} is clearly visible and identifiable:
-- ${character} must be recognizable as the specific character from ${title}
-- Group shots OK only if ${character} is clearly present and identifiable
-- Must be the correct character, not other characters from the same show
+`ACCEPT if this shows ${character} from ${title}:
+- ${character} is clearly visible and identifiable in the image
+- Recognizable as ${character} from ${title} specifically
+- Different art styles of ${character} are OK
+- Group shots where ${character} is identifiable
 
 REJECT if:
-- Shows other characters from ${title} without ${character}
-- ${character} is not clearly visible or identifiable
-- Wrong animated show entirely
+- ${character} is not visible or identifiable in the image
+- Shows only other characters from ${title} without ${character}
+- Clearly from a different animated show
 - Toys/merchandise` :
 
-`ACCEPT only if ${celebrityName} is clearly visible and identifiable:
-- Must be recognizable as ${celebrityName} specifically (not other actors)
-- Face must be visible and identifiable as ${celebrityName}
-- Group shots OK only if ${celebrityName} is clearly present and identifiable
-- Different ages/looks of ${celebrityName} are OK if recognizable
+`ACCEPT if this shows ${celebrityName} from ${title}:
+- ${celebrityName} is clearly visible and identifiable (face recognizable)
+- IMPORTANT: Consider age differences - ${celebrityName} may look significantly different across their career (child vs adult roles)
+- Accept both young and mature versions of ${celebrityName} if they're identifiable
+- Group shots where ${celebrityName} is clearly present and identifiable
+- Different ages/decades of ${celebrityName} are OK if recognizable as the same person
 
 REJECT if:
-- Shows other actors from ${title} without ${celebrityName} (even main characters)
-- ${celebrityName} is not clearly visible or identifiable in the image
-- Face is too small/obscured to identify as ${celebrityName}
-- Clearly a different person entirely
+- ${celebrityName} is not visible or not clearly identifiable
+- Shows only other actors from ${title} without ${celebrityName}
+- Face too small/obscured to identify as ${celebrityName} (any age)
+- Clearly a completely different person (not just older/younger ${celebrityName})
 - Toys/merchandise`}
 
-CRITICAL: In ensemble movies/shows, reject images that show only other characters/actors without the target person clearly visible.
-
-Focus on: Can you clearly identify ${isAnimated ? character : celebrityName} in this specific image?
+CRITICAL: Account for significant age differences - actors can look very different as children vs adults. Focus on whether this could reasonably be ${isAnimated ? character : celebrityName} at any age.
 
 Respond with exactly one word:
-- VALID (${isAnimated ? character : celebrityName} is clearly present and identifiable)
+- VALID (${isAnimated ? character : celebrityName} is clearly present and identifiable at any age)
 - INVALID_WRONG_PERSON (different person/character shown)
 - INVALID_NOT_VISIBLE (target person not clearly visible/identifiable)
 - INVALID_MERCHANDISE (toys/collectibles)
