@@ -1,55 +1,4 @@
-if (enableAIVerification) {
-        // AI VERIFICATION STEP
-        logger.info(`🤖 Starting AI verification of downloaded images...`);
-        try {
-          const verificationResults = await fetcher.aiVerifier.verifyImages(
-            downloadedImages,
-            celebrityName,
-            role.character || role.characterName || 'Unknown',
-            role.title || role.name,
-            role.medium || role.media_type || 'unknown'
-          );
-          
-          // DEBUG: Log what Claude rejected and why
-          if (verificationResults.invalid && verificationResults.invalid.length > 0) {
-            logger.info(`🔍 CLAUDE REJECTIONS DEBUG:`);
-            verificationResults.invalid.forEach((invalid, index) => {
-              logger.info(`❌ ${index + 1}. ${invalid.filename}`);
-              logger.info(`   Title: ${invalid.title || 'No title'}`);
-              logger.info(`   Source: ${invalid.sourceUrl || 'No source'}`);
-              logger.info(`   Reason: ${invalid.reason || 'No reason given'}`);
-              logger.info(`   ---`);
-            });
-          }
-          
-          // Keep only verified valid images
-          const finalValidImages = verificationResults.valid;
-          
-          // DEBUG: Log what Claude approved
-          logger.info(`✅ CLAUDE APPROVED ${finalValidImages.length} images:`);
-          finalValidImages.forEach((valid, index) => {
-            logger.info(`✅ ${index + 1}. ${valid.filename} - ${valid.title || 'No title'}`);
-          });
-          
-          // Clean up invalid images
-          await fetcher.cleanupInvalidImages(verificationResults.invalid);
-          
-          logger.info(`✅ Final result: ${finalValidImages.length} AI-verified images`);
-          logger.info(`💰 Verification cost: ${verificationResults.totalCost.toFixed(4)}`);
-          logger.info(`📊 Services used:`, verificationResults.serviceUsage);
-          
-          // Return the verified images (maintains compatibility)
-          return finalValidImages;
-          
-        } catch (verificationError) {
-          logger.warn(`⚠️ AI verification failed: ${verificationError.message}`);
-          logger.info(`📦 Returning ${downloadedImages.length} unverified images`);
-          return downloadedImages;
-        }
-      } else {
-        logger.info(`📦 AI verification disabled, returning ${downloadedImages.length} images`);
-        return downloadedImages;
-      }const axios = require('axios');
+const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../utils/config');
@@ -140,7 +89,7 @@ class ImageFetcher {
       const enableAIVerification = process.env.ENABLE_AI_VERIFICATION !== 'false';
       
       if (enableAIVerification) {
-        // AI VERIFICATION STEP - Let AI do the heavy filtering
+        // AI VERIFICATION STEP
         logger.info(`🤖 Starting AI verification of downloaded images...`);
         try {
           const verificationResults = await fetcher.aiVerifier.verifyImages(
@@ -151,8 +100,26 @@ class ImageFetcher {
             role.medium || role.media_type || 'unknown'
           );
           
+          // DEBUG: Log what Claude rejected and why
+          if (verificationResults.invalid && verificationResults.invalid.length > 0) {
+            logger.info(`🔍 CLAUDE REJECTIONS DEBUG:`);
+            verificationResults.invalid.forEach((invalid, index) => {
+              logger.info(`❌ ${index + 1}. ${invalid.filename}`);
+              logger.info(`   Title: ${invalid.title || 'No title'}`);
+              logger.info(`   Source: ${invalid.sourceUrl || 'No source'}`);
+              logger.info(`   Reason: ${invalid.reason || 'No reason given'}`);
+              logger.info(`   ---`);
+            });
+          }
+          
           // Keep only verified valid images
           const finalValidImages = verificationResults.valid;
+          
+          // DEBUG: Log what Claude approved
+          logger.info(`✅ CLAUDE APPROVED ${finalValidImages.length} images:`);
+          finalValidImages.forEach((valid, index) => {
+            logger.info(`✅ ${index + 1}. ${valid.filename} - ${valid.title || 'No title'}`);
+          });
           
           // Clean up invalid images
           await fetcher.cleanupInvalidImages(verificationResults.invalid);
@@ -523,6 +490,10 @@ class ImageFetcher {
     
     return { isValid: false, reason: 'No actor or role context' };
   }
+
+  /**
+   * NEW: Prioritize image quality for better upscaling potential
+   */
   prioritizeImageQuality(images) {
     return images
       .map(image => ({
