@@ -122,49 +122,52 @@ class AIImageVerifier {
   }
 
   /**
-   * OpenAI Vision verification (Primary) - Balanced facial verification
+   * OpenAI Vision verification (Primary) - Enhanced for ensemble movies
    */
   async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `You're analyzing an image from a targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
+    const prompt = `You're analyzing an image for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-IMPORTANT: Verify the RIGHT person/character is actually present and identifiable.
+ENHANCED FACIAL VERIFICATION: Focus on identifying the specific person/character.
 
 ${isAnimated ? 
-`For animated content - ACCEPT if:
-- ${character} is clearly visible and identifiable in the image
-- Shows ${character} from ${title} (solo or in groups where ${character} is present)
-- Different art styles of ${character} from ${title}
-- ${character} is recognizable even if other characters are also present
+`STRICT REQUIREMENTS for animated content:
+- ${character} must be clearly visible and recognizable in the image
+- Must be the specific character ${character}, not other characters from ${title}
+- Group shots OK only if ${character} is clearly identifiable among the group
+- Different art styles OK if it's clearly ${character}
 
 REJECT if:
-- ${character} is not visible or not identifiable in the image
+- ${character} is not visible or not clearly identifiable
 - Shows only other characters from ${title} without ${character}
-- Clearly from a different animated show/movie
-- Toys/merchandise/packaging` :
+- Wrong animated show/movie entirely
+- Face/character too small to identify clearly
+- Toys/merchandise` :
 
-`For live-action - ACCEPT if:
-- ${celebrityName} is clearly visible and identifiable in the image
-- Face/person is recognizable as ${celebrityName} (different angles/lighting OK)
-- Group shots where ${celebrityName} is clearly present and identifiable
-- Behind-the-scenes with ${celebrityName} visible
+`STRICT REQUIREMENTS for live-action:
+- ${celebrityName} must be clearly visible and facially recognizable
+- Face must be identifiable specifically as ${celebrityName} (not other actors)
+- Group shots OK only if ${celebrityName} is clearly visible and identifiable
+- Different ages/looks OK if face is recognizably ${celebrityName}
 
 REJECT if:
-- ${celebrityName} is not visible or not identifiable in the image
+- ${celebrityName} is not visible or face not clearly identifiable
 - Shows only other actors from ${title} without ${celebrityName}
-- Clearly a completely different person
-- Toys/merchandise/packaging`}
+- Face too small/obscured to identify as ${celebrityName}
+- Clearly a different person entirely
+- Toys/merchandise`}
 
-KEY REQUIREMENT: The target person/character must be PRESENT and IDENTIFIABLE in the image.
+SPECIAL NOTE FOR ENSEMBLE MOVIES: Many movies have large casts. Only accept if the TARGET person is clearly visible and identifiable, not just other actors from the same movie.
 
 RESPOND WITH EXACTLY ONE WORD:
-- VALID: If ${isAnimated ? character : celebrityName} is clearly present and identifiable
-- INVALID_WRONG_PERSON: If different person/character is shown instead
-- INVALID_MERCHANDISE: If toys/collectibles/packaging
-- INVALID_OTHER: If target not visible or completely unrelated`;
+- VALID: ${isAnimated ? character : celebrityName} is clearly present and facially/visually identifiable
+- INVALID_WRONG_PERSON: Different person/character shown instead
+- INVALID_NOT_VISIBLE: Target person present but not clearly identifiable
+- INVALID_MERCHANDISE: Toys/collectibles
+- INVALID_OTHER: Completely unrelated or target not present`;
 
     const completion = await this.openai.chat.completions.create({
       model: "gpt-4o",
@@ -181,8 +184,8 @@ RESPOND WITH EXACTLY ONE WORD:
           }
         ]
       }],
-      max_tokens: 20,
-      temperature: 0.1
+      max_tokens: 25,
+      temperature: 0.05
     });
 
     const response = completion.choices[0].message.content.trim();
@@ -190,55 +193,57 @@ RESPOND WITH EXACTLY ONE WORD:
   }
 
   /**
-   * Claude Vision verification (Fallback) - Balanced: face-focused but not overly strict
+   * Claude Vision verification (Fallback) - Enhanced facial recognition
    */
   async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `This image came from a targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
+    const prompt = `This image came from a search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-BALANCED VERIFICATION: Be reasonably lenient but ensure the right person/character is actually present.
+ENHANCED FACIAL VERIFICATION: Focus specifically on identifying the correct person.
 
 ${isAnimated ? 
-`ACCEPT if this shows ${character} from ${title}:
-- ${character} is clearly visible (solo or in groups)
-- Recognizable as ${character} from ${title} specifically
-- Different art styles of ${character} are OK
-- Group shots where ${character} is identifiable
+`ACCEPT only if ${character} is clearly visible and identifiable:
+- ${character} must be recognizable as the specific character from ${title}
+- Group shots OK only if ${character} is clearly present and identifiable
+- Must be the correct character, not other characters from the same show
 
 REJECT if:
-- ${character} is not visible or identifiable in the image
-- Shows only other characters from ${title} without ${character}
-- Clearly from a different animated show
+- Shows other characters from ${title} without ${character}
+- ${character} is not clearly visible or identifiable
+- Wrong animated show entirely
 - Toys/merchandise` :
 
-`ACCEPT if this shows ${celebrityName} from ${title}:
-- ${celebrityName} is clearly visible (solo or in groups)
-- Recognizable as ${celebrityName} specifically (face visible/identifiable)
-- Different ages/looks of ${celebrityName} are OK
-- Group shots where ${celebrityName} is identifiable
-- Behind-the-scenes with ${celebrityName} visible
+`ACCEPT only if ${celebrityName} is clearly visible and identifiable:
+- Must be recognizable as ${celebrityName} specifically (not other actors)
+- Face must be visible and identifiable as ${celebrityName}
+- Group shots OK only if ${celebrityName} is clearly present and identifiable
+- Different ages/looks of ${celebrityName} are OK if recognizable
 
 REJECT if:
-- ${celebrityName} is not visible or identifiable in the image
-- Shows only other actors from ${title} without ${celebrityName}
+- Shows other actors from ${title} without ${celebrityName} (even main characters)
+- ${celebrityName} is not clearly visible or identifiable in the image
+- Face is too small/obscured to identify as ${celebrityName}
 - Clearly a different person entirely
 - Toys/merchandise`}
 
-KEY POINT: The person/character must be actually PRESENT and IDENTIFIABLE in the image.
+CRITICAL: In ensemble movies/shows, reject images that show only other characters/actors without the target person clearly visible.
+
+Focus on: Can you clearly identify ${isAnimated ? character : celebrityName} in this specific image?
 
 Respond with exactly one word:
-- VALID (if ${isAnimated ? character : celebrityName} is clearly present and identifiable)
-- INVALID_WRONG_PERSON (if different person visible)
-- INVALID_MERCHANDISE (if toys/collectibles)
-- INVALID_OTHER (if completely unrelated or target not visible)`;
+- VALID (${isAnimated ? character : celebrityName} is clearly present and identifiable)
+- INVALID_WRONG_PERSON (different person/character shown)
+- INVALID_NOT_VISIBLE (target person not clearly visible/identifiable)
+- INVALID_MERCHANDISE (toys/collectibles)
+- INVALID_OTHER (completely unrelated)`;
 
     const requestBody = {
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 10,
-      temperature: 0.1,
+      max_tokens: 15,
+      temperature: 0.05,
       messages: [{
         role: 'user',
         content: [
@@ -361,8 +366,8 @@ Respond with exactly one word:
   parseVerificationResponse(response) {
     const upperResponse = response.toUpperCase();
     
-    // Be more specific with parsing - bring back wrong_person detection
-    if (upperResponse.includes('VALID') || upperResponse.includes('ACCEPT') || upperResponse.includes('YES')) {
+    // Enhanced parsing for facial recognition results
+    if (upperResponse.includes('VALID') && !upperResponse.includes('INVALID')) {
       return this.verificationResults.VALID;
     }
     if (upperResponse.includes('WRONG_PERSON') || upperResponse.includes('DIFFERENT_PERSON')) {
@@ -371,22 +376,26 @@ Respond with exactly one word:
     if (upperResponse.includes('WRONG_CHARACTER') || upperResponse.includes('DIFFERENT_CHARACTER')) {
       return this.verificationResults.INVALID_WRONG_CHARACTER;
     }
+    if (upperResponse.includes('NOT_VISIBLE') || upperResponse.includes('NOT_IDENTIFIABLE') || upperResponse.includes('TOO_SMALL')) {
+      return this.verificationResults.INVALID_OTHER;
+    }
     if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY')) {
       return this.verificationResults.INVALID_MERCHANDISE;
     }
     if (upperResponse.includes('EVENT_PHOTO')) {
       return this.verificationResults.INVALID_EVENT_PHOTO;
     }
-    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('UNRELATED') || upperResponse.includes('NOT_VISIBLE')) {
+    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('UNRELATED')) {
       return this.verificationResults.INVALID_OTHER;
     }
     
-    // For ambiguous responses, be moderately lenient but not completely
+    // Be stricter with ambiguous responses for facial recognition
     if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT') || upperResponse.includes('NO')) {
       return this.verificationResults.INVALID_OTHER;
     }
     
-    return this.verificationResults.VALID;
+    // Only accept clear positives
+    return this.verificationResults.INVALID_OTHER;
   }
 
   analyzeGoogleVisionResults(labels, textDetections, celebrityName, character, title) {
