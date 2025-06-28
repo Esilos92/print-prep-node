@@ -43,10 +43,14 @@ class ImageResizer {
   }
   
   /**
-   * Calculate image index within its role
+   * Calculate image index within its role - FIXED to use correct role field
    */
   static calculateImageIndex(currentImage, allImages) {
-    const sameRoleImages = allImages.filter(img => img.role === currentImage.role);
+    // Use the correct role identifier - check multiple possible fields
+    const currentRoleId = currentImage.title || currentImage.role || currentImage.name;
+    const sameRoleImages = allImages.filter(img => 
+      (img.title || img.role || img.name) === currentRoleId
+    );
     return sameRoleImages.indexOf(currentImage) + 1;
   }
   
@@ -78,15 +82,21 @@ class ImageResizer {
   }
   
   /**
-   * Resize image to specific print format
+   * Resize image to specific print format - FIXED to use correct role name
    */
   static async resizeToFormat(image, format, outputDir) {
     const dimensions = this.getPrintDimensions(format);
     
-    // NEW: Use generateFilename for proper naming convention
+    // FIXED: Use correct role name field with fallback priority
+    const roleName = image.title || image.role || image.name || 'Unknown';
+    
+    // DEBUG: Log what we're using for role name
+    console.log(`🐛 DEBUG: Generating filename with role: "${roleName}" for image: ${image.filename}`);
+    
+    // FIXED: Use generateFilename with correct role name
     const outputFilename = generateFilename(
       image.celebrityName || 'Unknown',
-      image.role || 'Unknown', 
+      roleName,  // <- FIXED: Use the correct role name
       image.indexInRole || 1,
       format
     );
