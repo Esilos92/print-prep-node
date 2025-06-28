@@ -129,21 +129,21 @@ class AIImageVerifier {
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `Analyze this image carefully. I need to verify if this shows ${celebrityName} playing the character ${character} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'TV show'} "${title}".
+    const prompt = `Analyze this image carefully. I need to verify if this shows ${isAnimated ? `the character ${character}` : `${celebrityName} playing the character ${character}`} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'TV show'} "${title}".
 
-${isAnimated ? `NOTE: This is animated content. Official animation includes promotional art, concept art, merchandise art, HD remasters, and fan recreations that may have different art styles. Only mark as FAN_ART if it's clearly amateur artwork or completely different from the source material.` : ''}
+${isAnimated ? `NOTE: This is animated content. ACCEPT group shots - if multiple characters from ${title} appear and ${character} is among them, mark as VALID. Only reject if it's clearly from a different show or has completely different characters.` : `NOTE: This is live-action content. Must be specifically ${celebrityName} - not someone with a similar name.`}
 
 RESPOND WITH EXACTLY ONE OF THESE:
-- VALID: Shows ${celebrityName} as ${character} from ${title}
-- INVALID_WRONG_PERSON: Shows different actor/person
-- INVALID_WRONG_CHARACTER: Shows ${celebrityName} but as different character  
+- VALID: Shows ${isAnimated ? `${character} from ${title} (solo or in group shots)` : `${celebrityName} as ${character} from ${title}`}
+- INVALID_WRONG_PERSON: Shows different actor/person (live-action only)
+- INVALID_WRONG_CHARACTER: Shows ${isAnimated ? 'characters from different show' : `${celebrityName} but as different character`}
 - INVALID_MERCHANDISE: Shows toys, figures, collectibles, or merchandise packaging
-- INVALID_FAN_ART: Shows clearly amateur fan art or completely different art style
+- INVALID_FAN_ART: Shows clearly amateur fan art only
 - INVALID_FRAMED: Shows a framed photo or picture on wall
 - INVALID_EVENT_PHOTO: Shows convention, interview, or event photo
 - INVALID_OTHER: Shows something else entirely
 
-Focus on: Is this the right person playing the right character from the right show/movie?`;
+Focus on: ${isAnimated ? `Is this from the right show (${title}) and does it include ${character}?` : `Is this the right person playing the right character from the right show/movie?`}`;
 
     const completion = await this.openai.chat.completions.create({
       model: "gpt-4o",
@@ -176,28 +176,38 @@ Focus on: Is this the right person playing the right character from the right sh
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `Analyze this image. Does it show EXACTLY ${celebrityName} playing ${character} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'show'} "${title}"?
+    const prompt = `Analyze this image. Does it show ${isAnimated ? `the character ${character}` : `EXACTLY ${celebrityName}`} from the ${mediaType} ${medium.includes('movie') ? 'movie' : 'show'} "${title}"?
 
-${isAnimated ? `IMPORTANT: For animated content, verify the character matches ${character} from ${title}. Accept any art style but must be the correct character.` : `IMPORTANT: For live-action, this must be specifically ${celebrityName} - not someone with a similar name or appearance.`}
+${isAnimated ? 
+`IMPORTANT: This is animated content. For animation:
+- ACCEPT if it shows ${character} from ${title} (even in group shots with other characters)
+- ACCEPT if it shows multiple characters from ${title} and ${character} appears to be among them
+- ACCEPT any art style variations of the correct character/show
+- ONLY REJECT if it's clearly the wrong show/movie or completely different characters` :
+`IMPORTANT: For live-action, this must be specifically ${celebrityName} - not someone with a similar name or appearance.`}
 
 BE LENIENT with:
 - Art style variations (for animation)
-- Different ages/looks of the same actor
+- Group shots with multiple characters (for animation)
+- Different ages/looks of the same actor (for live-action)
 - High-quality fan art of the correct character
 - Official promotional materials
 - Compression artifacts (JPEG compression but still high res)
 - Slightly soft focus if content is clearly correct
 
 BE STRICT with:
-- Must be the EXACT person: ${celebrityName} (not similar names)
+${isAnimated ? 
+`- Must be from the correct show/movie: ${title}
+- Reject if completely different animated show
+- Reject if obviously wrong characters` :
+`- Must be the EXACT person: ${celebrityName} (not similar names)
 - Must be the EXACT character: ${character} from ${title}
-- Reject if different person with similar name
-- Reject if wrong character entirely
+- Reject if different person with similar name`}
 
 Respond with exactly one word:
-- VALID if it shows exactly ${celebrityName} as ${character} from ${title}
-- INVALID_WRONG_PERSON if different person (even similar name)
-- INVALID_WRONG_CHARACTER if wrong character
+- VALID if it shows ${isAnimated ? `${character} from ${title} (solo or in group)` : `exactly ${celebrityName} as ${character} from ${title}`}
+- INVALID_WRONG_CHARACTER if wrong character${isAnimated ? ' or wrong show' : ''}
+- INVALID_WRONG_PERSON if different person (live-action only)
 - INVALID_MERCHANDISE if toys/packaging
 - INVALID_OTHER if unrelated`;
 
