@@ -122,48 +122,49 @@ class AIImageVerifier {
   }
 
   /**
-   * OpenAI Vision verification (Primary) - More lenient for targeted searches
+   * OpenAI Vision verification (Primary) - Balanced facial verification
    */
   async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
     const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
     const isAnimated = medium.includes('animation') || medium.includes('voice');
     
-    const prompt = `You're analyzing an image from a highly targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
+    const prompt = `You're analyzing an image from a targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-IMPORTANT: This image came from a very specific search, so be LENIENT - only reject obvious problems.
+IMPORTANT: Verify the RIGHT person/character is actually present and identifiable.
 
 ${isAnimated ? 
 `For animated content - ACCEPT if:
-- Shows ${character} from ${title} (solo or in groups)
-- Shows other characters from ${title} with ${character} visible
-- Different art styles of the same character/show
-- High-quality fan art of the correct character
-- Any variation that appears to be from ${title}
+- ${character} is clearly visible and identifiable in the image
+- Shows ${character} from ${title} (solo or in groups where ${character} is present)
+- Different art styles of ${character} from ${title}
+- ${character} is recognizable even if other characters are also present
 
-REJECT only if:
+REJECT if:
+- ${character} is not visible or not identifiable in the image
+- Shows only other characters from ${title} without ${character}
 - Clearly from a different animated show/movie
-- Obviously wrong characters entirely
 - Toys/merchandise/packaging` :
 
 `For live-action - ACCEPT if:
-- Appears to be ${celebrityName} from ${title}
-- Could reasonably be ${celebrityName} (different angles/lighting OK)
-- Group shots from ${title} that may include ${celebrityName}
-- Behind-the-scenes from ${title}
-- Promotional materials from ${title}
+- ${celebrityName} is clearly visible and identifiable in the image
+- Face/person is recognizable as ${celebrityName} (different angles/lighting OK)
+- Group shots where ${celebrityName} is clearly present and identifiable
+- Behind-the-scenes with ${celebrityName} visible
 
-REJECT only if:
+REJECT if:
+- ${celebrityName} is not visible or not identifiable in the image
+- Shows only other actors from ${title} without ${celebrityName}
 - Clearly a completely different person
-- Obviously from a different movie/show
 - Toys/merchandise/packaging`}
 
-RESPOND WITH EXACTLY ONE WORD:
-- VALID: If it could reasonably be the right ${isAnimated ? 'character' : 'person'} from the right ${isAnimated ? 'show' : 'show/movie'}
-- INVALID_MERCHANDISE: If it's clearly toys/collectibles/packaging
-- INVALID_OTHER: If it's clearly something completely unrelated
+KEY REQUIREMENT: The target person/character must be PRESENT and IDENTIFIABLE in the image.
 
-Be generous with VALID - this search was already highly filtered.`;
+RESPOND WITH EXACTLY ONE WORD:
+- VALID: If ${isAnimated ? character : celebrityName} is clearly present and identifiable
+- INVALID_WRONG_PERSON: If different person/character is shown instead
+- INVALID_MERCHANDISE: If toys/collectibles/packaging
+- INVALID_OTHER: If target not visible or completely unrelated`;
 
     const completion = await this.openai.chat.completions.create({
       model: "gpt-4o",
@@ -189,7 +190,7 @@ Be generous with VALID - this search was already highly filtered.`;
   }
 
   /**
-   * Claude Vision verification (Fallback) - Much more lenient
+   * Claude Vision verification (Fallback) - Balanced: face-focused but not overly strict
    */
   async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
@@ -198,38 +199,41 @@ Be generous with VALID - this search was already highly filtered.`;
     
     const prompt = `This image came from a targeted search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
 
-LENIENT VERIFICATION MODE: Since this search was highly specific, be generous with approval.
+BALANCED VERIFICATION: Be reasonably lenient but ensure the right person/character is actually present.
 
 ${isAnimated ? 
-`ACCEPT if this appears to be from ${title} and shows:
-- ${character} (any art style, solo or in groups)
-- Other characters from ${title} (${character} may be visible)
-- Scenes that look like they're from ${title}
-- Fan art of ${character} from ${title}
+`ACCEPT if this shows ${character} from ${title}:
+- ${character} is clearly visible (solo or in groups)
+- Recognizable as ${character} from ${title} specifically
+- Different art styles of ${character} are OK
+- Group shots where ${character} is identifiable
 
-REJECT only obviously wrong content:
-- Clearly different animated show
-- Toys/merchandise
-- Completely unrelated images` :
+REJECT if:
+- ${character} is not visible or identifiable in the image
+- Shows only other characters from ${title} without ${character}
+- Clearly from a different animated show
+- Toys/merchandise` :
 
-`ACCEPT if this could be from ${title} with ${celebrityName}:
-- Appears to be ${celebrityName} (any angle, lighting, age)
-- Group shots from ${title} (${celebrityName} may be present)
-- Behind-the-scenes from ${title}
-- Promotional content from ${title}
-- Anyone who could reasonably be ${celebrityName}
+`ACCEPT if this shows ${celebrityName} from ${title}:
+- ${celebrityName} is clearly visible (solo or in groups)
+- Recognizable as ${celebrityName} specifically (face visible/identifiable)
+- Different ages/looks of ${celebrityName} are OK
+- Group shots where ${celebrityName} is identifiable
+- Behind-the-scenes with ${celebrityName} visible
 
-REJECT only obviously wrong content:
-- Clearly different person AND different movie
-- Toys/merchandise  
-- Completely unrelated images`}
+REJECT if:
+- ${celebrityName} is not visible or identifiable in the image
+- Shows only other actors from ${title} without ${celebrityName}
+- Clearly a different person entirely
+- Toys/merchandise`}
 
-When in doubt, choose VALID - the search was already filtered.
+KEY POINT: The person/character must be actually PRESENT and IDENTIFIABLE in the image.
 
 Respond with exactly one word:
-- VALID (if it could reasonably be the right content)
+- VALID (if ${isAnimated ? character : celebrityName} is clearly present and identifiable)
+- INVALID_WRONG_PERSON (if different person visible)
 - INVALID_MERCHANDISE (if toys/collectibles)
-- INVALID_OTHER (if completely unrelated)`;
+- INVALID_OTHER (if completely unrelated or target not visible)`;
 
     const requestBody = {
       model: 'claude-3-5-sonnet-20241022',
@@ -357,27 +361,31 @@ Respond with exactly one word:
   parseVerificationResponse(response) {
     const upperResponse = response.toUpperCase();
     
-    // Be more lenient in parsing - default to valid for ambiguous responses
+    // Be more specific with parsing - bring back wrong_person detection
     if (upperResponse.includes('VALID') || upperResponse.includes('ACCEPT') || upperResponse.includes('YES')) {
       return this.verificationResults.VALID;
+    }
+    if (upperResponse.includes('WRONG_PERSON') || upperResponse.includes('DIFFERENT_PERSON')) {
+      return this.verificationResults.INVALID_WRONG_PERSON;
+    }
+    if (upperResponse.includes('WRONG_CHARACTER') || upperResponse.includes('DIFFERENT_CHARACTER')) {
+      return this.verificationResults.INVALID_WRONG_CHARACTER;
     }
     if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY')) {
       return this.verificationResults.INVALID_MERCHANDISE;
     }
-    if (upperResponse.includes('WRONG_PERSON')) {
-      return this.verificationResults.INVALID_WRONG_PERSON;
-    }
-    if (upperResponse.includes('WRONG_CHARACTER')) {
-      return this.verificationResults.INVALID_WRONG_CHARACTER;
-    }
     if (upperResponse.includes('EVENT_PHOTO')) {
       return this.verificationResults.INVALID_EVENT_PHOTO;
     }
-    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('UNRELATED')) {
+    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('UNRELATED') || upperResponse.includes('NOT_VISIBLE')) {
       return this.verificationResults.INVALID_OTHER;
     }
     
-    // DEFAULT TO VALID for targeted searches - let borderline cases through
+    // For ambiguous responses, be moderately lenient but not completely
+    if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT') || upperResponse.includes('NO')) {
+      return this.verificationResults.INVALID_OTHER;
+    }
+    
     return this.verificationResults.VALID;
   }
 
