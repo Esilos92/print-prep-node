@@ -131,21 +131,35 @@ class ImageFetcher {
    * Generate search queries using your optimized search terms
    */
   generateSearchQueries(celebrityName, role) {
-    const queries = [];
-    
-    // Use the optimized search terms if available
-    if (role.searchTerms && role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
-      logger.info(`🎯 Using optimized character image search terms`);
-      return role.searchTerms.character_images.slice(0, 6); // Use all 6 optimized terms
+    // PRIORITY 1: Use the optimized character image search terms if available
+    if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
+      logger.info(`🎯 Using AI-optimized character image search terms (${role.finalSearchTerms.length} terms)`);
+      return role.finalSearchTerms; // Use the AI-optimized terms directly
     }
     
-    // Fallback to basic queries if no optimized terms
+    // PRIORITY 2: Use character_images from search optimization
+    if (role.searchTerms && role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
+      logger.info(`🎯 Using ChatGPT character image search terms (${role.searchTerms.character_images.length} terms)`);
+      return role.searchTerms.character_images;
+    }
+    
+    // PRIORITY 3: Use any AI-generated terms
+    if (role.searchTerms && role.searchTerms.ai && role.searchTerms.ai.length > 0) {
+      logger.info(`🎯 Using AI-generated search terms (${role.searchTerms.ai.length} terms)`);
+      return role.searchTerms.ai;
+    }
+    
+    // FALLBACK: Generate basic queries (this is what you're seeing now)
+    logger.warn(`⚠️ No optimized search terms found, using basic fallback for ${role.name || role.title}`);
+    
     const watermarkExclusions = this.watermarkedDomains.map(d => `-site:${d}`).join(' ');
     const contentExclusions = this.contentExclusions.join(' ');
     const allExclusions = `${watermarkExclusions} ${contentExclusions}`;
     
+    const queries = [];
+    
     if (role.isVoiceRole) {
-      logger.info(`🎭 Voice role: targeting character images for ${role.name}`);
+      logger.info(`🎭 Voice role fallback: targeting character images for ${role.name}`);
       
       if (role.characterName && role.characterName !== 'Unknown Character') {
         queries.push(`"${role.characterName}" "${role.name}" character image ${allExclusions}`);
@@ -154,7 +168,7 @@ class ImageFetcher {
       queries.push(`"${role.name}" character images official ${allExclusions}`);
       
     } else {
-      logger.info(`🎬 Live action: targeting actor images for ${role.name}`);
+      logger.info(`🎬 Live action fallback: targeting actor images for ${role.name}`);
       
       queries.push(`"${celebrityName}" "${role.name}" scene still ${allExclusions}`);
       
