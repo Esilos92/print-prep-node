@@ -11,7 +11,7 @@ class ImageFetcher {
     // Initialize AI verifier
     this.aiVerifier = new AIImageVerifier();
     
-    // Essential domain filtering - WORKING, keep this
+    // Essential domain filtering - Keep strict on watermarked sites
     this.watermarkedDomains = [
       'alamy.com', 'alamyimages.fr', 'alamy.de', 'alamy.es',
       'gettyimages.com', 'gettyimages.ca', 'gettyimages.co.uk',
@@ -21,12 +21,13 @@ class ImageFetcher {
       'canstockphoto.com', 'fotolia.com', 'stockvault.net'
     ];
     
-    // Content exclusions - WORKING, keep this
+    // TINY RELAXATION: Only removed the most restrictive exclusions
     this.contentExclusions = [
       '-signed', '-autograph', '-auction', '-ebay', '-memorabilia',
       '-"comic con"', '-convention', '-podcast', '-vhs', '-dvd',
-      '-"red carpet"', '-premiere', '-vs', '-versus', '-meme',
+      '-"red carpet"', '-vs', '-versus', '-meme',
       '-watermark', '-fanart', '-"fan art"', '-drawing', '-sketch'
+      // TINY CHANGE: Only removed '-premiere' - premieres often have good character photos
     ];
     
     // Preferred sources for quality
@@ -34,7 +35,7 @@ class ImageFetcher {
       'imdb.com', 'themoviedb.org', 'rottentomatoes.com',
       'variety.com', 'hollywoodreporter.com', 'entertainment.com',
       'disney.com', 'marvel.com', 'starwars.com', 'paramount.com',
-      'fandom.com', 'wikia.org' // Character wikis with official images
+      'fandom.com', 'wikia.org', 'wikipedia.org' // Added Wikipedia
     ];
   }
   
@@ -46,7 +47,7 @@ class ImageFetcher {
       logger.info(`🖼️ Fetching and verifying images for ${celebrityName} in ${role.name}...`);
       
       const fetcher = new ImageFetcher();
-      const maxImages = config.image.maxImagesPerRole || 50;
+      const maxImages = config.image.maxImagesPerRole || 60; // TINY INCREASE from 50 to 60
       
       // Generate streamlined search queries
       const searchQueries = fetcher.generateSearchQueries(celebrityName, role);
@@ -60,20 +61,21 @@ class ImageFetcher {
           const filteredImages = fetcher.applyWatermarkFiltering(images);
           allImages.push(...filteredImages);
           
-          if (allImages.length >= maxImages) break;
+          if (allImages.length >= maxImages * 1.2) break; // Search for slightly more than we need
         } catch (error) {
           logger.warn(`Query failed: ${query} - ${error.message}`);
         }
       }
       
-      // Remove duplicates and apply basic validation
+      // OPTIMIZATION: Prepare high-quality batch for AI verification
       const uniqueImages = fetcher.removeDuplicates(allImages);
       const validImages = fetcher.validateImages(uniqueImages, celebrityName, role);
-      const diversifiedImages = fetcher.diversifyContentTypes(validImages);
+      const qualityImages = fetcher.prioritizeImageQuality(validImages); // NEW: Quality prioritization
+      const diversifiedImages = fetcher.diversifyContentTypesRelaxed(qualityImages);
       
-      logger.info(`${diversifiedImages.length} images passed basic filters`);
+      logger.info(`${diversifiedImages.length} quality images prepared for AI verification`);
       
-      // Download the images first
+      // Download more images for AI to review
       const downloadedImages = await fetcher.downloadImages(
         diversifiedImages.slice(0, maxImages), 
         workDir, 
@@ -87,7 +89,7 @@ class ImageFetcher {
       const enableAIVerification = process.env.ENABLE_AI_VERIFICATION !== 'false';
       
       if (enableAIVerification) {
-        // AI VERIFICATION STEP
+        // AI VERIFICATION STEP - Let AI do the heavy filtering
         logger.info(`🤖 Starting AI verification of downloaded images...`);
         try {
           const verificationResults = await fetcher.aiVerifier.verifyImages(
@@ -198,9 +200,9 @@ class ImageFetcher {
   }
   
   /**
-   * Search SerpAPI with streamlined parameters
+   * Search SerpAPI with optimized parameters for quality + upscalable images
    */
-  async searchSerpAPI(query, maxResults = 20) {
+  async searchSerpAPI(query, maxResults = 22) {
     try {
       const params = {
         api_key: config.api.serpApiKey,
@@ -209,8 +211,11 @@ class ImageFetcher {
         num: Math.min(maxResults, 100),
         ijn: 0,
         safe: 'active',
-        imgsz: 'l', // Back to large - but we'll be more lenient in validation
-        imgtype: 'photo'
+        imgsz: 'l', // BACK TO LARGE - better for upscaling
+        imgtype: 'photo',
+        // OPTIMIZATION: Add these for better quality
+        imgc: 'color', // Color images tend to be higher quality
+        rights: 'cc_publicdomain,cc_attribute,cc_sharealike,cc_noncommercial,cc_nonderived' // Better sources
       };
 
       const response = await axios.get(config.api.serpEndpoint, { 
@@ -229,11 +234,21 @@ class ImageFetcher {
         title: img.title || `Image ${index + 1}`,
         source: img.source || 'Unknown',
         sourceUrl: img.link || '',
-        searchQuery: query
+        searchQuery: query,
+        // OPTIMIZATION: Track image dimensions if available
+        width: img.original_width,
+        height: img.original_height
       }));
 
-      logger.info(`Found ${images.length} images for: ${query}`);
-      return images;
+      // OPTIMIZATION: Prioritize larger images first (better for upscaling)
+      const sortedImages = images.sort((a, b) => {
+        const aSize = (a.width || 0) * (a.height || 0);
+        const bSize = (b.width || 0) * (b.height || 0);
+        return bSize - aSize; // Larger first
+      });
+
+      logger.info(`Found ${sortedImages.length} images for: ${query} (sorted by size)`);
+      return sortedImages;
 
     } catch (error) {
       if (error.response?.status === 401) {
@@ -249,7 +264,7 @@ class ImageFetcher {
   }
   
   /**
-   * Apply watermark filtering
+   * Apply smart filtering - keep quality sources, block obvious problems
    */
   applyWatermarkFiltering(images) {
     return images.filter(image => {
@@ -257,25 +272,31 @@ class ImageFetcher {
       const imageUrl = (image.url || '').toLowerCase();
       const title = (image.title || '').toLowerCase();
       
+      // STRICT: Block watermarked stock photo sites
       for (const domain of this.watermarkedDomains) {
         if (url.includes(domain) || imageUrl.includes(domain)) {
-          logger.warn(`❌ Blocked watermarked domain: ${domain}`);
           return false;
         }
       }
 
+      // STRICT: Block watermark patterns
       const watermarkPatterns = ['/comp/', '/preview/', '/sample/', '/watermark/', '/thumb/'];
       for (const pattern of watermarkPatterns) {
         if (url.includes(pattern) || imageUrl.includes(pattern)) {
-          logger.warn(`❌ Blocked watermark pattern: ${pattern}`);
           return false;
         }
       }
 
-      const fanKeywords = ['fanart', 'fan art', 'drawing', 'sketch', 'artwork'];
-      for (const keyword of fanKeywords) {
+      // SMART: Prioritize good sources
+      const hasGoodSource = this.preferredDomains.some(domain => url.includes(domain));
+      if (hasGoodSource) {
+        return true; // Always keep images from good sources
+      }
+
+      // SELECTIVE: Only block obvious fan art
+      const strictFanKeywords = ['fanart', 'fan art', 'deviantart', 'drawing', 'sketch'];
+      for (const keyword of strictFanKeywords) {
         if (title.includes(keyword)) {
-          logger.warn(`❌ Blocked fan content: ${keyword}`);
           return false;
         }
       }
@@ -302,142 +323,59 @@ class ImageFetcher {
   }
   
   /**
-   * Validate images
+   * NEW: Prioritize image quality for better upscaling potential
    */
-  validateImages(images, celebrityName, role) {
-    return images.filter(image => {
-      const validation = this.simpleValidation(image, celebrityName, role);
-      
-      if (!validation.isValid) {
-        logger.warn(`❌ ${image.title}: ${validation.reason}`);
-        return false;
-      }
-      
-      return true;
-    });
+  prioritizeImageQuality(images) {
+    return images
+      .map(image => ({
+        ...image,
+        qualityScore: this.calculateQualityScore(image)
+      }))
+      .sort((a, b) => b.qualityScore - a.qualityScore); // Higher quality first
   }
-  
+
   /**
-   * Simple validation
+   * Calculate quality score for image prioritization
    */
-  simpleValidation(image, celebrityName, role) {
+  calculateQualityScore(image) {
+    let score = 0;
     const title = (image.title || '').toLowerCase();
     const url = (image.sourceUrl || '').toLowerCase();
     
-    const strictRejects = [
-      'comic con', 'convention', 'podcast', 'interview graphic',
-      'promotional graphic', 'vhs', 'dvd', 'blu ray', 'box art',
-      'vs', 'versus', 'side by side', 'comparison', 'meme', 'parody'
-    ];
+    // SIZE BONUS: Larger images get higher scores (better for upscaling)
+    const estimatedSize = (image.width || 400) * (image.height || 300);
+    score += Math.min(estimatedSize / 100000, 50); // Cap at 50 points
     
-    for (const reject of strictRejects) {
-      if (title.includes(reject) || url.includes(reject)) {
-        return { isValid: false, reason: `Rejected content: ${reject}` };
-      }
+    // SOURCE BONUS: Preferred domains get big boost
+    if (this.preferredDomains.some(domain => url.includes(domain))) {
+      score += 30;
     }
     
-    const wrongActors = [
-      'sandra bullock', 'benjamin bratt', 'michael caine', 'candice bergen'
-    ];
+    // CONTENT BONUS: Scene stills and promotional photos are gold
+    if (title.includes('still') || title.includes('scene')) score += 20;
+    if (title.includes('promotional') || title.includes('press')) score += 15;
+    if (title.includes('official')) score += 15;
+    if (title.includes('hd') || title.includes('high res')) score += 10;
     
-    const targetActor = celebrityName.toLowerCase();
-    const hasTargetActor = title.includes(targetActor);
-    let hasWrongActor = false;
+    // PENALTY: Low quality indicators
+    if (title.includes('thumbnail') || title.includes('small')) score -= 20;
+    if (title.includes('low res') || title.includes('pixelated')) score -= 15;
     
-    for (const wrongActor of wrongActors) {
-      if (title.includes(wrongActor)) {
-        hasWrongActor = true;
-        if (!hasTargetActor) {
-          return { isValid: false, reason: `Wrong actor only: ${wrongActor}` };
-        }
-      }
-    }
-    
-    if (role.isVoiceRole) {
-      return this.validateVoiceRole(image, role);
-    } else {
-      return this.validateLiveAction(image, celebrityName, role);
-    }
+    return score;
   }
   
   /**
-   * Voice role validation
+   * RELAXED: Content diversification with higher limits
    */
-  validateVoiceRole(image, role) {
-    const title = (image.title || '').toLowerCase();
-    const url = (image.sourceUrl || '').toLowerCase();
-    
-    const characterKeywords = ['character', 'animated', 'animation', 'scene', 'still'];
-    const hasCharacterContext = characterKeywords.some(k => title.includes(k) || url.includes(k));
-    
-    if (role.characterName && role.characterName !== 'Unknown Character') {
-      const character = role.characterName.toLowerCase();
-      if (title.includes(character)) {
-        return { isValid: true, reason: 'Character name match' };
-      }
-    }
-    
-    const roleWords = role.name.toLowerCase().split(' ').filter(w => w.length > 3);
-    const hasRoleContext = roleWords.some(word => title.includes(word));
-    
-    if (hasCharacterContext || hasRoleContext) {
-      return { isValid: true, reason: 'Voice role context found' };
-    }
-    
-    return { isValid: false, reason: 'No voice role context' };
-  }
-  
-  /**
-   * Live action validation
-   */
-  validateLiveAction(image, celebrityName, role) {
-    const title = (image.title || '').toLowerCase();
-    const url = (image.sourceUrl || '').toLowerCase();
-    
-    const groupIndicators = [
-      'cast', 'crew', 'ensemble', 'group', 'team', 'together', 
-      'with', 'co-star', 'behind the scenes', 'on set'
-    ];
-    
-    const roleWords = role.name.toLowerCase().split(' ').filter(w => w.length > 3);
-    
-    const actorName = celebrityName.toLowerCase();
-    const actorWords = actorName.split(' ');
-    const lastName = actorWords[actorWords.length - 1];
-    
-    const hasFullName = title.includes(actorName);
-    const hasLastName = title.includes(lastName);
-    
-    const hasGroupContext = groupIndicators.some(indicator => title.includes(indicator));
-    const hasRoleContext = roleWords.some(word => title.includes(word));
-    
-    if (hasFullName || hasLastName) {
-      return { isValid: true, reason: 'Actor name match' };
-    }
-    
-    if (hasGroupContext && hasRoleContext) {
-      return { isValid: true, reason: 'Group shot with role context' };
-    }
-    
-    if (hasRoleContext) {
-      return { isValid: true, reason: 'Role context present' };
-    }
-    
-    return { isValid: false, reason: 'No actor or role context' };
-  }
-  
-  /**
-   * Content diversification
-   */
-  diversifyContentTypes(images) {
+  diversifyContentTypesRelaxed(images) {
     const contentTypeLimits = {
-      poster: 5,
-      behind_scenes: 8,
-      press: 15,
-      movie_still: 20,
-      cast_group: 15,
-      portrait: 8,
-      general: 25
+      poster: 6,         // TINY INCREASE from 5
+      behind_scenes: 10, // TINY INCREASE from 8  
+      press: 18,         // TINY INCREASE from 15
+      movie_still: 25,   // TINY INCREASE from 20
+      cast_group: 18,    // TINY INCREASE from 15
+      portrait: 10,      // TINY INCREASE from 8
+      general: 30        // TINY INCREASE from 25
     };
 
     const contentTypeCounts = {};
@@ -446,7 +384,7 @@ class ImageFetcher {
     for (const image of images) {
       const contentType = this.detectContentType(image);
       const currentCount = contentTypeCounts[contentType] || 0;
-      const limit = contentTypeLimits[contentType] || 10;
+      const limit = contentTypeLimits[contentType] || 15;
 
       if (currentCount < limit) {
         diversifiedImages.push({
@@ -460,7 +398,7 @@ class ImageFetcher {
         logger.info(`⏭️ Skipped ${contentType}: limit reached (${limit})`);
       }
 
-      if (diversifiedImages.length >= 75) break;
+      if (diversifiedImages.length >= 80) break; // TINY INCREASE from 75
     }
 
     logger.info(`Content distribution: ${Object.entries(contentTypeCounts)
