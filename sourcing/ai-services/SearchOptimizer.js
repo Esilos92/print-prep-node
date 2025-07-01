@@ -7,8 +7,8 @@ class SearchOptimizer {
     this.hasOpenAI = false;
     this.initializeOpenAI();
     
-    // MINIMAL exclusions - only obvious junk
-    this.exclusions = "-funko -toy -figure -collectible -merchandise -convention -comic-con -autograph -signed -auction -ebay -framed -render -fanart -deviantart -vs -versus -meme -watermark";
+    // NO exclusions - let AI handle all filtering
+    this.exclusions = ""; // EMPTY - AI will filter everything
   }
 
   initializeOpenAI() {
@@ -124,10 +124,9 @@ class SearchOptimizer {
   }
 
   /**
-   * ENHANCED: Generate CHARACTER-FIRST search terms (6 terms)
+   * ENHANCED: Generate CLEAN CHARACTER-FIRST search terms (like manual search)
    */
   generateCharacterFirstTerms(celebrityName, character, title, medium, strategy) {
-    const exclusions = this.exclusions;
     const characterName = character || 'Unknown Character';
     const showTitle = title || 'Unknown Title';
     
@@ -135,66 +134,69 @@ class SearchOptimizer {
     
     switch (strategy) {
       case 'character_pure':
-        // PURE character focus for voice/animation - NO actor name pollution
+        // CLEAN character focus for voice/animation - like manual search
         terms = [
-          `"${characterName}" "${showTitle}" character scene ${exclusions}`,
-          `"${characterName}" "${showTitle}" episode screenshot ${exclusions}`,
-          `"${characterName}" character "${showTitle}" official ${exclusions}`,
-          `"${showTitle}" "${characterName}" anime scene ${exclusions}`,
-          `"${characterName}" "${showTitle}" character image ${exclusions}`,
-          `"${showTitle}" "${characterName}" official art ${exclusions}`
+          `"${characterName}"`,
+          `"${characterName}" "${showTitle}"`,
+          `"${characterName}" ${showTitle.split(' ').slice(0, 2).join(' ')}`,
+          `"${showTitle}" "${characterName}"`,
+          `"${characterName}" anime`,
+          `"${showTitle}" character`
         ];
         break;
         
       case 'character_iconic':
-        // Character-first for iconic roles (Captain Kirk > William Shatner)
+        // Clean character-first for iconic roles
         terms = [
-          `"${characterName}" "${showTitle}" character scene ${exclusions}`,
-          `"${characterName}" "${showTitle}" movie scene ${exclusions}`,
-          `"${showTitle}" "${characterName}" character ${exclusions}`,
-          `"${characterName}" character "${showTitle}" scene ${exclusions}`,
-          `"${characterName}" "${showTitle}" official image ${exclusions}`,
-          `"${celebrityName}" "${characterName}" "${showTitle}" scene ${exclusions}` // Actor last
+          `"${characterName}"`,
+          `"${characterName}" "${showTitle}"`,
+          `"${showTitle}" "${characterName}"`,
+          `"${characterName}" character`,
+          `"${characterName}" official`,
+          `"${celebrityName}" "${characterName}"`
         ];
         break;
         
       case 'character_modern':
-        // Character-first with modern production values
+        // Clean character-first for modern content
         terms = [
-          `"${characterName}" "${showTitle}" character HD ${exclusions}`,
-          `"${characterName}" "${showTitle}" scene still ${exclusions}`,
-          `"${showTitle}" "${characterName}" character ${exclusions}`,
-          `"${characterName}" "${showTitle}" promotional ${exclusions}`,
-          `"${celebrityName}" "${characterName}" "${showTitle}" ${exclusions}`,
-          `"${characterName}" character "${showTitle}" image ${exclusions}`
+          `"${characterName}" "${showTitle}"`,
+          `"${characterName}" HD`,
+          `"${showTitle}" "${characterName}"`,
+          `"${characterName}" character`,
+          `"${celebrityName}" "${characterName}"`,
+          `"${characterName}" official`
         ];
         break;
         
       case 'balanced_classic':
-        // Balanced approach for older content
+        // Clean balanced approach
         terms = [
-          `"${characterName}" "${showTitle}" character ${exclusions}`,
-          `"${celebrityName}" "${characterName}" "${showTitle}" ${exclusions}`,
-          `"${showTitle}" "${characterName}" scene ${exclusions}`,
-          `"${characterName}" "${showTitle}" movie ${exclusions}`,
-          `"${celebrityName}" "${showTitle}" character ${exclusions}`,
-          `"${characterName}" character "${showTitle}" ${exclusions}`
+          `"${characterName}" "${showTitle}"`,
+          `"${celebrityName}" "${characterName}"`,
+          `"${showTitle}" "${characterName}"`,
+          `"${characterName}" character`,
+          `"${celebrityName}" "${showTitle}"`,
+          `"${characterName}"`
         ];
         break;
         
       default:
-        // Fallback mixed approach
+        // Clean fallback
         terms = [
-          `"${characterName}" "${showTitle}" character ${exclusions}`,
-          `"${characterName}" "${showTitle}" scene ${exclusions}`,
-          `"${showTitle}" "${characterName}" ${exclusions}`,
-          `"${celebrityName}" "${characterName}" ${exclusions}`,
-          `"${characterName}" character image ${exclusions}`,
-          `"${showTitle}" character scene ${exclusions}`
+          `"${characterName}" "${showTitle}"`,
+          `"${characterName}"`,
+          `"${showTitle}" "${characterName}"`,
+          `"${celebrityName}" "${characterName}"`,
+          `"${characterName}" character`,
+          `"${showTitle}" character`
         ];
     }
     
-    return terms.filter(term => term.length > 20); // Filter out malformed terms
+    // Filter out malformed terms and keep clean
+    return terms
+      .filter(term => term.length > 5 && term.length < 80) // Reasonable length
+      .filter(term => !term.includes('Unknown')); // Remove unknown placeholders
   }
 
   /**
@@ -365,21 +367,25 @@ class SearchOptimizer {
       const celebrityName = this.extractCelebrityName(role);
       const medium = role.medium || 'unknown';
 
-      const prompt = `Generate 6 CHARACTER-FIRST image search terms for finding images of "${characterName}" from "${showTitle}".
+      const prompt = `Generate 6 CLEAN CHARACTER-FIRST image search terms for finding images of "${characterName}" from "${showTitle}".
 
-STRATEGY: Prioritize character name over actor name "${celebrityName}" to get more character-focused results.
+STRATEGY: Simple, clean searches like a human would do manually.
 
 REQUIREMENTS:
 - Focus on "${characterName}" as the primary search element
 - Include "${showTitle}" for context
-- Use terms like "character", "scene", "screenshot", "episode" for better targeting
-- ${medium.includes('voice') || medium.includes('anime') ? 'AVOID actor name pollution - pure character focus' : 'Character-first but actor support OK'}
-- Keep terms SHORT and focused (under 50 characters each)
+- Keep terms SHORT and CLEAN (like manual Google searches)
+- ${medium.includes('voice') || medium.includes('anime') ? 'Pure character focus for anime/voice content' : 'Character-first but actor context OK'}
+- NO exclusions or negative terms (AI will filter content)
+- Make searches that would find content on fandom wikis, Reddit, Game Rant, etc.
 
-Return exactly 6 SHORT search terms as JSON array:
-["term1", "term2", "term3", "term4", "term5", "term6"]
+Example clean terms:
+- "Shoto Todoroki"
+- "Shoto Todoroki My Hero Academia"  
+- "My Hero Academia Shoto Todoroki"
 
-Example format: ["Shoto Todoroki My Hero Academia character", "Shoto Todoroki episode scene"]`;
+Return exactly 6 CLEAN search terms as JSON array:
+["term1", "term2", "term3", "term4", "term5", "term6"]`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o",
