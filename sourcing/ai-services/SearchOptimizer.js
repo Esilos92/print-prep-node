@@ -374,10 +374,12 @@ REQUIREMENTS:
 - Include "${showTitle}" for context
 - Use terms like "character", "scene", "screenshot", "episode" for better targeting
 - ${medium.includes('voice') || medium.includes('anime') ? 'AVOID actor name pollution - pure character focus' : 'Character-first but actor support OK'}
-- Include exclusions: ${this.exclusions}
+- Keep terms SHORT and focused (under 50 characters each)
 
-Return exactly 6 search terms as JSON array:
-["term1", "term2", "term3", "term4", "term5", "term6"]`;
+Return exactly 6 SHORT search terms as JSON array:
+["term1", "term2", "term3", "term4", "term5", "term6"]
+
+Example format: ["Shoto Todoroki My Hero Academia character", "Shoto Todoroki episode scene"]`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o",
