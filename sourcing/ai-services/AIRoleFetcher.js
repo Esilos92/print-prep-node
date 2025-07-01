@@ -24,27 +24,38 @@ class AIRoleFetcher {
   }
 
   /**
-   * OPTIMIZED: Multi-stage AI role discovery with popularity ranking
+   * ENHANCED: Voice actor optimized role discovery
    */
   async fetchRoles(celebrityName) {
     try {
       console.log(`🎯 AI discovering top roles for: ${celebrityName}`);
       
-      // Stage 1: Primary AI discovery (OpenAI → Claude → Anthropic)
-      let roles = await this.performPrimaryDiscovery(celebrityName);
+      // ENHANCED: Try voice actor specific discovery first
+      let roles = await this.performVoiceActorDiscovery(celebrityName);
       
-      if (!roles || roles.length === 0) {
+      if (!roles || roles.length < 3) {
+        // Stage 1: Primary AI discovery (OpenAI → Claude → Anthropic)
+        const primaryRoles = await this.performPrimaryDiscovery(celebrityName);
+        roles = this.mergeRoles(roles, primaryRoles);
+      }
+      
+      if (!roles || roles.length < 3) {
         // Stage 2: Enhanced discovery with context analysis
-        roles = await this.performEnhancedDiscovery(celebrityName);
+        const enhancedRoles = await this.performEnhancedDiscovery(celebrityName);
+        roles = this.mergeRoles(roles, enhancedRoles);
       }
 
-      if (!roles || roles.length === 0) {
+      if (!roles || roles.length < 3) {
         // Stage 3: Broad search with alternative prompting
-        roles = await this.performBroadDiscovery(celebrityName);
+        const broadRoles = await this.performBroadDiscovery(celebrityName);
+        roles = this.mergeRoles(roles, broadRoles);
       }
 
-      // Stage 4: Popularity optimization and ranking
-      const optimizedRoles = await this.optimizeByPopularity(roles, celebrityName);
+      // Stage 4: Enhanced voice role detection and medium fixing
+      const processedRoles = this.enhanceVoiceRoleDetection(roles);
+      
+      // Stage 5: Popularity optimization and ranking
+      const optimizedRoles = await this.optimizeByPopularity(processedRoles, celebrityName);
       
       console.log(`✅ AI discovered ${optimizedRoles.length} popularity-ranked roles for ${celebrityName}`);
       return optimizedRoles;
@@ -53,6 +64,223 @@ class AIRoleFetcher {
       console.error(`❌ AI role discovery failed for ${celebrityName}:`, error.message);
       return this.createMinimalFallback(celebrityName);
     }
+  }
+
+  /**
+   * NEW: Voice actor specific discovery - CONDITIONAL approach
+   */
+  async performVoiceActorDiscovery(celebrityName) {
+    if (!this.hasOpenAI) return null;
+
+    try {
+      // First, quickly check if they might be a voice actor
+      const checkPrompt = `Is "${celebrityName}" primarily known for voice acting in anime, animation, or video games? Answer with just "YES" or "NO".`;
+      
+      const checkCompletion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: checkPrompt }],
+        temperature: 0.1,
+        max_tokens: 10
+      });
+
+      const isVoiceActor = checkCompletion.choices[0].message.content.trim().toUpperCase().includes('YES');
+      
+      if (!isVoiceActor) {
+        console.log(`📺 ${celebrityName} identified as primarily live-action performer`);
+        return null; // Skip voice-specific discovery
+      }
+
+      console.log(`🎭 ${celebrityName} identified as voice actor, using specialized discovery`);
+
+      const voiceActorPrompt = `"${celebrityName}" is a voice actor. List their 5 most famous voice acting roles in anime, animation, or video games.
+
+For each role, provide:
+- Character name
+- Show/movie/game title
+- Medium type (anime, animation, video game, etc.)
+- Year if known
+
+Return as JSON array:
+[{
+  "character": "Character Name",
+  "title": "Show/Movie/Game Title", 
+  "medium": "voice_anime_tv",
+  "year": "YYYY",
+  "popularity": "high/medium/low"
+}]`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert on voice acting specializing in anime, animation, and video games."
+          },
+          {
+            role: "user", 
+            content: voiceActorPrompt
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 800
+      });
+
+      const response = completion.choices[0].message.content;
+      const roles = this.parseAndValidateResponse(response, celebrityName);
+      
+      if (roles && roles.length > 0) {
+        console.log(`🎭 Found ${roles.length} voice acting roles for ${celebrityName}`);
+        return roles;
+      }
+      
+      return null;
+      
+    } catch (error) {
+      console.log(`Voice actor discovery failed: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * NEW: Merge role arrays without duplicates
+   */
+  mergeRoles(existingRoles, newRoles) {
+    if (!existingRoles) existingRoles = [];
+    if (!newRoles || !Array.isArray(newRoles)) return existingRoles;
+    
+    const seen = new Set();
+    const merged = [];
+    
+    // Add existing roles first
+    existingRoles.forEach(role => {
+      const key = `${role.character}_${role.title}`.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(role);
+      }
+    });
+    
+    // Add new roles if not duplicates
+    newRoles.forEach(role => {
+      const key = `${role.character}_${role.title}`.toLowerCase();
+      if (!seen.has(key) && merged.length < 8) { // Allow up to 8 total
+        seen.add(key);
+        merged.push(role);
+      }
+    });
+    
+    return merged;
+  }
+
+  /**
+   * ENHANCED: Voice role detection and medium correction
+   */
+  enhanceVoiceRoleDetection(roles) {
+    if (!roles || !Array.isArray(roles)) return [];
+
+    return roles.map(role => {
+      const enhanced = { ...role };
+      
+      // Detect voice acting from various indicators
+      const isVoiceRole = this.detectVoiceActing(role);
+      enhanced.isVoiceRole = isVoiceRole;
+      
+      // Fix medium if it's voice acting but not properly tagged
+      if (isVoiceRole && !enhanced.medium.includes('voice')) {
+        enhanced.medium = this.correctVoiceMedium(enhanced.medium, role);
+      }
+      
+      // Add voice-specific tags
+      if (isVoiceRole) {
+        enhanced.tags = enhanced.tags || [];
+        enhanced.tags.push('voice_acting');
+        
+        if (enhanced.medium.includes('anime')) {
+          enhanced.tags.push('anime');
+        }
+      }
+      
+      return enhanced;
+    });
+  }
+
+  /**
+   * NEW: Enhanced voice acting detection - GENERIC approach
+   */
+  detectVoiceActing(role) {
+    const character = (role.character || '').toLowerCase();
+    const title = (role.title || '').toLowerCase();
+    const medium = (role.medium || '').toLowerCase();
+    const description = (role.description || '').toLowerCase();
+    
+    // Direct medium indicators
+    if (medium.includes('voice') || medium.includes('anime') || 
+        medium.includes('animation') || medium.includes('game') ||
+        medium.includes('animated') || medium.includes('cartoon')) {
+      return true;
+    }
+    
+    // Content indicators - generic patterns
+    const voiceKeywords = [
+      'anime', 'animated', 'animation', 'cartoon', 'character voice',
+      'dub', 'dubbing', 'voice actor', 'voice work', 'video game',
+      'game', 'character', 'animated series', 'animated movie'
+    ];
+    
+    const hasVoiceKeywords = voiceKeywords.some(keyword => 
+      title.includes(keyword) || description.includes(keyword)
+    );
+    
+    if (hasVoiceKeywords) {
+      return true;
+    }
+    
+    // Generic live-action indicators (if present, likely NOT voice acting)
+    const liveActionKeywords = [
+      'movie', 'film', 'tv series', 'television', 'sitcom', 'drama',
+      'thriller', 'comedy series', 'netflix', 'hbo', 'broadcast'
+    ];
+    
+    const hasLiveActionKeywords = liveActionKeywords.some(keyword => 
+      title.includes(keyword) || description.includes(keyword)
+    );
+    
+    // If has live action indicators but no voice indicators, probably live action
+    if (hasLiveActionKeywords && !hasVoiceKeywords) {
+      return false;
+    }
+    
+    // Default: if medium is unknown, use heuristics
+    if (medium === 'unknown' || !medium) {
+      // If it has character + title pattern with no clear live action indicators
+      return !hasLiveActionKeywords;
+    }
+    
+    return false;
+  }
+
+  /**
+   * NEW: Correct medium type for voice acting
+   */
+  correctVoiceMedium(currentMedium, role) {
+    const title = (role.title || '').toLowerCase();
+    
+    // If already properly tagged, keep it
+    if (currentMedium.includes('voice')) {
+      return currentMedium;
+    }
+    
+    // Determine correct voice medium
+    if (title.includes('movie') || currentMedium.includes('movie')) {
+      return 'voice_anime_movie';
+    }
+    
+    if (title.includes('game') || currentMedium.includes('game')) {
+      return 'voice_game';
+    }
+    
+    // Default to anime TV series
+    return 'voice_anime_tv';
   }
 
   /**
@@ -135,7 +363,7 @@ class AIRoleFetcher {
         messages: [
           {
             role: "system",
-            content: "You are an expert entertainment industry analyst specializing in celebrity career analysis and popularity rankings."
+            content: "You are an expert entertainment industry analyst specializing in celebrity career analysis, with deep knowledge of anime, voice acting, and animation."
           },
           {
             role: "user", 
@@ -384,7 +612,7 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
       const validRoles = parsed
         .filter(role => role.character && role.title)
         .map(role => this.normalizeRole(role))
-        .slice(0, 5); // Ensure max 5 roles
+        .slice(0, 8); // Allow up to 8 for merging
 
       return validRoles;
       
@@ -412,7 +640,7 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
       const roles = [];
       let match;
       
-      while ((match = rolePattern.exec(response)) !== null && roles.length < 5) {
+      while ((match = rolePattern.exec(response)) !== null && roles.length < 8) {
         roles.push({
           character: match[1],
           title: match[2],
@@ -491,9 +719,10 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
       openaiAPI: this.hasOpenAI,
       claudeAPI: !!process.env.ANTHROPIC_API_KEY,
       primaryEngine: this.hasOpenAI ? 'OpenAI GPT-4o' : 'Claude API',
-      optimizationLevel: 'Advanced',
+      optimizationLevel: 'Advanced + Voice Actor Enhanced',
       popularityRanking: this.hasOpenAI,
-      multiStageDiscovery: true
+      multiStageDiscovery: true,
+      voiceActorSupport: true
     };
   }
 }
