@@ -508,7 +508,7 @@ Return as JSON array:
   }
 
   /**
-   * OPTIMIZATION: Popularity-based ranking and enhancement
+   * FIXED: Popularity-based ranking with robust JSON parsing
    */
   async optimizeByPopularity(roles, celebrityName) {
     if (!roles || roles.length === 0) return [];
@@ -530,7 +530,7 @@ Return as JSON array:
   }
 
   /**
-   * Enhance roles with AI-driven popularity scoring
+   * FIXED: Enhance roles with AI-driven popularity scoring
    */
   async enhanceWithPopularityScoring(roles, celebrityName) {
     if (!this.hasOpenAI) return roles; // Skip if no AI available
@@ -549,7 +549,13 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
         max_tokens: 500
       });
 
-      const scores = JSON.parse(completion.choices[0].message.content);
+      const response = completion.choices[0].message.content;
+      const scores = this.parseJSONResponse(response);
+      
+      if (!scores || !Array.isArray(scores)) {
+        console.log('Popularity scoring returned invalid format, skipping enhancement');
+        return roles;
+      }
       
       // Apply scores to roles
       return roles.map((role, index) => {
@@ -564,6 +570,41 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
     } catch (error) {
       console.log(`Popularity scoring failed: ${error.message}`);
       return roles;
+    }
+  }
+
+  /**
+   * NEW: Robust JSON parsing that handles markdown code blocks
+   */
+  parseJSONResponse(response) {
+    try {
+      // First try direct JSON parsing
+      return JSON.parse(response);
+    } catch (error) {
+      try {
+        // Try extracting from markdown code blocks
+        const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          return JSON.parse(jsonMatch[1]);
+        }
+        
+        // Try extracting any array pattern
+        const arrayMatch = response.match(/\[[\s\S]*?\]/);
+        if (arrayMatch) {
+          return JSON.parse(arrayMatch[0]);
+        }
+        
+        // Try extracting any object pattern
+        const objectMatch = response.match(/\{[\s\S]*?\}/);
+        if (objectMatch) {
+          return JSON.parse(objectMatch[0]);
+        }
+        
+        throw new Error('No valid JSON found');
+      } catch (parseError) {
+        console.log(`JSON parsing failed for response: ${response.substring(0, 200)}...`);
+        return null;
+      }
     }
   }
 
@@ -600,7 +641,7 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
   parseAndValidateResponse(response, celebrityName) {
     try {
       // Multiple parsing strategies
-      let parsed = this.tryJSONParsing(response) || 
+      let parsed = this.parseJSONResponse(response) || 
                    this.tryRegexParsing(response) || 
                    this.tryFallbackParsing(response, celebrityName);
       
@@ -620,16 +661,6 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
       console.error(`Response parsing failed for ${celebrityName}: ${error.message}`);
       return null;
     }
-  }
-
-  tryJSONParsing(response) {
-    try {
-      const jsonMatch = response.match(/\[[\s\S]*?\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-    } catch (e) { /* Silent fail, try next method */ }
-    return null;
   }
 
   tryRegexParsing(response) {
