@@ -3,435 +3,223 @@ const fs = require('fs').promises;
 const path = require('path');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
-const AIImageVerifier = require('./ai-services/AIImageVerifier');
 
-class ImageFetcher {
+// Import all three AI services for optimized pipeline
+const GoogleVisionVerifier = require('./ai-services/GoogleVisionVerifier'); // You'll need to create this
+const AIImageVerifier = require('./ai-services/AIImageVerifier'); // Your existing Claude verifier
+const OpenAIVerifier = require('./ai-services/OpenAIVerifier'); // Extract from AIImageVerifier
+
+class HighResImageFetcher {
   
   constructor() {
-    // Initialize AI verifier
-    this.aiVerifier = new AIImageVerifier();
+    // Initialize optimized AI pipeline: Google → Claude → OpenAI
+    this.googleVision = new GoogleVisionVerifier();
+    this.claudeVerifier = new AIImageVerifier();
+    this.openaiVerifier = new OpenAIVerifier();
     
-    // ESSENTIAL watermarked domains - Keep strict on these
+    // STRICT high-resolution requirements
+    this.minResolution = {
+      width: 800,   // Minimum width for print quality
+      height: 600,  // Minimum height for print quality
+      totalPixels: 480000 // 800x600 minimum
+    };
+    
+    // PRINT-READY quality thresholds
+    this.qualityThresholds = {
+      preferred: { width: 1920, height: 1080 }, // HD minimum preferred
+      acceptable: { width: 1200, height: 900 }, // Acceptable for most prints
+      minimum: { width: 800, height: 600 }      // Absolute minimum
+    };
+    
+    // Essential domain filtering
     this.watermarkedDomains = [
-      'alamy.com', 'alamyimages.fr', 'alamy.de', 'alamy.es',
-      'gettyimages.com', 'gettyimages.ca', 'gettyimages.co.uk',
-      'shutterstock.com', 'istockphoto.com', 'depositphotos.com',
-      'bigstock.com', 'dreamstime.com', 'stockphoto.com',
-      'photobucket.com', 'imageshack.us', '123rf.com',
-      'canstockphoto.com', 'fotolia.com', 'stockvault.net'
+      'alamy.com', 'alamyimages.fr', 'gettyimages.com', 'shutterstock.com',
+      'istockphoto.com', 'depositphotos.com', 'bigstock.com', 'dreamstime.com'
     ];
     
-    // SIMPLIFIED exclusions - Focus on obvious junk only
+    // Minimal exclusions - focus on resolution over content filtering
     this.contentExclusions = [
-      '-signed', '-autograph', '-auction', '-ebay', '-memorabilia',
-      '-"comic con"', '-convention', '-podcast', '-vhs', '-dvd',
-      '-watermark', '-vs', '-versus', '-meme'
-      // REMOVED: Most restrictive exclusions that were killing valid results
+      '-thumbnail', '-preview', '-small', '-comp', '-watermark',
+      '-signed', '-autograph', '-auction', '-ebay'
     ];
     
-    // Preferred sources for quality boosting
-    this.preferredDomains = [
-      'imdb.com', 'themoviedb.org', 'rottentomatoes.com',
-      'variety.com', 'hollywoodreporter.com', 'entertainment.com',
-      'disney.com', 'marvel.com', 'starwars.com', 'paramount.com',
-      'fandom.com', 'wikia.org', 'wikipedia.org', 'crunchyroll.com',
-      'funimation.com', 'myanimelist.net', 'anidb.net'
+    // HIGH-RESOLUTION preferred sources
+    this.highResSources = [
+      'imdb.com', 'themoviedb.org', 'fanart.tv', 'thetvdb.com',
+      'disney.com', 'marvel.com', 'starwars.com', 'hbo.com',
+      'netflix.com', 'crunchyroll.com', 'funimation.com',
+      'wikimedia.org', 'wikipedia.org', 'fandom.com'
     ];
   }
   
   /**
-   * Main entry point - CHARACTER-FIRST strategy
+   * MAIN: High-resolution image fetching with optimized AI pipeline
    */
   static async fetchImages(celebrityName, role, workDir) {
     try {
-      logger.info(`🖼️ Fetching images for ${celebrityName} in ${role.name} (CHARACTER-FIRST strategy)...`);
+      logger.info(`🖼️ HIGH-RES fetching for ${celebrityName} in ${role.name}...`);
       
-      const fetcher = new ImageFetcher();
-      const maxImages = config.image.maxImagesPerRole || 80; // Increased from 70
+      const fetcher = new HighResImageFetcher();
+      const maxImages = config.image.maxImagesPerRole || 60; // Reduced since we're being more selective
       
-      // Generate CHARACTER-FOCUSED search queries
-      const searchQueries = fetcher.generateCharacterFirstQueries(celebrityName, role);
+      // Generate HIGH-RESOLUTION focused search queries
+      const searchQueries = fetcher.generateHighResQueries(celebrityName, role);
       let allImages = [];
       
-      // Execute searches with higher volume
+      // Execute searches with HIGH-RESOLUTION parameters
       for (const query of searchQueries) {
         try {
-          logger.info(`Search: "${query}"`);
-          const images = await fetcher.searchSerpAPI(query, 35); // Increased from 22
-          const filteredImages = fetcher.applyMinimalFiltering(images);
+          logger.info(`🔍 HIGH-RES Search: "${query}"`);
+          const images = await fetcher.searchHighResSerpAPI(query, 25); // Focused search
+          const filteredImages = fetcher.applyResolutionFiltering(images);
           allImages.push(...filteredImages);
           
-          if (allImages.length >= maxImages * 1.5) break; // Get more images for AI to review
+          if (allImages.length >= maxImages * 1.5) break;
         } catch (error) {
           logger.warn(`Query failed: ${query} - ${error.message}`);
         }
       }
       
-      // Process with VOLUME-FIRST approach
+      // RESOLUTION-FIRST processing pipeline
       const uniqueImages = fetcher.removeDuplicates(allImages);
-      const validImages = fetcher.validateImagesLenient(uniqueImages, celebrityName, role);
-      const qualityImages = fetcher.prioritizeImageQualityBalanced(validImages);
-      const diversifiedImages = fetcher.diversifyContentTypesGenerous(qualityImages);
+      const highResImages = fetcher.enforceMinimumResolution(uniqueImages);
+      const qualityRanked = fetcher.rankByPrintQuality(highResImages);
       
-      logger.info(`${diversifiedImages.length} images prepared for AI verification (VOLUME-FIRST approach)`);
+      logger.info(`📏 ${qualityRanked.length} high-resolution images found (min ${fetcher.minResolution.width}x${fetcher.minResolution.height})`);
       
-      // Download MORE images for AI to review
-      const downloadedImages = await fetcher.downloadImages(
-        diversifiedImages.slice(0, Math.min(maxImages * 1.2, 100)), // Download more for AI review
+      if (qualityRanked.length === 0) {
+        logger.warn(`❌ NO HIGH-RESOLUTION IMAGES FOUND - adjusting search strategy`);
+        // Try fallback with slightly lower requirements
+        const fallbackImages = await fetcher.fallbackHighResSearch(celebrityName, role, workDir);
+        return fallbackImages;
+      }
+      
+      // Download high-res images for AI verification
+      const downloadedImages = await fetcher.downloadHighResImages(
+        qualityRanked.slice(0, Math.min(maxImages, 45)), // Download fewer but higher quality
         workDir, 
         celebrityName, 
         role
       );
       
-      logger.info(`📥 Downloaded ${downloadedImages.length} images`);
+      logger.info(`📥 Downloaded ${downloadedImages.length} high-resolution images`);
       
-      // AI VERIFICATION - Let AI do the heavy filtering
+      // OPTIMIZED AI PIPELINE: Google → Claude → OpenAI
       const enableAIVerification = process.env.ENABLE_AI_VERIFICATION !== 'false';
       
       if (enableAIVerification) {
-        logger.info(`🤖 Starting AI verification (CHARACTER-FIRST mode)...`);
-        try {
-          const verificationResults = await fetcher.aiVerifier.verifyImages(
-            downloadedImages,
-            celebrityName,
-            role.character || role.characterName || 'Unknown',
-            role.title || role.name,
-            role.medium || role.media_type || 'unknown'
-          );
-          
-          // Log detailed results
-          if (verificationResults.invalid && verificationResults.invalid.length > 0) {
-            logger.info(`🔍 AI REJECTIONS (${verificationResults.invalid.length}):`);
-            verificationResults.invalid.slice(0, 5).forEach((invalid, index) => {
-              logger.info(`❌ ${index + 1}. ${invalid.filename} - ${invalid.reason || 'No reason'}`);
-            });
-            if (verificationResults.invalid.length > 5) {
-              logger.info(`... and ${verificationResults.invalid.length - 5} more rejections`);
-            }
-          }
-          
-          const finalValidImages = verificationResults.valid;
-          
-          logger.info(`✅ AI APPROVED ${finalValidImages.length} images:`);
-          finalValidImages.slice(0, 5).forEach((valid, index) => {
-            logger.info(`✅ ${index + 1}. ${valid.filename} - ${valid.title || 'No title'}`);
-          });
-          if (finalValidImages.length > 5) {
-            logger.info(`... and ${finalValidImages.length - 5} more approved images`);
-          }
-          
-          // Clean up invalid images
-          await fetcher.cleanupInvalidImages(verificationResults.invalid);
-          
-          logger.info(`✅ FINAL RESULT: ${finalValidImages.length} AI-verified images`);
-          logger.info(`💰 Verification cost: $${verificationResults.totalCost.toFixed(4)}`);
-          logger.info(`📊 Services used:`, verificationResults.serviceUsage);
-          
-          return finalValidImages;
-          
-        } catch (verificationError) {
-          logger.warn(`⚠️ AI verification failed: ${verificationError.message}`);
-          logger.info(`📦 Returning ${downloadedImages.length} unverified images`);
-          return downloadedImages;
+        logger.info(`🤖 Starting OPTIMIZED AI verification pipeline (Google → Claude → OpenAI)...`);
+        
+        const verificationResults = await fetcher.runOptimizedAIPipeline(
+          downloadedImages,
+          celebrityName,
+          role.character || role.characterName || 'Unknown',
+          role.title || role.name,
+          role.medium || role.media_type || 'unknown'
+        );
+        
+        const finalValidImages = verificationResults.valid;
+        
+        logger.info(`✅ FINAL HIGH-RES RESULT: ${finalValidImages.length} verified print-ready images`);
+        logger.info(`💰 Total verification cost: $${verificationResults.totalCost.toFixed(4)}`);
+        logger.info(`📊 Pipeline efficiency:`, verificationResults.pipelineStats);
+        
+        // Validate final resolution compliance
+        const resolutionCompliant = await fetcher.validateFinalResolution(finalValidImages);
+        
+        if (resolutionCompliant.failed.length > 0) {
+          logger.warn(`⚠️ ${resolutionCompliant.failed.length} images failed final resolution check`);
+          await fetcher.cleanupFailedImages(resolutionCompliant.failed);
         }
+        
+        logger.info(`📐 RESOLUTION VALIDATION: ${resolutionCompliant.passed.length} images meet print standards`);
+        
+        return resolutionCompliant.passed;
+        
       } else {
-        logger.info(`📦 AI verification disabled, returning ${downloadedImages.length} images`);
+        logger.info(`📦 AI verification disabled, returning ${downloadedImages.length} high-res images`);
         return downloadedImages;
       }
       
     } catch (error) {
-      logger.error(`Error fetching images for ${role.name}:`, error.message);
+      logger.error(`Error in high-res fetching for ${role.name}:`, error.message);
       return [];
     }
   }
   
   /**
-   * CHARACTER-FIRST query generation - prioritizes character over actor
+   * HIGH-RESOLUTION search query generation
    */
-  generateCharacterFirstQueries(celebrityName, role) {
-    // PRIORITY 1: Use optimized search terms if available
-    if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
-      logger.info(`🎯 Using AI-optimized search terms (${role.finalSearchTerms.length} terms)`);
-      return role.finalSearchTerms;
-    }
-    
-    if (role.searchTerms && role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
-      logger.info(`🎯 Using character image search terms (${role.searchTerms.character_images.length} terms)`);
-      return role.searchTerms.character_images;
-    }
-    
-    if (role.searchTerms && Array.isArray(role.searchTerms) && role.searchTerms.length > 0) {
-      logger.info(`🎯 Using search terms array (${role.searchTerms.length} terms)`);
-      return role.searchTerms;
-    }
-    
-    // FALLBACK: Generate CHARACTER-FIRST queries
-    const roleName = role.name || role.title || role.character || 'Unknown Role';
-    logger.info(`🎯 Generating CHARACTER-FIRST fallback queries for ${roleName}`);
+  generateHighResQueries(celebrityName, role) {
+    // Use existing character-first terms but add high-res modifiers
+    const baseQueries = this.getCharacterFirstTerms(celebrityName, role);
     
     const watermarkExclusions = this.watermarkedDomains.map(d => `-site:${d}`).join(' ');
     const contentExclusions = this.contentExclusions.join(' ');
-    const allExclusions = `${watermarkExclusions} ${contentExclusions}`;
+    const resolutionBoosts = 'HD 1080p "high resolution" "high quality"';
+    const allModifiers = `${watermarkExclusions} ${contentExclusions} ${resolutionBoosts}`;
     
-    const queries = [];
+    // Enhance base queries with high-res modifiers
+    const highResQueries = baseQueries.map(query => {
+      // Remove existing exclusions to avoid duplication
+      const cleanQuery = query.replace(/-[^\s]+/g, '').trim();
+      return `${cleanQuery} ${allModifiers}`;
+    });
     
-    // Determine if character-focused search should be used
+    // Add resolution-specific variants
     const characterName = role.character || role.characterName;
     const showTitle = role.title || role.name;
-    const isVoiceRole = role.isVoiceRole || 
-                       role.medium?.includes('voice') || 
-                       role.media_type?.includes('voice') ||
-                       role.medium?.includes('animation') ||
-                       role.medium?.includes('anime');
     
-    // CHARACTER-FIRST approach for ALL roles (not just voice)
-    if (characterName && characterName !== 'Unknown Character' && characterName !== 'Unknown role') {
-      
-      if (isVoiceRole) {
-        logger.info(`🎭 VOICE ROLE: Pure character focus for ${characterName}`);
-        
-        // PURE CHARACTER FOCUS - NO actor name pollution
-        queries.push(`"${characterName}" "${showTitle}" character anime scene ${allExclusions}`);
-        queries.push(`"${characterName}" "${showTitle}" episode screenshot ${allExclusions}`);
-        queries.push(`"${characterName}" character "${showTitle}" official art ${allExclusions}`);
-        queries.push(`"${showTitle}" "${characterName}" anime character ${allExclusions}`);
-        
-      } else {
-        logger.info(`🎬 LIVE ACTION: Character-first with balanced actor approach for ${characterName}`);
-        
-        // CHARACTER-FIRST even for live action (like Captain Kirk vs William Shatner)
-        queries.push(`"${characterName}" "${showTitle}" character scene ${allExclusions}`);
-        queries.push(`"${characterName}" "${showTitle}" movie scene ${allExclusions}`);
-        queries.push(`"${showTitle}" "${characterName}" character ${allExclusions}`);
-        
-        // THEN add actor-specific terms
-        queries.push(`"${celebrityName}" "${characterName}" "${showTitle}" scene ${allExclusions}`);
-      }
-      
-    } else {
-      // Fallback when no clear character name
-      logger.info(`🔄 FALLBACK: Show-focused search for ${showTitle}`);
-      
-      if (isVoiceRole) {
-        queries.push(`"${showTitle}" characters anime scene ${allExclusions}`);
-        queries.push(`"${showTitle}" anime character images ${allExclusions}`);
-      } else {
-        queries.push(`"${celebrityName}" "${showTitle}" scene ${allExclusions}`);
-        queries.push(`"${showTitle}" "${celebrityName}" promotional ${allExclusions}`);
-      }
+    if (characterName && characterName !== 'Unknown Character') {
+      highResQueries.push(`"${characterName}" "${showTitle}" HD wallpaper 1920x1080 ${allModifiers}`);
+      highResQueries.push(`"${characterName}" "${showTitle}" 4K ultra HD ${allModifiers}`);
     }
-
-    return queries.slice(0, 4); // Increased from 3 to 4
-  }
-  
-  /**
-   * MINIMAL filtering - let AI do the heavy work
-   */
-  applyMinimalFiltering(images) {
-    return images.filter(image => {
-      const url = (image.sourceUrl || '').toLowerCase();
-      const imageUrl = (image.url || '').toLowerCase();
-      
-      // ONLY block obvious watermarked stock sites
-      for (const domain of this.watermarkedDomains) {
-        if (url.includes(domain) || imageUrl.includes(domain)) {
-          return false;
-        }
-      }
-
-      // ONLY block obvious watermark URL patterns
-      const obviousWatermarkPatterns = ['/comp/', '/preview/', '/watermark/'];
-      for (const pattern of obviousWatermarkPatterns) {
-        if (url.includes(pattern) || imageUrl.includes(pattern)) {
-          return false;
-        }
-      }
-
-      return true; // Let everything else through for AI verification
-    });
-  }
-  
-  /**
-   * LENIENT validation - reduced pre-filtering
-   */
-  validateImagesLenient(images, celebrityName, role) {
-    return images.filter(image => {
-      const validation = this.lenientValidation(image, celebrityName, role);
-      
-      if (!validation.isValid) {
-        // Only log obvious rejections
-        if (validation.severity === 'high') {
-          logger.warn(`❌ ${image.title}: ${validation.reason}`);
-        }
-        return false;
-      }
-      
-      return true;
-    });
-  }
-  
-  /**
-   * LENIENT validation logic
-   */
-  lenientValidation(image, celebrityName, role) {
-    const title = (image.title || '').toLowerCase();
-    const url = (image.sourceUrl || '').toLowerCase();
     
-    // ONLY reject obvious junk with HIGH severity
-    const highSeverityRejects = [
-      'comic con', 'convention center', 'autograph signing',
-      'blu ray box', 'dvd box', 'toy package', 'funko pop'
+    return highResQueries.slice(0, 6); // Focus on quality over quantity
+  }
+  
+  /**
+   * Get character-first terms (compatible with your existing system)
+   */
+  getCharacterFirstTerms(celebrityName, role) {
+    if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
+      return role.finalSearchTerms;
+    }
+    
+    if (role.searchTerms && role.searchTerms.character_images) {
+      return role.searchTerms.character_images;
+    }
+    
+    // Fallback character-first generation
+    const characterName = role.character || role.characterName;
+    const showTitle = role.title || role.name;
+    
+    return [
+      `"${characterName}" "${showTitle}" character scene`,
+      `"${characterName}" "${showTitle}" HD screenshot`,
+      `"${showTitle}" "${characterName}" official image`
     ];
-    
-    for (const reject of highSeverityRejects) {
-      if (title.includes(reject) || url.includes(reject)) {
-        return { isValid: false, reason: `High severity rejection: ${reject}`, severity: 'high' };
-      }
-    }
-    
-    // REMOVED most medium/low severity rejections - let AI handle them
-    
-    return { isValid: true, reason: 'Passed lenient validation' };
   }
   
   /**
-   * BALANCED quality prioritization
+   * HIGH-RESOLUTION SerpAPI search with strict quality parameters
    */
-  prioritizeImageQualityBalanced(images) {
-    return images
-      .map(image => ({
-        ...image,
-        qualityScore: this.calculateBalancedQualityScore(image)
-      }))
-      .sort((a, b) => b.qualityScore - a.qualityScore);
-  }
-
-  /**
-   * BALANCED quality scoring - don't over-prioritize HD
-   */
-  calculateBalancedQualityScore(image) {
-    let score = 0;
-    const title = (image.title || '').toLowerCase();
-    const url = (image.sourceUrl || '').toLowerCase();
-    
-    // SIZE BONUS: More balanced approach
-    const estimatedSize = (image.width || 400) * (image.height || 300);
-    score += Math.min(estimatedSize / 150000, 25); // Reduced weight
-    
-    // SOURCE BONUS: Good sources get modest boost
-    if (this.preferredDomains.some(domain => url.includes(domain))) {
-      score += 20; // Balanced bonus
-    }
-    
-    // HD CONTENT: Nice to have but not dominating
-    if (this.detectHDContent(image)) {
-      score += 15; // Reduced from 20
-    }
-    
-    // CONTENT TYPE BONUSES: Balanced across types
-    if (title.includes('scene') || title.includes('still')) score += 12;
-    if (title.includes('character') || title.includes('official')) score += 12;
-    if (title.includes('episode') || title.includes('screenshot')) score += 10;
-    
-    // OLDER CONTENT SUPPORT: Don't penalize older shows
-    const olderContentIndicators = ['vintage', 'classic', 'original', '80s', '90s', '2000s'];
-    const isOlderContent = olderContentIndicators.some(indicator => 
-      title.includes(indicator) || url.includes(indicator)
-    );
-    
-    if (isOlderContent) {
-      score += 18; // Good bonus for older content
-    }
-    
-    // MINIMAL PENALTIES: Only for obviously bad content
-    if (title.includes('thumbnail')) score -= 5;
-    if (title.includes('very small')) score -= 5;
-    
-    return score;
-  }
-  
-  /**
-   * GENEROUS content diversification - higher limits for popular characters
-   */
-  diversifyContentTypesGenerous(images) {
-    const contentTypeLimits = {
-      poster: 12,         // Increased
-      behind_scenes: 18,  // Increased  
-      press: 35,          // Increased significantly
-      movie_still: 50,    // Increased significantly - most valuable content
-      cast_group: 30,     // Increased
-      portrait: 18,       // Increased
-      character: 60,      // NEW: High limit for character-focused content
-      general: 50         // Increased
-    };
-
-    const contentTypeCounts = {};
-    const diversifiedImages = [];
-
-    for (const image of images) {
-      const contentType = this.detectContentTypeEnhanced(image);
-      const currentCount = contentTypeCounts[contentType] || 0;
-      const limit = contentTypeLimits[contentType] || 30;
-
-      if (currentCount < limit) {
-        diversifiedImages.push({
-          ...image,
-          contentType: contentType
-        });
-        contentTypeCounts[contentType] = currentCount + 1;
-      } else if (diversifiedImages.length < 120) { // Allow overflow if under total limit
-        diversifiedImages.push({
-          ...image,
-          contentType: 'overflow'
-        });
-      }
-
-      if (diversifiedImages.length >= 120) break; // Increased total limit
-    }
-
-    logger.info(`Content distribution: ${Object.entries(contentTypeCounts)
-      .map(([type, count]) => `${type}:${count}`)
-      .join(', ')}`);
-
-    return diversifiedImages;
-  }
-  
-  /**
-   * ENHANCED content type detection
-   */
-  detectContentTypeEnhanced(image) {
-    const title = (image.title || '').toLowerCase();
-    
-    // CHARACTER-FOCUSED detection
-    if (title.includes('character') || title.includes('anime character') || 
-        title.includes('character design')) return 'character';
-    if (title.includes('scene') || title.includes('still') || 
-        title.includes('screenshot') || title.includes('episode')) return 'movie_still';
-    if (title.includes('poster') || title.includes('artwork')) return 'poster';
-    if (title.includes('behind the scenes') || title.includes('on set')) return 'behind_scenes';
-    if (title.includes('press') || title.includes('promotional')) return 'press';
-    if (title.includes('cast') || title.includes('group') || title.includes('ensemble')) return 'cast_group';
-    if (title.includes('portrait') || title.includes('headshot')) return 'portrait';
-    
-    return 'general';
-  }
-
-  /**
-   * Search SerpAPI with optimized parameters for HIGHER VOLUME
-   */
-  async searchSerpAPI(query, maxResults = 35) { // Increased default
+  async searchHighResSerpAPI(query, maxResults = 25) {
     try {
       const params = {
         api_key: config.api.serpApiKey,
         engine: 'google_images',
         q: query,
-        num: Math.min(maxResults, 100),
+        num: Math.min(maxResults, 50),
         ijn: 0,
         safe: 'active',
-        imgsz: 'm', // Changed from 'l' to 'm' - more inclusive sizing
+        // HIGH-RESOLUTION specific parameters
+        imgsz: 'l',        // Large images only
         imgtype: 'photo',
         imgc: 'color',
-        // REMOVED restrictive rights filter to get more results
+        // Quality filters
+        as_sitesearch: this.highResSources.join(' OR '), // Prefer high-quality sources
+        tbs: 'isz:l,ic:color' // Large size, color images
       };
 
       const response = await axios.get(config.api.serpEndpoint, { 
@@ -440,84 +228,276 @@ class ImageFetcher {
       });
 
       if (!response.data?.images_results) {
-        logger.warn(`No images found for: ${query}`);
+        logger.warn(`No high-res images found for: ${query}`);
         return [];
       }
 
       const images = response.data.images_results.map((img, index) => ({
         url: img.original || img.thumbnail,
         thumbnail: img.thumbnail,
-        title: img.title || `Image ${index + 1}`,
+        title: img.title || `High-Res Image ${index + 1}`,
         source: img.source || 'Unknown',
         sourceUrl: img.link || '',
         searchQuery: query,
-        width: img.original_width,
-        height: img.original_height
+        // CRITICAL: Resolution data
+        width: img.original_width || 0,
+        height: img.original_height || 0,
+        estimatedFileSize: this.estimateFileSize(img.original_width, img.original_height)
       }));
 
-      // LIGHT sorting - don't over-optimize here
-      const sortedImages = images.sort((a, b) => {
-        const aSize = (a.width || 0) * (a.height || 0);
-        const bSize = (b.width || 0) * (b.height || 0);
-        
-        // Light preference for larger images
-        return bSize - aSize;
-      });
+      // Pre-filter by resolution immediately
+      const highResImages = images.filter(img => 
+        img.width >= this.minResolution.width && 
+        img.height >= this.minResolution.height
+      );
 
-      logger.info(`Found ${sortedImages.length} images for: ${query}`);
-      return sortedImages;
+      logger.info(`Found ${highResImages.length}/${images.length} high-resolution images for: ${query}`);
+      return highResImages;
 
     } catch (error) {
-      if (error.response?.status === 401) {
-        throw new Error('Invalid SerpAPI key. Check your SERP_API_KEY in .env file');
-      }
-      if (error.response?.status === 403) {
-        throw new Error('SerpAPI quota exceeded or access denied');
-      }
-      
-      logger.error(`SerpAPI error: ${error.message}`);
+      logger.error(`High-res search failed: ${error.message}`);
       return [];
     }
   }
-
-  /**
-   * Detect HD/remastered content
-   */
-  detectHDContent(image) {
-    const title = (image.title || '').toLowerCase();
-    const url = (image.sourceUrl || '').toLowerCase();
-    
-    const hdIndicators = [
-      'hd', '1080p', '4k', 'uhd', 'blu-ray', 'bluray', 'remastered', 
-      'restored', 'digital', 'high resolution'
-    ];
-    
-    return hdIndicators.some(indicator => 
-      title.includes(indicator) || url.includes(indicator)
-    );
-  }
   
   /**
-   * Remove duplicate images
+   * STRICT resolution filtering
    */
-  removeDuplicates(images) {
-    const seen = new Set();
-    
-    return images.filter(img => {
-      const urlKey = (img.url || '').split('?')[0].toLowerCase();
+  applyResolutionFiltering(images) {
+    return images.filter(image => {
+      const url = (image.sourceUrl || '').toLowerCase();
+      const imageUrl = (image.url || '').toLowerCase();
+      const title = (image.title || '').toLowerCase();
       
-      if (seen.has(urlKey)) {
+      // Block watermarked sites
+      for (const domain of this.watermarkedDomains) {
+        if (url.includes(domain) || imageUrl.includes(domain)) {
+          return false;
+        }
+      }
+
+      // Block obvious low-res indicators
+      const lowResIndicators = ['/thumb/', '/small/', '/preview/', '/comp/', '_thumb', '_small'];
+      for (const indicator of lowResIndicators) {
+        if (url.includes(indicator) || imageUrl.includes(indicator)) {
+          return false;
+        }
+      }
+      
+      // Block low-res keywords in title
+      const lowResKeywords = ['thumbnail', 'preview', 'small', 'tiny', 'icon'];
+      for (const keyword of lowResKeywords) {
+        if (title.includes(keyword)) {
+          return false;
+        }
+      }
+
+      // Require minimum resolution
+      const width = image.width || 0;
+      const height = image.height || 0;
+      
+      if (width < this.minResolution.width || height < this.minResolution.height) {
         return false;
       }
-      seen.add(urlKey);
+
       return true;
     });
   }
   
   /**
-   * Download images with improved error handling
+   * ENFORCE minimum resolution requirements
    */
-  async downloadImages(images, workDir, celebrityName, role) {
+  enforceMinimumResolution(images) {
+    const compliantImages = images.filter(image => {
+      const width = image.width || 0;
+      const height = image.height || 0;
+      const totalPixels = width * height;
+      
+      const meetsMinimum = width >= this.minResolution.width && 
+                          height >= this.minResolution.height &&
+                          totalPixels >= this.minResolution.totalPixels;
+      
+      if (!meetsMinimum) {
+        logger.debug(`❌ Resolution fail: ${width}x${height} (need ${this.minResolution.width}x${this.minResolution.height})`);
+      }
+      
+      return meetsMinimum;
+    });
+    
+    logger.info(`📏 Resolution enforcement: ${compliantImages.length}/${images.length} images meet minimum standards`);
+    return compliantImages;
+  }
+  
+  /**
+   * RANK by print quality (resolution + source quality)
+   */
+  rankByPrintQuality(images) {
+    return images
+      .map(image => ({
+        ...image,
+        printQualityScore: this.calculatePrintQualityScore(image)
+      }))
+      .sort((a, b) => b.printQualityScore - a.printQualityScore);
+  }
+  
+  /**
+   * Calculate print quality score prioritizing resolution
+   */
+  calculatePrintQualityScore(image) {
+    let score = 0;
+    const width = image.width || 0;
+    const height = image.height || 0;
+    const url = (image.sourceUrl || '').toLowerCase();
+    const title = (image.title || '').toLowerCase();
+    
+    // RESOLUTION SCORING (70% of total score)
+    const totalPixels = width * height;
+    
+    // Preferred resolution bonus (1920x1080+)
+    if (width >= this.qualityThresholds.preferred.width && height >= this.qualityThresholds.preferred.height) {
+      score += 70; // Maximum resolution score
+    }
+    // Acceptable resolution bonus (1200x900+)
+    else if (width >= this.qualityThresholds.acceptable.width && height >= this.qualityThresholds.acceptable.height) {
+      score += 50;
+    }
+    // Minimum resolution bonus (800x600+)
+    else if (width >= this.qualityThresholds.minimum.width && height >= this.qualityThresholds.minimum.height) {
+      score += 30;
+    }
+    
+    // Aspect ratio bonus (16:9, 4:3, etc.)
+    const aspectRatio = width / height;
+    if (aspectRatio >= 1.3 && aspectRatio <= 1.8) { // Good aspect ratios
+      score += 10;
+    }
+    
+    // SOURCE QUALITY SCORING (20% of total score)
+    if (this.highResSources.some(domain => url.includes(domain))) {
+      score += 15; // High-quality source bonus
+    }
+    
+    // HD/4K content indicators
+    const hdIndicators = ['hd', '1080p', '4k', 'uhd', 'high resolution', 'high quality'];
+    if (hdIndicators.some(indicator => title.includes(indicator) || url.includes(indicator))) {
+      score += 10;
+    }
+    
+    // CONTENT TYPE SCORING (10% of total score)
+    if (title.includes('official') || title.includes('promo')) score += 5;
+    if (title.includes('still') || title.includes('scene')) score += 5;
+    
+    return score;
+  }
+  
+  /**
+   * OPTIMIZED AI PIPELINE: Google → Claude → OpenAI
+   */
+  async runOptimizedAIPipeline(images, celebrityName, character, title, medium) {
+    const pipelineResults = {
+      totalProcessed: images.length,
+      googleFiltered: 0,
+      claudeVerified: 0,
+      openaiValidated: 0,
+      totalCost: 0,
+      pipelineStats: {
+        stage1_google: { processed: 0, passed: 0, cost: 0 },
+        stage2_claude: { processed: 0, passed: 0, cost: 0 },
+        stage3_openai: { processed: 0, passed: 0, cost: 0 }
+      }
+    };
+    
+    logger.info(`🔄 Stage 1: Google Vision pre-filtering ${images.length} images...`);
+    
+    // STAGE 1: Google Vision (Pre-filter)
+    const googleResults = await this.googleVision.batchPreFilter(images, celebrityName, character);
+    const googlePassed = googleResults.passed || images; // Fallback if Google unavailable
+    
+    pipelineResults.pipelineStats.stage1_google = {
+      processed: images.length,
+      passed: googlePassed.length,
+      cost: googleResults.cost || 0
+    };
+    pipelineResults.totalCost += googleResults.cost || 0;
+    
+    logger.info(`✅ Stage 1 complete: ${googlePassed.length}/${images.length} passed Google pre-filter`);
+    
+    if (googlePassed.length === 0) {
+      return { valid: [], invalid: images, totalCost: pipelineResults.totalCost, pipelineStats: pipelineResults.pipelineStats };
+    }
+    
+    // STAGE 2: Claude (Character verification)
+    logger.info(`🔄 Stage 2: Claude character verification for ${googlePassed.length} images...`);
+    
+    const claudeResults = await this.claudeVerifier.verifyImages(
+      googlePassed, 
+      celebrityName, 
+      character, 
+      title, 
+      medium
+    );
+    
+    const claudePassed = claudeResults.valid || [];
+    
+    pipelineResults.pipelineStats.stage2_claude = {
+      processed: googlePassed.length,
+      passed: claudePassed.length,
+      cost: claudeResults.totalCost || 0
+    };
+    pipelineResults.totalCost += claudeResults.totalCost || 0;
+    
+    logger.info(`✅ Stage 2 complete: ${claudePassed.length}/${googlePassed.length} passed Claude verification`);
+    
+    if (claudePassed.length === 0) {
+      return { 
+        valid: [], 
+        invalid: [...claudeResults.invalid, ...images.filter(img => !googlePassed.includes(img))], 
+        totalCost: pipelineResults.totalCost, 
+        pipelineStats: pipelineResults.pipelineStats 
+      };
+    }
+    
+    // STAGE 3: OpenAI (Final validation)
+    logger.info(`🔄 Stage 3: OpenAI final validation for ${claudePassed.length} images...`);
+    
+    const openaiResults = await this.openaiVerifier.finalValidation(
+      claudePassed,
+      celebrityName,
+      character,
+      title,
+      medium
+    );
+    
+    const finalValid = openaiResults.valid || claudePassed; // Fallback if OpenAI unavailable
+    
+    pipelineResults.pipelineStats.stage3_openai = {
+      processed: claudePassed.length,
+      passed: finalValid.length,
+      cost: openaiResults.cost || 0
+    };
+    pipelineResults.totalCost += openaiResults.cost || 0;
+    
+    logger.info(`✅ Stage 3 complete: ${finalValid.length}/${claudePassed.length} passed OpenAI validation`);
+    
+    // Compile all invalid images
+    const allInvalid = [
+      ...(claudeResults.invalid || []),
+      ...(openaiResults.invalid || []),
+      ...images.filter(img => !googlePassed.includes(img))
+    ];
+    
+    return {
+      valid: finalValid,
+      invalid: allInvalid,
+      totalCost: pipelineResults.totalCost,
+      pipelineStats: pipelineResults.pipelineStats
+    };
+  }
+  
+  /**
+   * Download high-resolution images with validation
+   */
+  async downloadHighResImages(images, workDir, celebrityName, role) {
     const downloadDir = path.join(workDir, 'downloaded');
     await fs.mkdir(downloadDir, { recursive: true });
     
@@ -530,9 +510,9 @@ class ImageFetcher {
         const filename = this.generateSafeFilename(role.name, i + 1, image.url);
         const filepath = path.join(downloadDir, filename);
         
-        const success = await this.downloadSingleImage(image.url, filepath);
+        const downloadResult = await this.downloadAndValidateImage(image.url, filepath, image.width, image.height);
         
-        if (success) {
+        if (downloadResult.success) {
           downloadedImages.push({
             filename: filename,
             filepath: filepath,
@@ -542,21 +522,29 @@ class ImageFetcher {
             title: image.title,
             source: image.source,
             sourceUrl: image.sourceUrl,
-            contentType: image.contentType || 'general',
-            qualityScore: image.qualityScore || 0,
+            // High-res metadata
+            expectedWidth: image.width,
+            expectedHeight: image.height,
+            actualWidth: downloadResult.actualWidth,
+            actualHeight: downloadResult.actualHeight,
+            printQualityScore: image.printQualityScore || 0,
+            resolutionTier: this.getResolutionTier(downloadResult.actualWidth, downloadResult.actualHeight),
             tags: [
               role.media_type || 'unknown', 
+              'high_resolution',
               'serpapi',
               role.isVoiceRole ? 'voice_role' : 'live_action',
               'character_first_search'
             ]
           });
           
-          logger.info(`✅ Downloaded: ${filename}`);
+          logger.info(`✅ Downloaded HIGH-RES: ${filename} (${downloadResult.actualWidth}x${downloadResult.actualHeight})`);
+        } else {
+          logger.warn(`❌ Failed HIGH-RES download: ${image.title} - ${downloadResult.error}`);
         }
         
       } catch (error) {
-        logger.warn(`❌ Failed to download image ${i + 1}:`, error.message);
+        logger.warn(`❌ Download error for image ${i + 1}:`, error.message);
       }
     }
     
@@ -564,97 +552,200 @@ class ImageFetcher {
   }
   
   /**
-   * Clean up invalid images
+   * Download and validate actual image resolution
    */
-  async cleanupInvalidImages(invalidImages) {
-    for (const invalidImage of invalidImages) {
-      try {
-        await fs.unlink(invalidImage.filepath);
-        logger.info(`🗑️ Removed invalid image: ${invalidImage.filename} (${invalidImage.reason})`);
-      } catch (error) {
-        logger.warn(`⚠️ Failed to remove ${invalidImage.filename}: ${error.message}`);
+  async downloadAndValidateImage(url, filepath, expectedWidth, expectedHeight) {
+    try {
+      const response = await axios({
+        method: 'GET',
+        url: url,
+        responseType: 'stream',
+        timeout: 25000,
+        maxRedirects: 5,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      const contentType = response.headers['content-type'];
+      if (!contentType?.startsWith('image/')) {
+        throw new Error(`Invalid content type: ${contentType}`);
       }
+
+      const writer = require('fs').createWriteStream(filepath);
+      response.data.pipe(writer);
+
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      
+      // Validate actual resolution after download
+      const actualDimensions = await this.getActualImageDimensions(filepath);
+      
+      // Check if actual resolution meets our standards
+      if (actualDimensions.width < this.minResolution.width || actualDimensions.height < this.minResolution.height) {
+        await fs.unlink(filepath); // Delete low-res image
+        throw new Error(`Resolution too low: ${actualDimensions.width}x${actualDimensions.height}`);
+      }
+      
+      return {
+        success: true,
+        actualWidth: actualDimensions.width,
+        actualHeight: actualDimensions.height
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
   
   /**
-   * Download single image with retries
+   * Get actual image dimensions after download
    */
-  async downloadSingleImage(url, filepath, retries = 3) {
-    if (!this.isValidImageUrl(url)) {
-      logger.warn(`Invalid image URL: ${url}`);
-      return false;
+  async getActualImageDimensions(filepath) {
+    try {
+      const sharp = require('sharp'); // You may need: npm install sharp
+      const metadata = await sharp(filepath).metadata();
+      return {
+        width: metadata.width || 0,
+        height: metadata.height || 0
+      };
+    } catch (error) {
+      // Fallback method if sharp isn't available
+      logger.warn('Sharp not available for dimension checking, using file size estimation');
+      const stats = await fs.stat(filepath);
+      // Estimate dimensions based on file size (rough approximation)
+      const estimatedPixels = stats.size / 3; // Assume ~3 bytes per pixel
+      const estimatedWidth = Math.sqrt(estimatedPixels * 1.5); // Assume ~1.5:1 aspect ratio
+      const estimatedHeight = Math.sqrt(estimatedPixels / 1.5);
+      
+      return {
+        width: Math.round(estimatedWidth),
+        height: Math.round(estimatedHeight)
+      };
     }
-
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const response = await axios({
-          method: 'GET',
-          url: url,
-          responseType: 'stream',
-          timeout: 20000, // Increased timeout
-          maxRedirects: 5, // Increased redirects
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        });
-
-        const contentType = response.headers['content-type'];
-        if (!contentType?.startsWith('image/')) {
-          throw new Error(`Invalid content type: ${contentType}`);
-        }
-
-        const writer = require('fs').createWriteStream(filepath);
-        response.data.pipe(writer);
-
-        return new Promise((resolve, reject) => {
-          writer.on('finish', () => resolve(true));
-          writer.on('error', reject);
-        });
-        
-      } catch (error) {
-        logger.warn(`Download attempt ${attempt} failed: ${error.message}`);
-        
-        if (attempt === retries) {
-          return false;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      }
-    }
-    
-    return false;
-  }
-
-  /**
-   * Validate image URL
-   */
-  isValidImageUrl(url) {
-    if (!url || typeof url !== 'string') return false;
-    
-    const lowerUrl = url.toLowerCase();
-    
-    const badPatterns = [
-      '/search?', '/login', 'javascript:', 'data:', 'mailto:',
-      '.html', '.php', '.asp'
-    ];
-    
-    if (badPatterns.some(pattern => lowerUrl.includes(pattern))) {
-      return false;
-    }
-    
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-    const imageHosts = ['imgur.com', 'flickr.com', 'i.redd.it'];
-    
-    const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
-    const isImageHost = imageHosts.some(host => lowerUrl.includes(host));
-    
-    return hasImageExtension || isImageHost;
   }
   
   /**
-   * Generate safe filename
+   * Get resolution tier for classification
    */
+  getResolutionTier(width, height) {
+    if (width >= this.qualityThresholds.preferred.width && height >= this.qualityThresholds.preferred.height) {
+      return 'premium'; // 1920x1080+
+    } else if (width >= this.qualityThresholds.acceptable.width && height >= this.qualityThresholds.acceptable.height) {
+      return 'high'; // 1200x900+
+    } else if (width >= this.qualityThresholds.minimum.width && height >= this.qualityThresholds.minimum.height) {
+      return 'standard'; // 800x600+
+    } else {
+      return 'low'; // Below standards
+    }
+  }
+  
+  /**
+   * Final resolution validation for print-ready images
+   */
+  async validateFinalResolution(images) {
+    const passed = [];
+    const failed = [];
+    
+    for (const image of images) {
+      const actualWidth = image.actualWidth || 0;
+      const actualHeight = image.actualHeight || 0;
+      
+      if (actualWidth >= this.minResolution.width && actualHeight >= this.minResolution.height) {
+        passed.push(image);
+        logger.info(`✅ PRINT-READY: ${image.filename} (${actualWidth}x${actualHeight})`);
+      } else {
+        failed.push(image);
+        logger.warn(`❌ PRINT-FAIL: ${image.filename} (${actualWidth}x${actualHeight}) - below ${this.minResolution.width}x${this.minResolution.height}`);
+      }
+    }
+    
+    return { passed, failed };
+  }
+  
+  /**
+   * Fallback search with slightly relaxed requirements
+   */
+  async fallbackHighResSearch(celebrityName, role, workDir) {
+    logger.info(`🔄 Attempting fallback high-res search...`);
+    
+    // Temporarily lower requirements
+    const originalMinRes = { ...this.minResolution };
+    this.minResolution.width = 600;
+    this.minResolution.height = 450;
+    this.minResolution.totalPixels = 270000;
+    
+    try {
+      // Try broader search terms
+      const fallbackQueries = [
+        `"${role.character}" "${role.title}" image HD`,
+        `"${celebrityName}" "${role.title}" photo`,
+        `"${role.title}" character images`
+      ];
+      
+      let fallbackImages = [];
+      
+      for (const query of fallbackQueries) {
+        const images = await this.searchHighResSerpAPI(query, 15);
+        const filtered = this.applyResolutionFiltering(images);
+        fallbackImages.push(...filtered);
+        
+        if (fallbackImages.length >= 20) break;
+      }
+      
+      if (fallbackImages.length > 0) {
+        logger.info(`📸 Fallback found ${fallbackImages.length} images with relaxed requirements`);
+        
+        const downloaded = await this.downloadHighResImages(
+          fallbackImages.slice(0, 30),
+          workDir,
+          celebrityName,
+          role
+        );
+        
+        // Restore original requirements
+        this.minResolution = originalMinRes;
+        
+        return downloaded;
+      }
+      
+      // Restore original requirements
+      this.minResolution = originalMinRes;
+      
+      logger.warn(`❌ No images found even with fallback search`);
+      return [];
+      
+    } catch (error) {
+      // Restore original requirements
+      this.minResolution = originalMinRes;
+      throw error;
+    }
+  }
+  
+  /**
+   * Utility functions
+   */
+  estimateFileSize(width, height) {
+    if (!width || !height) return 0;
+    // Rough estimate: width * height * 3 bytes per pixel * compression factor
+    return Math.round(width * height * 3 * 0.3); // Assume ~30% compression
+  }
+  
+  removeDuplicates(images) {
+    const seen = new Set();
+    return images.filter(img => {
+      const urlKey = (img.url || '').split('?')[0].toLowerCase();
+      if (seen.has(urlKey)) return false;
+      seen.add(urlKey);
+      return true;
+    });
+  }
+  
   generateSafeFilename(roleName, index, originalUrl) {
     const cleanRoleName = roleName
       .replace(/[^\w\s-]/g, '')
@@ -662,23 +753,29 @@ class ImageFetcher {
       .substring(0, 30);
     
     const extension = this.getImageExtension(originalUrl);
-    return `${cleanRoleName}_${index}.${extension}`;
+    return `${cleanRoleName}_highres_${index}.${extension}`;
   }
   
-  /**
-   * Get image extension
-   */
   getImageExtension(url) {
-    const extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-    
+    const extensions = ['jpg', 'jpeg', 'png', 'webp'];
     for (const ext of extensions) {
       if (url.toLowerCase().includes(`.${ext}`)) {
         return ext === 'jpeg' ? 'jpg' : ext;
       }
     }
-    
     return 'jpg';
+  }
+  
+  async cleanupFailedImages(failedImages) {
+    for (const image of failedImages) {
+      try {
+        await fs.unlink(image.filepath);
+        logger.info(`🗑️ Cleaned up low-res image: ${image.filename}`);
+      } catch (error) {
+        logger.warn(`⚠️ Failed to cleanup ${image.filename}: ${error.message}`);
+      }
+    }
   }
 }
 
-module.exports = { fetchImages: ImageFetcher.fetchImages.bind(ImageFetcher) };
+module.exports = { fetchImages: HighResImageFetcher.fetchImages.bind(HighResImageFetcher) };
