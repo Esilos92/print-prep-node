@@ -192,14 +192,21 @@ class ImageFetcher {
                        role.medium?.includes('animation');
     
     if (isVoiceRole) {
-      logger.info(`🎭 Voice role fallback: targeting character images for ${roleName}`);
+      logger.info(`🎭 Voice role fallback: targeting CHARACTER images for ${roleName}`);
       
       const characterName = role.character || role.characterName;
+      const showTitle = role.title || role.name;
+      
       if (characterName && characterName !== 'Unknown Character') {
-        queries.push(`"${characterName}" "${roleName}" character image ${allExclusions}`);
-        queries.push(`"${characterName}" "${roleName}" scene still ${allExclusions}`);
+        // PURE CHARACTER FOCUS: No actor name - just character and show
+        queries.push(`"${characterName}" "${showTitle}" character image anime ${allExclusions}`);
+        queries.push(`"${characterName}" "${showTitle}" scene still screenshot ${allExclusions}`);
+        queries.push(`"${characterName}" character "${showTitle}" official art ${allExclusions}`);
+      } else {
+        // If no character name, focus on show with character keywords
+        queries.push(`"${showTitle}" characters official art ${allExclusions}`);
+        queries.push(`"${showTitle}" anime character images ${allExclusions}`);
       }
-      queries.push(`"${roleName}" character images official ${allExclusions}`);
       
     } else {
       logger.info(`🎬 Live action fallback: targeting actor images for ${roleName}`);
@@ -426,30 +433,44 @@ class ImageFetcher {
   }
   
   /**
-   * Voice role validation
+   * Voice role validation - UPDATED for character-focused searches
    */
   validateVoiceRole(image, role) {
     const title = (image.title || '').toLowerCase();
     const url = (image.sourceUrl || '').toLowerCase();
     
-    const characterKeywords = ['character', 'animated', 'animation', 'scene', 'still'];
+    // Enhanced character keywords for anime/animation
+    const characterKeywords = [
+      'character', 'animated', 'animation', 'scene', 'still', 'anime', 
+      'screenshot', 'episode', 'manga', 'art', 'official'
+    ];
     const hasCharacterContext = characterKeywords.some(k => title.includes(k) || url.includes(k));
     
-    if (role.characterName && role.characterName !== 'Unknown Character') {
-      const character = role.characterName.toLowerCase();
+    // Check for character name match
+    if (role.character && role.character !== 'Unknown Character') {
+      const character = role.character.toLowerCase();
       if (title.includes(character)) {
         return { isValid: true, reason: 'Character name match' };
       }
     }
     
-    const roleWords = role.name.toLowerCase().split(' ').filter(w => w.length > 3);
-    const hasRoleContext = roleWords.some(word => title.includes(word));
-    
-    if (hasCharacterContext || hasRoleContext) {
-      return { isValid: true, reason: 'Voice role context found' };
+    // Check for show/series name
+    const showTitle = role.title || role.name;
+    if (showTitle) {
+      const showWords = showTitle.toLowerCase().split(' ').filter(w => w.length > 3);
+      const hasShowContext = showWords.some(word => title.includes(word));
+      
+      if (hasShowContext && hasCharacterContext) {
+        return { isValid: true, reason: 'Show and character context found' };
+      }
     }
     
-    return { isValid: false, reason: 'No voice role context' };
+    // Accept if has strong character/animation indicators
+    if (hasCharacterContext) {
+      return { isValid: true, reason: 'Animation/character context found' };
+    }
+    
+    return { isValid: false, reason: 'No character/animation context' };
   }
   
   /**
