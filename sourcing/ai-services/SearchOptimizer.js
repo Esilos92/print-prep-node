@@ -396,7 +396,7 @@ Return exactly 6 search terms as JSON array:
       });
 
       const response = completion.choices[0].message.content;
-      const enhancedTerms = JSON.parse(response);
+      const enhancedTerms = this.parseJSONResponse(response);
       
       if (Array.isArray(enhancedTerms) && enhancedTerms.length === 6) {
         console.log(`🎯 OpenAI enhanced CHARACTER-FIRST terms for ${characterName}`);
@@ -465,8 +465,33 @@ Return exactly 6 search terms as JSON array:
   }
 
   /**
-   * Get optimization statistics
+   * NEW: Parse JSON response handling markdown code blocks
    */
+  parseJSONResponse(response) {
+    try {
+      // First try direct JSON parsing
+      return JSON.parse(response);
+    } catch (error) {
+      try {
+        // Try extracting from markdown code blocks
+        const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          return JSON.parse(jsonMatch[1]);
+        }
+        
+        // Try extracting any array pattern
+        const arrayMatch = response.match(/\[[\s\S]*?\]/);
+        if (arrayMatch) {
+          return JSON.parse(arrayMatch[0]);
+        }
+        
+        throw new Error('No valid JSON found');
+      } catch (parseError) {
+        console.log(`JSON parsing failed for response: ${response.substring(0, 200)}...`);
+        return null;
+      }
+    }
+  }
   getOptimizationStats(roles) {
     if (!roles || !Array.isArray(roles)) return {};
 
