@@ -17,18 +17,18 @@ class HighResImageFetcher {
     this.claudeVerifier = new AIImageVerifier();
     this.openaiVerifier = new OpenAIVerifier();
     
-    // STRICT high-resolution requirements
+    // BALANCED resolution requirements - start more lenient
     this.minResolution = {
-      width: 800,   // Minimum width for print quality
-      height: 600,  // Minimum height for print quality
-      totalPixels: 480000 // 800x600 minimum
+      width: 400,   // Lowered from 800 - more realistic minimum
+      height: 300,  // Lowered from 600 - more realistic minimum
+      totalPixels: 120000 // 400x300 minimum
     };
     
     // PRINT-READY quality thresholds
     this.qualityThresholds = {
-      preferred: { width: 1920, height: 1080 }, // HD minimum preferred
-      acceptable: { width: 1200, height: 900 }, // Acceptable for most prints
-      minimum: { width: 800, height: 600 }      // Absolute minimum
+      preferred: { width: 1200, height: 900 },  // Lowered from 1920x1080
+      acceptable: { width: 600, height: 450 },  // Lowered from 1200x900
+      minimum: { width: 400, height: 300 }      // Lowered from 800x600
     };
     
     // Essential domain filtering
@@ -88,9 +88,9 @@ class HighResImageFetcher {
       logger.info(`📏 ${qualityRanked.length} high-resolution images found (min ${fetcher.minResolution.width}x${fetcher.minResolution.height})`);
       
       if (qualityRanked.length === 0) {
-        logger.warn(`❌ NO HIGH-RESOLUTION IMAGES FOUND - adjusting search strategy`);
-        // Try fallback with slightly lower requirements
-        const fallbackImages = await fetcher.fallbackHighResSearch(celebrityName, role, workDir);
+        logger.warn(`❌ NO SUITABLE IMAGES FOUND - trying broader search strategy`);
+        // Try fallback with even more lenient requirements
+        const fallbackImages = await fetcher.fallbackBroaderSearch(celebrityName, role, workDir);
         return fallbackImages;
       }
       
@@ -202,7 +202,7 @@ class HighResImageFetcher {
   }
   
   /**
-   * HIGH-RESOLUTION SerpAPI search with strict quality parameters
+   * BALANCED SerpAPI search - prioritize quality but allow more results
    */
   async searchHighResSerpAPI(query, maxResults = 25) {
     try {
@@ -213,13 +213,13 @@ class HighResImageFetcher {
         num: Math.min(maxResults, 50),
         ijn: 0,
         safe: 'active',
-        // HIGH-RESOLUTION specific parameters
-        imgsz: 'l',        // Large images only
+        // BALANCED parameters - not too restrictive
+        imgsz: 'm',        // Medium images (was 'l' large only)
         imgtype: 'photo',
         imgc: 'color',
-        // Quality filters
-        as_sitesearch: this.highResSources.join(' OR '), // Prefer high-quality sources
-        tbs: 'isz:l,ic:color' // Large size, color images
+        // Remove overly restrictive filters
+        // as_sitesearch: removed - was too limiting
+        // tbs: simplified
       };
 
       const response = await axios.get(config.api.serpEndpoint, { 
@@ -228,40 +228,44 @@ class HighResImageFetcher {
       });
 
       if (!response.data?.images_results) {
-        logger.warn(`No high-res images found for: ${query}`);
+        logger.warn(`No images found for: ${query}`);
         return [];
       }
 
       const images = response.data.images_results.map((img, index) => ({
         url: img.original || img.thumbnail,
         thumbnail: img.thumbnail,
-        title: img.title || `High-Res Image ${index + 1}`,
+        title: img.title || `Image ${index + 1}`,
         source: img.source || 'Unknown',
         sourceUrl: img.link || '',
         searchQuery: query,
-        // CRITICAL: Resolution data
+        // CRITICAL: Resolution data (may be null from SerpAPI)
         width: img.original_width || 0,
         height: img.original_height || 0,
         estimatedFileSize: this.estimateFileSize(img.original_width, img.original_height)
       }));
 
-      // Pre-filter by resolution immediately
-      const highResImages = images.filter(img => 
-        img.width >= this.minResolution.width && 
-        img.height >= this.minResolution.height
-      );
+      // LENIENT pre-filter - only remove obviously tiny images
+      const sizedImages = images.filter(img => {
+        // If we have dimensions and they're tiny, filter out
+        if (img.width > 0 && img.height > 0) {
+          return img.width >= 200 && img.height >= 150; // Very lenient pre-filter
+        }
+        // If no dimensions from SerpAPI, let it through for actual download check
+        return true;
+      });
 
-      logger.info(`Found ${highResImages.length}/${images.length} high-resolution images for: ${query}`);
-      return highResImages;
+      logger.info(`Found ${sizedImages.length}/${images.length} potentially good images for: ${query}`);
+      return sizedImages;
 
     } catch (error) {
-      logger.error(`High-res search failed: ${error.message}`);
+      logger.error(`Search failed: ${error.message}`);
       return [];
     }
   }
   
   /**
-   * STRICT resolution filtering
+   * LENIENT resolution filtering - check actual quality after download
    */
   applyResolutionFiltering(images) {
     return images.filter(image => {
@@ -276,27 +280,29 @@ class HighResImageFetcher {
         }
       }
 
-      // Block obvious low-res indicators
-      const lowResIndicators = ['/thumb/', '/small/', '/preview/', '/comp/', '_thumb', '_small'];
+      // Block obvious low-res indicators in URL
+      const lowResIndicators = ['/thumb/', '/small/', '/preview/', '/comp/', '_thumb', '_small', '_tiny'];
       for (const indicator of lowResIndicators) {
         if (url.includes(indicator) || imageUrl.includes(indicator)) {
           return false;
         }
       }
       
-      // Block low-res keywords in title
-      const lowResKeywords = ['thumbnail', 'preview', 'small', 'tiny', 'icon'];
+      // Block obvious low-res keywords in title
+      const lowResKeywords = ['thumbnail', 'preview', 'icon', 'tiny'];
       for (const keyword of lowResKeywords) {
         if (title.includes(keyword)) {
           return false;
         }
       }
 
-      // Require minimum resolution
+      // LENIENT: Only filter if we're SURE it's too small
       const width = image.width || 0;
       const height = image.height || 0;
       
-      if (width < this.minResolution.width || height < this.minResolution.height) {
+      // Only reject if we have dimensions AND they're really tiny
+      if (width > 0 && height > 0 && (width < 200 || height < 150)) {
+        logger.debug(`❌ Too small: ${width}x${height}`);
         return false;
       }
 
@@ -305,27 +311,14 @@ class HighResImageFetcher {
   }
   
   /**
-   * ENFORCE minimum resolution requirements
+   * ENFORCE minimum resolution - but check after download for accuracy
    */
   enforceMinimumResolution(images) {
-    const compliantImages = images.filter(image => {
-      const width = image.width || 0;
-      const height = image.height || 0;
-      const totalPixels = width * height;
-      
-      const meetsMinimum = width >= this.minResolution.width && 
-                          height >= this.minResolution.height &&
-                          totalPixels >= this.minResolution.totalPixels;
-      
-      if (!meetsMinimum) {
-        logger.debug(`❌ Resolution fail: ${width}x${height} (need ${this.minResolution.width}x${this.minResolution.height})`);
-      }
-      
-      return meetsMinimum;
-    });
+    // CHANGE: Don't pre-filter by SerpAPI dimensions (often inaccurate)
+    // Instead, let download process validate actual dimensions
     
-    logger.info(`📏 Resolution enforcement: ${compliantImages.length}/${images.length} images meet minimum standards`);
-    return compliantImages;
+    logger.info(`📏 Resolution enforcement: Will validate ${images.length} images after download`);
+    return images; // Pass all images to download for actual dimension checking
   }
   
   /**
@@ -583,10 +576,10 @@ class HighResImageFetcher {
       // Validate actual resolution after download
       const actualDimensions = await this.getActualImageDimensions(filepath);
       
-      // Check if actual resolution meets our standards
+      // Check if actual resolution meets our LENIENT standards
       if (actualDimensions.width < this.minResolution.width || actualDimensions.height < this.minResolution.height) {
         await fs.unlink(filepath); // Delete low-res image
-        throw new Error(`Resolution too low: ${actualDimensions.width}x${actualDimensions.height}`);
+        throw new Error(`Resolution too low: ${actualDimensions.width}x${actualDimensions.height} (need ${this.minResolution.width}x${this.minResolution.height})`);
       }
       
       return {
@@ -669,61 +662,93 @@ class HighResImageFetcher {
   }
   
   /**
-   * Fallback search with slightly relaxed requirements
+   * BROADER fallback search with minimal restrictions
    */
-  async fallbackHighResSearch(celebrityName, role, workDir) {
-    logger.info(`🔄 Attempting fallback high-res search...`);
-    
-    // Temporarily lower requirements
-    const originalMinRes = { ...this.minResolution };
-    this.minResolution.width = 600;
-    this.minResolution.height = 450;
-    this.minResolution.totalPixels = 270000;
+  async fallbackBroaderSearch(celebrityName, role, workDir) {
+    logger.info(`🔄 Attempting BROADER search with minimal restrictions...`);
     
     try {
-      // Try broader search terms
-      const fallbackQueries = [
-        `"${role.character}" "${role.title}" image HD`,
-        `"${celebrityName}" "${role.title}" photo`,
-        `"${role.title}" character images`
+      // Use simpler, broader search terms
+      const broadQueries = [
+        `"${role.character}" "${role.title}"`,
+        `"${celebrityName}" "${role.title}"`,
+        `"${role.title}" character`,
+        `"${role.character}" image`,
+        `"${celebrityName}" photo`
       ];
       
-      let fallbackImages = [];
+      let broadImages = [];
       
-      for (const query of fallbackQueries) {
-        const images = await this.searchHighResSerpAPI(query, 15);
-        const filtered = this.applyResolutionFiltering(images);
-        fallbackImages.push(...filtered);
+      for (const query of broadQueries) {
+        logger.info(`🔍 BROAD Search: "${query}"`);
         
-        if (fallbackImages.length >= 20) break;
+        // Use basic search parameters
+        const params = {
+          api_key: config.api.serpApiKey,
+          engine: 'google_images',
+          q: query,
+          num: 20,
+          safe: 'active',
+          imgtype: 'photo'
+          // Remove all size restrictions
+        };
+
+        try {
+          const response = await axios.get(config.api.serpEndpoint, { params });
+          
+          if (response.data?.images_results) {
+            const images = response.data.images_results.map((img, index) => ({
+              url: img.original || img.thumbnail,
+              thumbnail: img.thumbnail,
+              title: img.title || `Broad Search Image ${index + 1}`,
+              source: img.source || 'Unknown',
+              sourceUrl: img.link || '',
+              searchQuery: query,
+              width: img.original_width || 0,
+              height: img.original_height || 0
+            }));
+            
+            // Only filter out obvious watermarked sites
+            const basicFiltered = images.filter(img => {
+              const url = (img.sourceUrl || '').toLowerCase();
+              return !this.watermarkedDomains.some(domain => url.includes(domain));
+            });
+            
+            broadImages.push(...basicFiltered);
+            logger.info(`Found ${basicFiltered.length} images with broad search`);
+          }
+          
+          if (broadImages.length >= 30) break;
+          
+        } catch (error) {
+          logger.warn(`Broad search failed for "${query}": ${error.message}`);
+        }
       }
       
-      if (fallbackImages.length > 0) {
-        logger.info(`📸 Fallback found ${fallbackImages.length} images with relaxed requirements`);
+      if (broadImages.length > 0) {
+        logger.info(`📸 Broad search found ${broadImages.length} images total`);
         
+        // Remove duplicates
+        const uniqueImages = this.removeDuplicates(broadImages);
+        
+        // Download and let the download process filter by actual dimensions
         const downloaded = await this.downloadHighResImages(
-          fallbackImages.slice(0, 30),
+          uniqueImages.slice(0, 40),
           workDir,
           celebrityName,
           role
         );
         
-        // Restore original requirements
-        this.minResolution = originalMinRes;
-        
+        logger.info(`📥 Broad search downloaded ${downloaded.length} images`);
         return downloaded;
       }
       
-      // Restore original requirements
-      this.minResolution = originalMinRes;
-      
-      logger.warn(`❌ No images found even with fallback search`);
+      logger.warn(`❌ Even broad search found no suitable images`);
       return [];
       
     } catch (error) {
-      // Restore original requirements
-      this.minResolution = originalMinRes;
-      throw error;
+      logger.error(`Broad search failed: ${error.message}`);
+      return [];
     }
   }
   
