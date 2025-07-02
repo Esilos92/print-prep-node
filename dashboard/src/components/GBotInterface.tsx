@@ -119,7 +119,7 @@ export default function GBotInterface({
           </div>
           <div className="flex-1">
             <h3 className="font-cyber text-lg font-bold text-glow-blue">GBot.EXE</h3>
-            <p className="text-xs text-slate-400">AI Image Sourcing Assistant v2.1</p>
+            <p className="text-xs text-slate-400">AI Image Sourcing Assistant</p>
           </div>
           <motion.div 
             animate={{ rotate: currentJob?.status === 'running' ? 360 : 0 }}
@@ -149,7 +149,7 @@ export default function GBotInterface({
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400 font-mono text-xs">
-                {new Date().toISOString().split('T')[1].split('.')[0]}
+                {typeof window !== 'undefined' ? new Date().toISOString().split('T')[1].split('.')[0] : '--:--:--'}
               </span>
             </div>
             <div className={`p-3 rounded-lg border ${
