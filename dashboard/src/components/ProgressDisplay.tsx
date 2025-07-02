@@ -57,6 +57,18 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     return thresholds.findIndex(threshold => currentJob.progress <= threshold);
   };
 
+  const isPhaseActive = (phaseIndex: number) => {
+    if (!currentJob) return false;
+    const currentPhaseIndex = getCurrentPhaseIndex();
+    return phaseIndex <= currentPhaseIndex;
+  };
+
+  const isPhaseComplete = (phaseIndex: number) => {
+    if (!currentJob) return false;
+    const thresholds = [10, 25, 40, 70, 90, 100];
+    return currentJob.progress > thresholds[phaseIndex];
+  };
+
   const formatDuration = (startTime?: Date) => {
     if (!startTime) return '0s';
     const duration = Math.floor((Date.now() - startTime.getTime()) / 1000);
@@ -65,26 +77,70 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
   };
 
+  const PhaseItem = ({ phase, index }: { phase: any; index: number }) => {
+    const Icon = phase.icon;
+    const isActive = isPhaseActive(index);
+    const isComplete = isPhaseComplete(index);
+    const currentPhaseIndex = getCurrentPhaseIndex();
+    const isCurrent = currentPhaseIndex === index;
+
+    if (!isActive) return null; // Only show phases that are active
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.2 }}
+        className="flex items-center gap-3 mb-4"
+      >
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+          isComplete 
+            ? 'bg-green-500 border-green-400' 
+            : isCurrent 
+              ? 'bg-blue-500 border-blue-400' 
+              : 'bg-slate-700 border-slate-600'
+        }`}>
+          {isComplete ? (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.5, type: "spring" }}
+            >
+              <CheckCircle2 className="w-5 h-5 text-white" />
+            </motion.div>
+          ) : (
+            <Icon className={`w-4 h-4 ${
+              isCurrent ? 'text-white' : 'text-slate-400'
+            }`} />
+          )}
+        </div>
+        <span className={`text-sm font-ui ${
+          isComplete ? 'text-green-300' : isCurrent ? 'text-blue-300' : 'text-slate-400'
+        }`}>
+          {phase.name}
+        </span>
+      </motion.div>
+    );
+  };
+
   return (
     <div className="cyber-panel">
-      <div className="flex h-full">
+      <div className="p-6">
         
-        {/* Left Section - Header & Overall Progress */}
-        <div className="w-72 flex flex-col border-r border-blue-500/30">
-          {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-blue-500/30 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-blue-400" />
-              <h3 className="text-lg font-cyber font-bold text-glow-blue">
-                MISSION STATUS
-              </h3>
-            </div>
+        {/* ROW 1 - Header Section */}
+        <div className="mb-6">
+          {/* Mission Status Header */}
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-5 h-5 text-blue-400" />
+            <h3 className="text-lg font-cyber font-bold text-glow-blue">
+              MISSION STATUS
+            </h3>
           </div>
 
           {!currentJob ? (
             /* Idle State */
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-3">
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Search className="w-8 h-8 text-slate-600" />
               </div>
               <h4 className="text-sm font-cyber text-slate-400 mb-2">
@@ -95,169 +151,132 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               </p>
             </div>
           ) : (
-            /* Active Job - Overall Progress */
-            <div className="flex-1 p-4 flex flex-col justify-center">
-              <div className="text-center mb-4">
-                <h4 className="font-cyber text-lg text-glow-pink mb-2">
-                  {currentJob.celebrity}
-                </h4>
-                <span className="text-2xl font-cyber font-bold text-blue-400">
-                  {currentJob.progress}%
-                </span>
-              </div>
-              <div className="progress-bar mb-3 h-3">
-                <motion.div 
-                  className="progress-fill"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${currentJob.progress}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-              <p className="text-xs text-slate-400 font-ui text-center">
-                {currentJob.currentPhase}
-              </p>
-              {currentJob.startTime && (
-                <div className="flex items-center justify-center gap-2 text-xs text-slate-400 mt-2">
-                  <Clock className="w-3 h-3" />
-                  <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Right Section - Phase Breakdown & Stats */}
-        <div className="flex-1 flex flex-col">
-          {currentJob ? (
             <>
-              {/* Phase Breakdown */}
-              <div className="flex-1 p-4 overflow-y-auto">
-                <h5 className="font-cyber text-xs text-slate-300 mb-4 tracking-wide">
-                  MISSION PHASES
-                </h5>
-                <div className="grid grid-cols-6 gap-3">
-                  {phases.map((phase, index) => {
-                    const Icon = phase.icon;
-                    const phaseProgress = getPhaseProgress(index);
-                    const isActive = getCurrentPhaseIndex() === index;
-                    const isComplete = currentJob.progress > [10, 25, 40, 70, 90, 100][index];
-                    
-                    return (
-                      <motion.div 
-                        key={phase.name}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.2 }}
-                        className={`flex flex-col items-center gap-2 p-3 rounded-lg border ${
-                          isActive 
-                            ? 'bg-blue-900/30 border-blue-500' 
-                            : isComplete 
-                              ? 'bg-green-900/20 border-green-500/50'
-                              : 'bg-slate-800/30 border-slate-600'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                          isComplete 
-                            ? 'bg-green-500 border-green-400' 
-                            : isActive 
-                              ? 'bg-blue-500 border-blue-400' 
-                              : 'bg-slate-700 border-slate-600'
-                        }`}>
-                          {isComplete ? (
-                            <CheckCircle2 className="w-5 h-5 text-white" />
-                          ) : (
-                            <Icon className={`w-5 h-5 ${
-                              isActive ? 'text-white' : 'text-slate-400'
-                            }`} />
-                          )}
-                        </div>
-                        <div className="text-center">
-                          <p className={`text-xs font-ui font-medium text-center leading-tight ${
-                            isActive ? 'text-blue-300' : isComplete ? 'text-green-300' : 'text-slate-400'
-                          }`}>
-                            {phase.name}
-                          </p>
-                          <div className="w-full bg-slate-700 h-1 rounded-full mt-2">
-                            <motion.div 
-                              className={`h-full rounded-full ${
-                                isComplete 
-                                  ? 'bg-green-400' 
-                                  : 'bg-blue-400'
-                              }`}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${phaseProgress}%` }}
-                              transition={{ duration: 0.3 }}
-                            />
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Celebrity Name */}
+              <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
+                {currentJob.celebrity}
+              </h4>
 
-              {/* Stats Section */}
-              {(currentJob.roles || currentJob.imagesProcessed) && (
-                <div className="p-4 border-t border-slate-700 flex-shrink-0">
-                  <div className="flex gap-6">
-                    {/* Roles Found */}
-                    {currentJob.roles && (
-                      <div className="flex-1">
-                        <h6 className="text-xs font-cyber text-slate-400 mb-2 tracking-wide flex items-center gap-1">
-                          <Star className="w-3 h-3" />
-                          ROLES ({currentJob.roles.length})
-                        </h6>
-                        <div className="flex flex-wrap gap-1">
-                          {currentJob.roles.slice(0, 3).map((role, index) => (
-                            <motion.span
-                              key={role}
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: index * 0.1 }}
-                              className="text-xs bg-blue-900/30 text-blue-200 px-2 py-1 rounded border border-blue-500/30 font-ui"
-                            >
-                              {role}
-                            </motion.span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Image Stats */}
-                    {currentJob.imagesProcessed && (
-                      <div className="flex-1">
-                        <h6 className="text-xs font-cyber text-slate-400 mb-2 tracking-wide flex items-center gap-1">
-                          <Image className="w-3 h-3" />
-                          IMAGES
-                        </h6>
-                        <div className="flex gap-4">
-                          <div className="text-center">
-                            <div className="text-yellow-400 font-cyber text-sm font-bold">
-                              {currentJob.imagesProcessed}
-                            </div>
-                            <div className="text-xs text-slate-300 font-ui">Downloaded</div>
-                          </div>
-                          {currentJob.imagesValidated && (
-                            <div className="text-center">
-                              <div className="text-green-400 font-cyber text-sm font-bold">
-                                {currentJob.imagesValidated}
-                              </div>
-                              <div className="text-xs text-slate-300 font-ui">Validated</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              {/* Line Break */}
+              <br />
+
+              {/* Percentage Bar */}
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-2xl font-cyber font-bold text-blue-400">
+                    {currentJob.progress}%
+                  </span>
+                  {currentJob.startTime && (
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+                <div className="progress-bar h-4">
+                  <motion.div 
+                    className="progress-fill"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${currentJob.progress}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                <p className="text-xs text-slate-400 font-ui text-center mt-2">
+                  {currentJob.currentPhase}
+                </p>
+              </div>
             </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-500 font-ui text-sm">
-              Mission details will appear here when active
-            </div>
           )}
         </div>
+
+        {/* BENEATH THE ROW - Mission Phases in 3 Columns */}
+        {currentJob && (
+          <div className="border-t border-slate-700 pt-6">
+            <h5 className="font-cyber text-sm text-slate-300 mb-6 tracking-wide">
+              MISSION PHASES
+            </h5>
+            
+            <div className="grid grid-cols-3 gap-8">
+              
+              {/* Column 1 */}
+              <div>
+                <PhaseItem phase={phases[0]} index={0} />
+                {isPhaseActive(0) && <br />}
+                <PhaseItem phase={phases[1]} index={1} />
+              </div>
+
+              {/* Column 2 */}
+              <div>
+                <PhaseItem phase={phases[2]} index={2} />
+                {isPhaseActive(2) && <br />}
+                <PhaseItem phase={phases[3]} index={3} />
+              </div>
+
+              {/* Column 3 */}
+              <div>
+                <PhaseItem phase={phases[4]} index={4} />
+                {isPhaseActive(4) && <br />}
+                <PhaseItem phase={phases[5]} index={5} />
+              </div>
+            </div>
+
+            {/* Stats Section */}
+            {(currentJob.roles || currentJob.imagesProcessed) && (
+              <div className="mt-6 pt-4 border-t border-slate-700">
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Roles Found */}
+                  {currentJob.roles && (
+                    <div>
+                      <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-1">
+                        <Star className="w-3 h-3" />
+                        ROLES ({currentJob.roles.length})
+                      </h6>
+                      <div className="flex flex-wrap gap-2">
+                        {currentJob.roles.slice(0, 3).map((role, index) => (
+                          <motion.span
+                            key={role}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="text-xs bg-blue-900/30 text-blue-200 px-3 py-1 rounded border border-blue-500/30 font-ui"
+                          >
+                            {role}
+                          </motion.span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Image Stats */}
+                  {currentJob.imagesProcessed && (
+                    <div>
+                      <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-1">
+                        <Image className="w-3 h-3" />
+                        IMAGES
+                      </h6>
+                      <div className="flex gap-6">
+                        <div className="text-center">
+                          <div className="text-yellow-400 font-cyber text-lg font-bold">
+                            {currentJob.imagesProcessed}
+                          </div>
+                          <div className="text-xs text-slate-300 font-ui">Downloaded</div>
+                        </div>
+                        {currentJob.imagesValidated && (
+                          <div className="text-center">
+                            <div className="text-green-400 font-cyber text-lg font-bold">
+                              {currentJob.imagesValidated}
+                            </div>
+                            <div className="text-xs text-slate-300 font-ui">Validated</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
