@@ -246,7 +246,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                 <PhaseItem phase={phases[5]} index={5} />
               </div>
             </div>
-          </div> 
+          </div>
         )}
       </div>
     </div>
