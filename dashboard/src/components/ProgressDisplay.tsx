@@ -142,51 +142,81 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               </p>
             </div>
           ) : (
-            <>
-              {/* Celebrity Name */}
-              <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
-                {currentJob.celebrity}
-              </h4>
+            <div style={{ display: 'flex', flexDirection: 'row', gap: '32px' }}>
+              
+              {/* Column 1 - Celebrity Info & Progress */}
+              <div style={{ flex: 1 }}>
+                {/* Celebrity Name */}
+                <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
+                  {currentJob.celebrity}
+                </h4>
 
-              {/* Roles beneath celebrity name */}
-              {currentJob.roles && (
-                <div className="text-center mb-4">
-                  <span className="text-sm text-blue-200 font-ui">
-                    {currentJob.roles.slice(0, 3).join(', ')}
-                  </span>
+                {/* Roles beneath celebrity name */}
+                {currentJob.roles && (
+                  <div className="text-center mb-4">
+                    <span className="text-sm text-blue-200 font-ui">
+                      {currentJob.roles.slice(0, 3).join(', ')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Percentage Bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-2xl font-cyber font-bold text-blue-400">
+                      {currentJob.progress}%
+                    </span>
+                    {currentJob.startTime && (
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Clock className="w-3 h-3" />
+                        <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="progress-bar h-4">
+                    <motion.div 
+                      className="progress-fill"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${currentJob.progress}%` }}
+                      transition={{ duration: 0.5 }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400 font-ui text-center mt-2">
+                    {currentJob.currentPhase}
+                  </p>
+                </div>
+              </div>
+
+              {/* Column 2 - Image Stats */}
+              {currentJob.imagesProcessed && (
+                <div style={{ flex: 1 }}>
+                  <h6 className="text-sm font-cyber text-slate-400 mb-4 tracking-wide flex items-center gap-1">
+                    <Image className="w-4 h-4" />
+                    IMAGES
+                  </h6>
+                  <div className="flex gap-8">
+                    <div className="text-center">
+                      <div className="text-yellow-400 font-cyber text-2xl font-bold">
+                        {currentJob.imagesProcessed}
+                      </div>
+                      <div className="text-sm text-slate-300 font-ui">Downloaded</div>
+                    </div>
+                    {currentJob.imagesValidated && (
+                      <div className="text-center">
+                        <div className="text-green-400 font-cyber text-2xl font-bold">
+                          {currentJob.imagesValidated}
+                        </div>
+                        <div className="text-sm text-slate-300 font-ui">Validated</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-
-              {/* Line Break */}
-              <br />
-
-              {/* Percentage Bar */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-2xl font-cyber font-bold text-blue-400">
-                    {currentJob.progress}%
-                  </span>
-                  {currentJob.startTime && (
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <Clock className="w-3 h-3" />
-                      <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="progress-bar h-4">
-                  <motion.div 
-                    className="progress-fill"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${currentJob.progress}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400 font-ui text-center mt-2">
-                  {currentJob.currentPhase}
-                </p>
-              </div>
-            </>
+            </div>
           )}
+
+          {/* Line Break between progress bar and mission phases */}
+          {currentJob && <br />}
         </div>
 
         {/* BENEATH THE ROW - Mission Phases in 3 Columns */}
@@ -219,37 +249,6 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                 <PhaseItem phase={phases[5]} index={5} />
               </div>
             </div>
-
-            {/* Stats Section */}
-            {currentJob.imagesProcessed && (
-              <div className="mt-6 pt-4 border-t border-slate-700">
-                <div className="grid grid-cols-1 gap-6">
-                  {/* Image Stats Only */}
-                  <div>
-                    <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-1">
-                      <Image className="w-3 h-3" />
-                      IMAGES
-                    </h6>
-                    <div className="flex gap-6">
-                      <div className="text-center">
-                        <div className="text-yellow-400 font-cyber text-lg font-bold">
-                          {currentJob.imagesProcessed}
-                        </div>
-                        <div className="text-xs text-slate-300 font-ui">Downloaded</div>
-                      </div>
-                      {currentJob.imagesValidated && (
-                        <div className="text-center">
-                          <div className="text-green-400 font-cyber text-lg font-bold">
-                            {currentJob.imagesValidated}
-                          </div>
-                          <div className="text-xs text-slate-300 font-ui">Validated</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
