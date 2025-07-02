@@ -147,7 +147,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               <div style={{ display: 'flex', flexDirection: 'row', gap: '32px' }}>
                 
                 {/* Column 1 - Celebrity Info */}
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
                   {/* Celebrity Name */}
                   <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
                     {currentJob.celebrity}
@@ -165,11 +165,12 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
                 {/* Column 2 - Image Stats */}
                 {currentJob.imagesProcessed && (
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, paddingLeft: '16px' }}>
                     <h6 className="text-sm font-cyber text-slate-400 mb-4 tracking-wide flex items-center gap-1">
                       <Image className="w-4 h-4" />
                       IMAGES
                     </h6>
+                    <br />
                     <div className="flex gap-8">
                       <div className="text-center">
                         <div className="text-yellow-400 font-cyber text-2xl font-bold">
@@ -186,6 +187,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                         </div>
                       )}
                     </div>
+                    <br />
                   </div>
                 )}
               </div>
@@ -234,21 +236,18 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               {/* Column 1 - 33.33% */}
               <div style={{ width: '33.33%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
                 <PhaseItem phase={phases[0]} index={0} />
-                {isPhaseActive(0) && <br />}
                 <PhaseItem phase={phases[1]} index={1} />
               </div>
 
               {/* Column 2 - 33.33% */}
               <div style={{ width: '33.33%', paddingLeft: '16px', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
                 <PhaseItem phase={phases[2]} index={2} />
-                {isPhaseActive(2) && <br />}
                 <PhaseItem phase={phases[3]} index={3} />
               </div>
 
               {/* Column 3 - 33.33% */}
               <div style={{ width: '33.33%', paddingLeft: '16px' }}>
                 <PhaseItem phase={phases[4]} index={4} />
-                {isPhaseActive(4) && <br />}
                 <PhaseItem phase={phases[5]} index={5} />
               </div>
             </div>
