@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Bot, Send, Zap, Terminal, Cpu } from 'lucide-react';
+import { Bot, Send, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface JobStatus {
@@ -72,30 +72,17 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
-      {/* Horizontal Layout - Split into sections */}
-      <div className="flex h-full">
+      {/* NO HEADER - Start directly with content split */}
+      <div className="flex h-full p-3">
         
-        {/* Left Section - Terminal Header & Avatar */}
-        <div className="w-72 flex flex-col border-r border-blue-500/30">
-          {/* Terminal Header */}
-          <div className="bg-gradient-to-r from-blue-900/80 to-blue-800/80 px-4 py-2 border-b border-blue-500/30 flex-shrink-0">
+        {/* LEFT SIDE - GBot Info & Controls */}
+        <div className="w-1/2 pr-3 border-r border-blue-500/30 flex flex-col space-y-4">
+          
+          {/* GBot Info Section */}
+          <div className="bg-slate-900/50 rounded-lg p-4">
             <div className="flex items-center gap-3">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-blue-300" />
-              </div>
-            </div>
-          </div>
-
-          {/* GBot Avatar & Status */}
-          <div className="flex-1 flex items-center justify-center p-4 bg-slate-900/50">
-            <div className="flex flex-col items-center gap-3">
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                   <Bot className="w-8 h-8 text-white" />
                 </div>
                 <motion.div 
@@ -104,117 +91,38 @@ export default function GBotInterface({
                   transition={{ repeat: Infinity, duration: 2 }}
                 />
               </div>
-              <div className="text-center">
-                <h3 className="font-cyber text-lg font-bold text-glow-blue">GBot.EXE</h3>
-                <p className="text-xs text-slate-400">AI Image Sourcing Assistant</p>
+              <div>
+                <h3 className="font-cyber text-xl font-bold text-glow-blue">GBot.EXE</h3>
+                <p className="text-sm text-slate-400">AI Image Sourcing Assistant</p>
               </div>
-              <motion.div 
-                animate={{ rotate: currentJob?.status === 'running' ? 360 : 0 }}
-                transition={{ repeat: currentJob?.status === 'running' ? Infinity : 0, duration: 2 }}
-              >
-                <Zap className="w-5 h-5 text-yellow-400" />
-              </motion.div>
-              {currentJob?.status === 'running' && (
-                <div className="text-center mt-2">
-                  <div className="text-sm font-cyber text-yellow-400 mb-1">PROCESSING</div>
-                  <div className="text-xs text-slate-400 font-ui">{currentJob.celebrity}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Section - Messages & Input */}
-        <div className="flex-1 flex flex-col">
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-3 bg-slate-950/80">
-            <div className="space-y-2">
-              {messages.slice(-4).map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-1"
-                >
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={`font-cyber px-2 py-1 rounded text-xs ${
-                      message.isBot 
-                        ? 'bg-blue-900/50 text-blue-300' 
-                        : 'bg-pink-900/50 text-pink-300'
-                    }`}>
-                      {message.timestamp}
-                    </span>
-                  </div>
-                  <div className={`p-2 rounded-lg border text-sm ${
-                    message.isBot 
-                      ? 'bg-blue-900/20 text-blue-100 border-blue-500/30' 
-                      : 'bg-pink-900/20 text-pink-100 border-pink-500/30'
-                  }`}>
-                    <p className="font-ui leading-relaxed">{message.text}</p>
-                  </div>
-                </motion.div>
-              ))}
-              
-              {isTyping && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="space-y-1"
-                >
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="font-cyber px-2 py-1 rounded text-xs bg-blue-900/50 text-blue-300">
-                      GBot.EXE
-                    </span>
-                  </div>
-                  <div className="bg-blue-900/20 text-blue-100 border border-blue-500/30 p-2 rounded-lg">
-                    <div className="flex space-x-1">
-                      <motion.div 
-                        className="w-2 h-2 bg-blue-400 rounded-full"
-                        animate={{ scale: [1, 1.5, 1] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
-                      />
-                      <motion.div 
-                        className="w-2 h-2 bg-blue-400 rounded-full"
-                        animate={{ scale: [1, 1.5, 1] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
-                      />
-                      <motion.div 
-                        className="w-2 h-2 bg-blue-400 rounded-full"
-                        animate={{ scale: [1, 1.5, 1] }}
-                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
-                      />
-                    </div>
-                  </div>
-                </motion.div>
-              )}
             </div>
           </div>
 
-          {/* Terminal Input */}
-          <div className="p-4 bg-slate-900/80 border-t border-blue-500/30 flex-shrink-0 mt-auto">
+          {/* Subject Input Section */}
+          <div className="flex-1 bg-slate-900/30 rounded-lg p-4 flex flex-col justify-center">
+            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex gap-2">
-                <div className="flex items-center gap-2 text-xs text-slate-400 font-cyber">
-                  <span className="text-green-400">TARGET@NetOp:</span>
-                  <span className="text-blue-400">~$</span>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <span className="text-xs text-green-400 font-cyber">SUBJECT@NetOp:</span>
+                  <input
+                    type="text"
+                    value={celebrityName}
+                    onChange={(e) => setCelebrityName(e.target.value)}
+                    placeholder="input celebrity subject name..."
+                    className="cyber-input flex-1 text-sm py-2 px-3"
+                    disabled={currentJob?.status === 'running'}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!celebrityName.trim() || currentJob?.status === 'running'}
+                    className={`cyber-button px-4 py-2 text-sm ${
+                      currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  value={celebrityName}
-                  onChange={(e) => setCelebrityName(e.target.value)}
-                  placeholder="input celebrity target name..."
-                  className="cyber-input flex-1 text-sm py-1 px-3"
-                  disabled={currentJob?.status === 'running'}
-                />
-                <button
-                  type="submit"
-                  disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button px-3 py-1 text-sm ${
-                    currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  <Send className="w-4 h-4" />
-                </button>
               </div>
               
               {currentJob?.status === 'running' && (
@@ -229,8 +137,106 @@ export default function GBotInterface({
               )}
             </form>
           </div>
+
+          {/* System Status Section */}
+          <div className="bg-slate-900/30 rounded-lg p-4">
+            <h4 className="text-sm font-cyber text-slate-300 mb-2 tracking-wide">SYSTEM STATUS</h4>
+            <div className="p-3 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
+              <p className="text-sm font-ui leading-relaxed">
+                GBot.EXE online! Ready to execute celebrity image sourcing missions.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT SIDE - Processing & Communication */}
+        <div className="w-1/2 pl-3 flex flex-col space-y-4">
+          
+          {/* Processing Status */}
+          {currentJob?.status === 'running' && (
+            <div className="bg-slate-800/40 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  <Zap className="w-5 h-5 text-yellow-400" />
+                </motion.div>
+                <span className="font-cyber text-lg text-yellow-400">PROCESSING</span>
+              </div>
+              <div className="text-blue-300 font-cyber text-lg">{currentJob.celebrity}</div>
+              <div className="text-sm text-slate-400">{currentJob.currentPhase}</div>
+            </div>
+          )}
+
+          {/* Communication Log */}
+          <div className="flex-1 bg-slate-950/80 rounded-lg p-4">
+            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">COMMUNICATION LOG</h4>
+            <div className="bg-slate-900/50 rounded-lg border border-slate-700 p-3 h-full overflow-y-auto">
+              <div className="space-y-3">
+                {messages.slice(-3).map((message) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-1"
+                  >
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className={`font-cyber px-2 py-1 rounded text-xs ${
+                        message.isBot 
+                          ? 'bg-blue-900/50 text-blue-300' 
+                          : 'bg-pink-900/50 text-pink-300'
+                      }`}>
+                        {message.timestamp}
+                      </span>
+                    </div>
+                    <div className={`p-3 rounded border text-sm ${
+                      message.isBot 
+                        ? 'bg-blue-900/20 text-blue-100 border-blue-500/30' 
+                        : 'bg-pink-900/20 text-pink-100 border-pink-500/30'
+                    }`}>
+                      <p className="font-ui leading-relaxed">{message.text}</p>
+                    </div>
+                  </motion.div>
+                ))}
+                
+                {isTyping && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-1"
+                  >
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-cyber px-2 py-1 rounded text-xs bg-blue-900/50 text-blue-300">
+                        GBot.EXE
+                      </span>
+                    </div>
+                    <div className="bg-blue-900/20 text-blue-100 border border-blue-500/30 p-3 rounded">
+                      <div className="flex space-x-1">
+                        <motion.div 
+                          className="w-2 h-2 bg-blue-400 rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
+                        />
+                        <motion.div 
+                          className="w-2 h-2 bg-blue-400 rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                        />
+                        <motion.div 
+                          className="w-2 h-2 bg-blue-400 rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
-} 
+}
