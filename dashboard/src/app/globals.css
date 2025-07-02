@@ -59,7 +59,7 @@ body {
   100% { transform: translate(50px, 50px); }
 }
 
-/* Terminal/Panel Styling */
+/* Enhanced Terminal/Panel Styling with structure */
 .cyber-panel {
   background: linear-gradient(145deg, var(--bg-panel), var(--bg-card));
   border: 2px solid var(--border-glow);
@@ -67,6 +67,10 @@ body {
   box-shadow: var(--shadow-blue);
   position: relative;
   overflow: hidden;
+  height: 650px;
+  width: 400px;
+  padding: 0;
+  margin: 0 auto;
 }
 
 .cyber-panel::before {
@@ -85,7 +89,7 @@ body {
   100% { left: 100%; }
 }
 
-/* Button Styling */
+/* Refined button spacing */
 .cyber-button {
   background: linear-gradient(145deg, var(--primary-blue), #0052a3);
   border: 2px solid var(--neon-blue);
@@ -95,11 +99,15 @@ body {
   text-transform: uppercase;
   letter-spacing: 1px;
   border-radius: 8px;
-  padding: 12px 24px;
+  padding: 8px 16px;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
 }
 
 .cyber-button:hover {
@@ -120,6 +128,33 @@ body {
 .cyber-button.pink:hover {
   background: linear-gradient(145deg, #dc1475, var(--accent-pink));
   box-shadow: var(--shadow-pink);
+}
+
+/* Compact download button */
+.download-button {
+  background: linear-gradient(145deg, var(--accent-pink), #dc1475);
+  border: 1px solid var(--neon-pink);
+  color: white;
+  font-family: 'Orbitron', monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.download-button:hover {
+  background: linear-gradient(145deg, #dc1475, var(--accent-pink));
+  box-shadow: var(--shadow-pink);
+  transform: translateY(-1px);
 }
 
 /* Input Styling */
@@ -188,6 +223,63 @@ body {
 .text-glow-pink {
   color: var(--neon-pink);
   text-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+}
+
+/* Structured content areas */
+.panel-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.2);
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.panel-body {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.panel-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(37, 99, 235, 0.2);
+  background: rgba(15, 23, 42, 0.3);
+}
+
+/* Structured job card layout */
+.job-card {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+}
+
+.job-card:hover {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.job-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.job-actions {
+  flex-shrink: 0;
 }
 
 /* Utility Classes */
