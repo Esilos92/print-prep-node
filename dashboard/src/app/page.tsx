@@ -108,22 +108,23 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      <div className="container mx-auto px-8 py-12 relative z-10 max-w-[1400px]">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-cyber font-bold text-glow-blue mb-2">
-            CELEBRITY IMAGE SOURCING SYSTEM
-          </h1>
-          <p className="text-xl text-slate-400 font-ui">
-            Powered by GBot.EXE AI Assistant
-          </p>
-        </motion.div>
+      <div className="flex flex-col items-center justify-center min-h-screen px-8 py-12 relative z-10">
+  {/* Header */}
+  <motion.div 
+    initial={{ opacity: 0, y: -20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="text-center mb-12"
+  >
+    <h1 className="text-4xl font-cyber font-bold text-glow-blue mb-2">
+      CELEBRITY IMAGE SOURCING SYSTEM
+    </h1>
+    <p className="text-xl text-slate-400 font-ui">
+      Powered by GBot.EXE AI Assistant
+    </p>
+  </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full justify-center">
+  <div className="w-full max-w-[1200px] mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - GBot Interface */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
