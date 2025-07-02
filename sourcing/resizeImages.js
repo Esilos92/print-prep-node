@@ -7,7 +7,7 @@ const { sanitizeFilename, generateFilename } = require('../utils/helpers');
 class ImageResizer {
   
   /**
-   * Resize images to print formats
+   * FIXED: Resize images with continuous numbering across all roles
    */
   static async resizeImages(validatedImages, workDir, celebrityName) {
     try {
@@ -17,29 +17,28 @@ class ImageResizer {
       const outputDir = path.join(workDir, 'resized');
       await fs.mkdir(outputDir, { recursive: true });
       
-      // Group images by role for proper numbering
-      const imagesByRole = this.groupImagesByRole(validatedImages);
+      // FIXED: Use continuous counter instead of grouping by role
+      let globalCounter = 1; // Start at 1 and keep incrementing
       
-      for (const [roleName, roleImages] of Object.entries(imagesByRole)) {
-        for (let i = 0; i < roleImages.length; i++) {
-          const image = roleImages[i];
+      for (const image of validatedImages) {
+        // Add missing data for filename generation
+        image.celebrityName = celebrityName;
+        image.cleanRoleName = this.extractCleanRoleName(image);
+        image.globalIndex = globalCounter; // Use global counter instead of role-specific
+        
+        try {
+          const resizeResults = await this.resizeImageToFormats(image, outputDir);
+          resizedImages.push(...resizeResults);
           
-          // Add missing data for filename generation
-          image.celebrityName = celebrityName;
-          image.cleanRoleName = roleName; // Use clean role name
-          image.indexInRole = i + 1; // Sequential numbering per role
+          globalCounter++; // Increment for next image regardless of role
           
-          try {
-            const resizeResults = await this.resizeImageToFormats(image, outputDir);
-            resizedImages.push(...resizeResults);
-            
-          } catch (error) {
-            logger.warn(`Error resizing ${image.filename}:`, error.message);
-          }
+        } catch (error) {
+          logger.warn(`Error resizing ${image.filename}:`, error.message);
+          globalCounter++; // Still increment counter even on error
         }
       }
       
-      logger.info(`Resizing complete: ${resizedImages.length} output files`);
+      logger.info(`Resizing complete: ${resizedImages.length} output files with continuous numbering`);
       return resizedImages;
       
     } catch (error) {
@@ -49,26 +48,11 @@ class ImageResizer {
   }
   
   /**
-   * NEW: Group images by clean role name for proper numbering
+   * REMOVED: No longer group by role - we want continuous numbering
    */
-  static groupImagesByRole(images) {
-    const groups = {};
-    
-    for (const image of images) {
-      // Get clean role name from the image's role data
-      const roleName = this.extractCleanRoleName(image);
-      
-      if (!groups[roleName]) {
-        groups[roleName] = [];
-      }
-      groups[roleName].push(image);
-    }
-    
-    return groups;
-  }
   
   /**
-   * NEW: Extract clean role name from image data
+   * Extract clean role name from image data
    */
   static extractCleanRoleName(image) {
     // Priority order for finding the clean role name
@@ -96,7 +80,7 @@ class ImageResizer {
   }
   
   /**
-   * NEW: Check if a title looks like a messy source title
+   * Check if a title looks like a messy source title
    */
   static isMessySourceTitle(title) {
     if (!title) return true;
@@ -111,7 +95,7 @@ class ImageResizer {
   }
   
   /**
-   * NEW: Extract show name from AI-generated filename patterns
+   * Extract show name from AI-generated filename patterns
    */
   static extractShowFromFilename(filename) {
     // AI-generated filenames often have patterns like:
@@ -175,7 +159,7 @@ class ImageResizer {
   }
   
   /**
-   * FIXED: Resize image to specific print format with clean naming
+   * FIXED: Resize image to specific print format with continuous numbering
    */
   static async resizeToFormat(image, format, outputDir) {
     const dimensions = this.getPrintDimensions(format);
@@ -184,13 +168,13 @@ class ImageResizer {
     const cleanRoleName = image.cleanRoleName || 'Unknown';
     
     // DEBUG: Log what we're using (but cleaner message)
-    console.log(`🔧 Generating clean filename: ${image.indexInRole} - ${image.celebrityName} - ${cleanRoleName} - ${format}`);
+    console.log(`🔧 Generating clean filename: ${image.globalIndex} - ${image.celebrityName} - ${cleanRoleName} - ${format}`);
     
-    // Generate clean filename: 01 - Jackson Rathbone - Twilight - 8x10.jpg
+    // FIXED: Generate clean filename with GLOBAL counter: 01 - Jackson Rathbone - Twilight - 8x10.jpg
     const outputFilename = generateFilename(
       image.celebrityName || 'Unknown',
       cleanRoleName,
-      image.indexInRole || 1,
+      image.globalIndex || 1, // Use globalIndex instead of indexInRole
       format
     );
     const outputPath = path.join(outputDir, outputFilename);
