@@ -156,10 +156,11 @@ export default function GBotInterface({
           {currentJob?.status === 'running' && (
             <>
               <div>
-              <div className="flex items-center gap-3">
-                <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
-              </div>
-              <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
+                <div className="flex items-center gap-4 mb-2">
+                  <Zap className="w-6 h-6 text-blue-400" />
+                  <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
+                </div>
+                <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
               </div>
               
               {/* LINE BREAK */}
