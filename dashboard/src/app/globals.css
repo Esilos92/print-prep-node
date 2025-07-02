@@ -68,9 +68,11 @@ body {
   position: relative;
   overflow: hidden;
   height: 650px;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
   padding: 0;
 }
-
 .cyber-panel::before {
   content: '';
   position: absolute;
