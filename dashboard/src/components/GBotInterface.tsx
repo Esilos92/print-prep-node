@@ -71,46 +71,37 @@ export default function GBotInterface({
   };
 
   return (
-    <div className="cyber-panel relative">
-      {/* Rotating Animation Around Entire Container */}
-      <motion.div 
-        className="absolute inset-0 pointer-events-none"
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-      >
-        <div className="absolute top-2 left-1/2 transform -translate-x-1/2">
-          <Zap className="w-4 h-4 text-yellow-400" />
-        </div>
-      </motion.div>
-
-      <div className="flex h-full">
+    <div className="cyber-panel">
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '12px' }}>
         
-        {/* LEFT SIDE - 50% */}
-        <div className="w-1/2 p-6 border-r border-blue-500/30 flex flex-col">
+        {/* LEFT SIDE - Exactly 50% */}
+        <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
           {/* Robot Emoji + GBot.EXE + AI Image Sourcing Assistant */}
-          <div className="flex items-center gap-4 mb-8">
-            <div className="relative">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                <Bot className="w-8 h-8 text-white" />
+          <div className="bg-slate-900/50 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Bot className="w-8 h-8 text-white" />
+                </div>
+                <motion.div 
+                  className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                />
               </div>
-              <motion.div 
-                className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-              />
-            </div>
-            <div>
-              <h3 className="font-cyber text-2xl font-bold text-glow-blue">GBot.EXE</h3>
-              <p className="text-base text-slate-400">AI Image Sourcing Assistant</p>
+              <div>
+                <h3 className="font-cyber text-2xl font-bold text-glow-blue">GBot.EXE</h3>
+                <p className="text-base text-slate-400">AI Image Sourcing Assistant</p>
+              </div>
             </div>
           </div>
 
           {/* Intentional Space */}
-          <div className="mb-8"></div>
+          <div className="mb-6"></div>
 
           {/* System Status */}
-          <div className="mb-8">
+          <div className="bg-slate-900/30 rounded-lg p-4 mb-6">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SYSTEM STATUS</h4>
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
               <p className="text-base font-ui leading-relaxed">
@@ -120,15 +111,15 @@ export default function GBotInterface({
           </div>
 
           {/* Intentional Space */}
-          <div className="mb-8"></div>
+          <div className="mb-6"></div>
 
           {/* Intentional Space */}
-          <div className="mb-8"></div>
+          <div className="mb-6"></div>
 
-          {/* SUBJECT INPUT - At bottom */}
-          <div className="mt-auto">
+          {/* Subject Input - Push to bottom */}
+          <div className="bg-slate-900/30 rounded-lg p-4 mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div className="flex gap-3 items-center">
                 <input
                   type="text"
@@ -146,7 +137,7 @@ export default function GBotInterface({
                   }`}
                 >
                   <Send className="w-5 h-5 mr-2" />
-                  EXECUTE
+                  Execute
                 </button>
               </div>
               
@@ -164,13 +155,13 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT SIDE - 50% */}
-        <div className="w-1/2 p-6 flex flex-col">
+        {/* RIGHT SIDE - Exactly 50% */}
+        <div style={{ width: '50%', paddingLeft: '16px' }} className="flex flex-col">
           
           {/* Processing (only when running) */}
           {currentJob?.status === 'running' && (
             <>
-              <div className="mb-4">
+              <div className="bg-slate-800/40 rounded-lg p-4 mb-4">
                 <div className="flex items-center gap-4 mb-2">
                   <motion.div 
                     animate={{ rotate: 360 }}
@@ -184,27 +175,27 @@ export default function GBotInterface({
               </div>
               
               {/* Intentional Space */}
-              <div className="mb-8"></div>
+              <div className="mb-6"></div>
             </>
           )}
 
-          {/* Communication Log */}
-          <div className="flex-1 flex flex-col">
+          {/* Communication Log - Takes remaining space */}
+          <div className="flex-1 bg-slate-950/80 rounded-lg p-4">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
-            {/* Embedded Terminal Chat Box */}
-            <div className="bg-black/80 rounded-lg border-2 border-slate-600 flex-1 flex flex-col overflow-hidden">
+            {/* All GBot.EXE communications - Embedded terminal chat box */}
+            <div className="bg-black/80 rounded-lg border-2 border-slate-600 h-full flex flex-col overflow-hidden">
               
-              {/* Terminal Header */}
-              <div className="bg-slate-700 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
+              {/* Terminal Header Bar */}
+              <div className="bg-slate-700 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
                 <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
               </div>
               
-              {/* Scrollable Chat Messages */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-black/90 min-h-0">
+              {/* Chat Messages Area - Scrollable */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-black/90">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
