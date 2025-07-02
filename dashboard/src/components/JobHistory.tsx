@@ -73,26 +73,44 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         {/* LEFT COLUMN - 35% */}
         <div style={{ width: '35%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
           
-          {/* Mission Archive Header + Completed Count on same line */}
-          <div className="flex items-center justify-between">
+          {/* Mission Archive Header with Icon */}
+          <div className="flex items-center gap-3">
+            <FileArchive className="w-6 h-6 text-blue-400" />
             <span className="font-cyber text-xl text-glow-blue">MISSION ARCHIVE</span>
-            <span className="font-cyber text-2xl text-blue-300">{completedCount}</span>
+          </div>
+          
+          {/* Completed Count underneath */}
+          <div className="font-cyber text-lg text-blue-300 mt-2">
+            Completed - {completedCount}
           </div>
           
           <br />
           
-          {/* Last Subject Section */}
+          {/* Last Subject Section - matching System Status style */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <User className="w-4 h-4 text-blue-300" />
-              <span className="text-sm font-ui text-slate-400">LAST SUBJECT</span>
-            </div>
-            <div className="font-cyber text-lg text-glow-pink">
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">LAST SUBJECT</h4>
+            <div className="font-cyber text-xl text-glow-pink">
               {lastJob ? lastJob.celebrity : 'None'}
             </div>
-            <div className={`text-sm font-ui ${getStatusColor(lastJob?.status || 'idle')}`}>
+            <div className={`text-sm font-ui mt-1 ${getStatusColor(lastJob?.status || 'idle')}`}>
               {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
             </div>
+            
+            {/* Roles and Images for last subject */}
+            {lastJob && (
+              <div className="mt-3 space-y-2">
+                {lastJob.roles && (
+                  <div className="text-sm font-ui text-slate-300">
+                    <span className="text-slate-400">Roles:</span> {lastJob.roles.join(', ')}
+                  </div>
+                )}
+                {(lastJob.imagesProcessed || lastJob.imagesValidated) && (
+                  <div className="text-sm font-ui text-slate-300">
+                    <span className="text-slate-400">Images:</span> {lastJob.imagesValidated || 0} Validated / {lastJob.imagesProcessed || 0} Downloaded
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <br />
