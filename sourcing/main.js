@@ -31,6 +31,42 @@ class CelebrityRoleOrchestrator {
         throw new Error(`No roles found for ${celebrityName}`);
       }
 
+      // ➕ ADDED: Step 1.25: Verify character names are accurate
+      console.log(`🔍 Verifying character names are accurate...`);
+      if (this.roleFetcher.hasOpenAI) {
+        const roleVerificationPrompt = `Verify the exact character names for ${celebrityName} in these roles:
+${roles.map(r => `"${r.title}" - claimed character: "${r.character}"`).join('\n')}
+
+For each, respond with: TITLE|CORRECT_CHARACTER_NAME|HIGH
+Only respond if you're certain of the character name. If uncertain, respond: TITLE|VERIFY_NEEDED|LOW`;
+
+        try {
+          const verification = await this.roleFetcher.openai.chat.completions.create({
+            model: "gpt-4o", 
+            messages: [{ role: "user", content: roleVerificationPrompt }],
+            temperature: 0.1,
+            max_tokens: 300
+          });
+
+          // Parse and fix character names
+          const corrections = verification.choices[0].message.content.split('\n');
+          corrections.forEach(line => {
+            if (line.includes('|')) {
+              const [title, character, confidence] = line.split('|').map(s => s.trim());
+              if (confidence === 'HIGH' && character !== 'VERIFY_NEEDED') {
+                const role = roles.find(r => r.title && r.title.toLowerCase().includes(title.toLowerCase()));
+                if (role && role.character !== character) {
+                  console.log(`🔧 Fixed character name: "${role.character}" → "${character}" in ${role.title}`);
+                  role.character = character;
+                }
+              }
+            }
+          });
+        } catch (error) {
+          console.warn(`⚠️ Character name verification failed: ${error.message}`);
+        }
+      }
+
       // ➕ ADDED: Step 1.5: Verify roles are real (eliminates fake roles)
       console.log(`🔍 Verifying ${roles.length} discovered roles are real...`);
       const verifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, roles);
