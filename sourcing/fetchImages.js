@@ -37,14 +37,14 @@ class AIFirstImageFetcher {
       const fetcher = new AIFirstImageFetcher();
       const maxImages = config.image.maxImagesPerRole || 50;
       
-      // Generate CLEAN, SIMPLE search queries (like manual search)
-      const searchQueries = fetcher.generateCleanSearchQueries(celebrityName, role);
+      // 🎯 FIXED: Use smart search terms correctly
+      const searchQueries = fetcher.generateOptimalSearchQueries(celebrityName, role);
       let allImages = [];
       
       // Execute searches with NO filtering - get everything
       for (const query of searchQueries) {
         try {
-          logger.info(`🔍 CLEAN Search: "${query}"`);
+          logger.info(`🔍 SMART Search: "${query}"`);
           const images = await fetcher.searchEverything(query, 35);
           const minimalFiltered = fetcher.applyMinimalFiltering(images); // Only block obvious watermarks
           allImages.push(...minimalFiltered);
@@ -112,23 +112,31 @@ class AIFirstImageFetcher {
   }
   
   /**
-   * Generate CLEAN search queries - exactly like your manual searches
+   * 🎯 FIXED: Generate OPTIMAL search queries using smart search integration
    */
-  generateCleanSearchQueries(celebrityName, role) {
+  generateOptimalSearchQueries(celebrityName, role) {
     // DEBUG: Log what we're getting
     logger.info(`🔧 DEBUG role.finalSearchTerms:`, role.finalSearchTerms);
-    logger.info(`🔧 DEBUG role keys:`, Object.keys(role));
+    logger.info(`🔧 DEBUG role.isMultiActorCharacter:`, role.isMultiActorCharacter);
+    logger.info(`🔧 DEBUG role.smartSearchApproach:`, role.smartSearchApproach);
     
-    // Use optimized terms if available, otherwise generate clean ones
+    // 🎯 CRITICAL FIX: Use smart search terms WITHOUT cleaning quotes
     if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
-      logger.info(`✅ Using smart search terms: ${role.finalSearchTerms.slice(0, 2).join(', ')}...`);
-      // Clean any existing terms of exclusions
-      return role.finalSearchTerms.map(term => this.cleanSearchTerm(term));
+      logger.info(`✅ Using SMART search terms: ${role.finalSearchTerms.slice(0, 2).join(', ')}...`);
+      
+      // 🔥 KEY FIX: Don't clean the smart terms - preserve quotes for precision
+      if (role.isMultiActorCharacter) {
+        logger.info(`🎭 Multi-actor precision mode: preserving exact quote structure`);
+        return role.finalSearchTerms; // Use them exactly as generated
+      } else {
+        // For single-actor characters, can clean lightly but preserve structure
+        return role.finalSearchTerms.map(term => this.lightCleanSearchTerm(term));
+      }
     }
     
     if (role.searchTerms && role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
       logger.info(`✅ Using character_images terms: ${role.searchTerms.character_images.slice(0, 2).join(', ')}...`);
-      return role.searchTerms.character_images.map(term => this.cleanSearchTerm(term));
+      return role.searchTerms.character_images.map(term => this.lightCleanSearchTerm(term));
     }
     
     logger.warn(`⚠️ No smart search terms found, generating fallback terms`);
@@ -165,12 +173,24 @@ class AIFirstImageFetcher {
       queries.push(`"${characterName}" anime`);
     }
     
-    logger.info(`🎯 Generated ${queries.length} clean search queries (AI will handle filtering)`);
+    logger.info(`🎯 Generated ${queries.length} fallback search queries`);
     return queries.slice(0, 6); // Keep it focused
   }
   
   /**
+   * 🎯 NEW: Light cleaning that preserves quote structure for precision
+   */
+  lightCleanSearchTerm(term) {
+    // Only remove obvious junk, preserve quotes for search precision
+    return term
+      .replace(/\s+/g, ' ') // Clean up spaces
+      .trim();
+    // DON'T remove quotes - they're critical for multi-actor precision!
+  }
+  
+  /**
    * Clean search terms of all exclusions - let AI handle filtering
+   * 🎯 KEPT for fallback cases only
    */
   cleanSearchTerm(term) {
     // Remove all exclusions and extra modifiers
