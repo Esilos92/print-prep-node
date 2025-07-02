@@ -1,14 +1,6 @@
 import { motion } from 'framer-motion';
-import { 
-  Download, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  User,
-  Calendar,
-  FileArchive,
-  Star
-} from 'lucide-react';
+import { Bot, Send, Zap, Terminal, Cpu } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface JobStatus {
   id: string;
@@ -16,247 +8,238 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  roles?: string[];
-  imagesProcessed?: number;
-  imagesValidated?: number;
-  downloadLink?: string;
-  startTime?: Date;
-  endTime?: Date;
 }
 
-interface JobHistoryProps {
-  jobs: JobStatus[];
+interface GBotInterfaceProps {
+  currentJob: JobStatus | null;
+  onStartJob: () => void;
+  celebrityName: string;
+  setCelebrityName: (name: string) => void;
 }
 
-export default function JobHistory({ jobs }: JobHistoryProps) {
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="w-4 h-4 text-green-400" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-400" />;
-      case 'running':
-        return <Clock className="w-4 h-4 text-blue-400 animate-spin" />;
-      default:
-        return <Clock className="w-4 h-4 text-slate-400" />;
+export default function GBotInterface({ 
+  currentJob, 
+  onStartJob, 
+  celebrityName, 
+  setCelebrityName 
+}: GBotInterfaceProps) {
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
+      isBot: true,
+      timestamp: 'System Boot'
     }
+  ]);
+
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    if (currentJob?.status === 'running') {
+      addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
+    } else if (currentJob?.status === 'completed') {
+      addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
+    }
+  }, [currentJob?.status]);
+
+  const addBotMessage = (text: string) => {
+    setIsTyping(true);
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text,
+        isBot: true,
+        timestamp: 'GBot.EXE'
+      }]);
+      setIsTyping(false);
+    }, 1000);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'text-green-400';
-      case 'error':
-        return 'text-red-400';
-      case 'running':
-        return 'text-blue-400';
-      default:
-        return 'text-slate-400';
-    }
-  };
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!celebrityName.trim() || currentJob?.status === 'running') return;
 
-  const formatDuration = (start?: Date, end?: Date) => {
-    if (!start || !end) return 'Unknown';
-    const duration = Math.floor((end.getTime() - start.getTime()) / 1000);
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    // Add user message
+    setMessages(prev => [...prev, {
+      id: Date.now(),
+      text: `Process images for: ${celebrityName}`,
+      isBot: false,
+      timestamp: 'USER'
+    }]);
+
+    onStartJob();
   };
 
   return (
     <div className="cyber-panel">
+      {/* Horizontal Layout - Split into sections */}
       <div className="flex h-full">
         
-        {/* Left Section - Header & Summary */}
+        {/* Left Section - Terminal Header & Avatar */}
         <div className="w-72 flex flex-col border-r border-blue-500/30">
-          {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-blue-500/30 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <FileArchive className="w-5 h-5 text-blue-400" />
-              <h3 className="text-lg font-cyber font-bold text-glow-blue">
-                MISSION ARCHIVE
-              </h3>
+          {/* Terminal Header */}
+          <div className="bg-gradient-to-r from-blue-900/80 to-blue-800/80 px-4 py-2 border-b border-blue-500/30 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-blue-300" />
+                <span className="font-cyber text-sm text-blue-300">GBot.EXE Terminal</span>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <motion.div 
+                  className="flex items-center gap-1"
+                  animate={{ opacity: currentJob?.status === 'running' ? [1, 0.5, 1] : 1 }}
+                  transition={{ repeat: currentJob?.status === 'running' ? Infinity : 0, duration: 1 }}
+                >
+                  <Cpu className="w-4 h-4 text-green-400" />
+                  <span className="text-xs text-green-400 font-cyber">ONLINE</span>
+                </motion.div>
+              </div>
             </div>
           </div>
 
-          {/* Summary Stats */}
-          <div className="flex-1 flex flex-col justify-center p-4">
-            <div className="text-center space-y-3">
-              <div>
-                <div className="text-2xl font-cyber font-bold text-blue-400">
-                  {jobs.length}
+          {/* GBot Avatar & Status */}
+          <div className="flex-1 flex items-center justify-center p-4 bg-slate-900/50">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Bot className="w-8 h-8 text-white" />
                 </div>
-                <div className="text-xs text-slate-400 font-ui">Total Missions</div>
+                <motion.div 
+                  className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                />
               </div>
-              <div>
-                <div className="text-xl font-cyber font-bold text-green-400">
-                  {jobs.filter(j => j.status === 'completed').length}
-                </div>
-                <div className="text-xs text-slate-400 font-ui">Completed</div>
+              <div className="text-center">
+                <h3 className="font-cyber text-lg font-bold text-glow-blue">GBot.EXE</h3>
+                <p className="text-xs text-slate-400">AI Image Sourcing Assistant</p>
               </div>
-              {jobs.length === 0 && (
-                <div className="mt-4">
-                  <div className="w-12 h-12 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <Calendar className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <p className="text-xs text-slate-500 font-ui">
-                    No missions logged
-                  </p>
+              <motion.div 
+                animate={{ rotate: currentJob?.status === 'running' ? 360 : 0 }}
+                transition={{ repeat: currentJob?.status === 'running' ? Infinity : 0, duration: 2 }}
+              >
+                <Zap className="w-5 h-5 text-yellow-400" />
+              </motion.div>
+              {currentJob?.status === 'running' && (
+                <div className="text-center mt-2">
+                  <div className="text-sm font-cyber text-yellow-400 mb-1">PROCESSING</div>
+                  <div className="text-xs text-slate-400 font-ui">{currentJob.celebrity}</div>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Right Section - Job List */}
+        {/* Right Section - Messages & Input */}
         <div className="flex-1 flex flex-col">
-          {jobs.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-slate-500 font-ui text-sm">
-              Completed missions will appear here
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-3 bg-slate-950/80">
+            <div className="space-y-2">
+              {messages.slice(-4).map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-1"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`font-cyber px-2 py-1 rounded text-xs ${
+                      message.isBot 
+                        ? 'bg-blue-900/50 text-blue-300' 
+                        : 'bg-pink-900/50 text-pink-300'
+                    }`}>
+                      {message.timestamp}
+                    </span>
+                  </div>
+                  <div className={`p-2 rounded-lg border text-sm ${
+                    message.isBot 
+                      ? 'bg-blue-900/20 text-blue-100 border-blue-500/30' 
+                      : 'bg-pink-900/20 text-pink-100 border-pink-500/30'
+                  }`}>
+                    <p className="font-ui leading-relaxed">{message.text}</p>
+                  </div>
+                </motion.div>
+              ))}
+              
+              {isTyping && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-1"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-cyber px-2 py-1 rounded text-xs bg-blue-900/50 text-blue-300">
+                      GBot.EXE
+                    </span>
+                  </div>
+                  <div className="bg-blue-900/20 text-blue-100 border border-blue-500/30 p-2 rounded-lg">
+                    <div className="flex space-x-1">
+                      <motion.div 
+                        className="w-2 h-2 bg-blue-400 rounded-full"
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
+                      />
+                      <motion.div 
+                        className="w-2 h-2 bg-blue-400 rounded-full"
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                      />
+                      <motion.div 
+                        className="w-2 h-2 bg-blue-400 rounded-full"
+                        animate={{ scale: [1, 1.5, 1] }}
+                        transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {jobs.map((job, index) => (
-                  <motion.div
-                    key={job.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="bg-slate-800/30 border border-slate-700 rounded-lg p-3 hover:border-blue-500/50 transition-all duration-300 hover:bg-slate-800/50"
-                  >
-                    {/* Job Header */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {getStatusIcon(job.status)}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <User className="w-3 h-3 text-blue-300 flex-shrink-0" />
-                            <h4 className="font-cyber text-sm text-blue-300 truncate">
-                              {job.celebrity}
-                            </h4>
-                          </div>
-                          <p className={`text-xs font-ui ${getStatusColor(job.status)}`}>
-                            {job.status.toUpperCase()}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {job.status === 'completed' && job.downloadLink && (
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="cyber-button pink text-xs px-3 py-1 flex items-center gap-1 flex-shrink-0"
-                          onClick={() => window.open(job.downloadLink, '_blank')}
-                        >
-                          <Download className="w-3 h-3" />
-                          <span>Download</span>
-                        </motion.button>
-                      )}
-                    </div>
+          </div>
 
-                    {/* Job Details */}
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      {/* Timeline */}
-                      <div>
-                        <h5 className="text-slate-400 text-xs font-cyber tracking-wide mb-1">TIMELINE</h5>
-                        <div className="space-y-1">
-                          {job.startTime && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <Clock className="w-2 h-2 text-slate-500 flex-shrink-0" />
-                              <span className="text-slate-300 font-ui text-xs">
-                                {job.startTime.toLocaleTimeString()}
-                              </span>
-                            </div>
-                          )}
-                          {job.endTime && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <CheckCircle2 className="w-2 h-2 text-green-500 flex-shrink-0" />
-                              <span className="text-slate-300 font-ui text-xs">
-                                {formatDuration(job.startTime, job.endTime)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Stats */}
-                      <div>
-                        <h5 className="text-slate-400 text-xs font-cyber tracking-wide mb-1">RESULTS</h5>
-                        <div className="space-y-1">
-                          {job.roles && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <Star className="w-2 h-2 text-yellow-500 flex-shrink-0" />
-                              <span className="text-slate-300 font-ui text-xs">
-                                {job.roles.length} roles found
-                              </span>
-                            </div>
-                          )}
-                          {job.imagesValidated && (
-                            <div className="flex items-center gap-1 text-xs">
-                              <CheckCircle2 className="w-2 h-2 text-green-500 flex-shrink-0" />
-                              <span className="text-slate-300 font-ui text-xs">
-                                {job.imagesValidated} images validated
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Discovered Roles */}
-                    {job.roles && job.roles.length > 0 && (
-                      <div className="pt-2 border-t border-slate-700">
-                        <h5 className="text-slate-400 text-xs mb-2 font-cyber tracking-wide">
-                          DISCOVERED ROLES
-                        </h5>
-                        <div className="flex flex-wrap gap-1">
-                          {job.roles.slice(0, 3).map((role, roleIndex) => (
-                            <motion.span
-                              key={role}
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: roleIndex * 0.1 }}
-                              className="text-xs bg-blue-900/40 text-blue-200 px-2 py-1 rounded border border-blue-500/30 font-ui"
-                            >
-                              {role}
-                            </motion.span>
-                          ))}
-                          {job.roles.length > 3 && (
-                            <span className="text-xs text-slate-400 px-2 py-1 font-ui">
-                              +{job.roles.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Progress Bar for Running Jobs */}
-                    {job.status === 'running' && (
-                      <div className="mt-3 pt-2 border-t border-slate-700">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs text-slate-400 font-cyber">
-                            {job.currentPhase}
-                          </span>
-                          <span className="text-xs text-blue-400 font-cyber font-bold">
-                            {job.progress}%
-                          </span>
-                        </div>
-                        <div className="progress-bar h-1">
-                          <motion.div 
-                            className="progress-fill"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${job.progress}%` }}
-                            transition={{ duration: 0.5 }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+          {/* Terminal Input */}
+          <div className="p-4 bg-slate-900/80 border-t border-blue-500/30 flex-shrink-0">
+            <form onSubmit={handleSubmit} className="space-y-2">
+              <div className="flex gap-2">
+                <div className="flex items-center gap-2 text-xs text-slate-400 font-cyber">
+                  <span className="text-green-400">USER@terminal:</span>
+                  <span className="text-blue-400">~$</span>
+                </div>
+                <input
+                  type="text"
+                  value={celebrityName}
+                  onChange={(e) => setCelebrityName(e.target.value)}
+                  placeholder="enter celebrity name..."
+                  className="cyber-input flex-1 text-sm py-1 px-3"
+                  disabled={currentJob?.status === 'running'}
+                />
+                <button
+                  type="submit"
+                  disabled={!celebrityName.trim() || currentJob?.status === 'running'}
+                  className={`cyber-button px-3 py-1 text-sm ${
+                    currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <Send className="w-4 h-4" />
+                </button>
               </div>
-            </div>
-          )}
+              
+              {currentJob?.status === 'running' && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-2 text-xs text-yellow-400 font-ui"
+                >
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  <span>Processing mission... Stand by for updates</span>
+                </motion.div>
+              )}
+            </form>
+          </div>
         </div>
       </div>
     </div>
