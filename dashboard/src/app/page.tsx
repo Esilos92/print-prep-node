@@ -124,7 +124,7 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Dashboard Grid - 3 Columns Centered */}
-        <div className="w-full max-w-[1320px] grid grid-cols-1 lg:grid-cols-3 gap-6 place-items-stretch">
+        <div className="w-full max-w-[1320px] grid grid-cols-1 lg:grid-cols-3 gap-6 h-[650px]">
           {/* Left Column - GBot Chat Terminal */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
