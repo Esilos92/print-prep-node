@@ -74,9 +74,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           <div>
             <FileArchive className="w-6 h-6 text-blue-400 mb-2" />
             <h3 className="font-cyber text-xl text-glow-blue">MISSION ARCHIVE</h3>
-            <div className="font-cyber text-lg text-blue-300">
-              Completed - {completedCount}
-            </div>
+            <div className="font-cyber text-lg text-blue-300">Completed - {completedCount}</div>
           </div>
         </div>
         <div style={{ width: '65%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
@@ -91,16 +89,6 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         
         {/* LEFT COLUMN - 35% */}
         <div style={{ width: '35%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
-          
-          {/* Completed Count underneath */}
-          <div className="font-cyber text-lg text-blue-300 mt-2">
-            Completed - {completedCount}
-          </div>
-          
-          {/* Completed Count underneath */}
-          <div className="font-cyber text-lg text-blue-300 mt-2">
-            Completed - {completedCount}
-          </div>
           
           <br />
           
