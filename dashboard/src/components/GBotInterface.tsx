@@ -257,5 +257,6 @@ export default function GBotInterface({
         </div>
       </div>
     </div>
+    </div>
   );
 }
