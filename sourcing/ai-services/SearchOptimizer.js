@@ -209,49 +209,56 @@ class SearchOptimizer {
   }
 
   /**
-   * SMART: AI-powered detection of multi-actor characters
+   * SMART: Simple but effective multi-actor detection with fallback
    */
   async detectMultiActorCharacter(characterName, showTitle) {
-    // Quick hardcoded check for common cases (fast path)
-    const quickCheck = this.quickMultiActorCheck(characterName, showTitle);
-    if (quickCheck !== null) return quickCheck;
-    
-    // AI detection for unknown cases
-    if (this.hasOpenAI) {
-      return await this.aiDetectMultiActor(characterName, showTitle);
-    }
-    
-    // Fallback: assume single actor
-    return false;
-  }
-
-  /**
-   * Quick hardcoded check for most common multi-actor characters (performance optimization)
-   */
-  quickMultiActorCheck(characterName, showTitle) {
     const character = characterName.toLowerCase();
     const title = showTitle.toLowerCase();
     
-    // Only the most common cases for speed
-    const quickChecks = [
-      { chars: ['the doctor', 'doctor'], shows: ['doctor who'], hasMultiple: true },
-      { chars: ['james bond', 'bond', '007'], shows: ['bond', 'james bond'], hasMultiple: true },
-      { chars: ['batman', 'bruce wayne'], shows: ['batman'], hasMultiple: true },
-      { chars: ['spider-man', 'spiderman', 'peter parker'], shows: ['spider', 'spiderman'], hasMultiple: true },
-      { chars: ['sherlock'], shows: ['sherlock'], hasMultiple: true }
+    // GUARANTEED multi-actor cases (no AI needed)
+    const definiteMultiActor = [
+      // Doctor Who - GUARANTEED multi-actor
+      { char: 'doctor', show: 'doctor who', reason: 'The Doctor has 14+ actors' },
+      
+      // James Bond - GUARANTEED multi-actor  
+      { char: 'bond', show: 'bond', reason: 'James Bond has 6+ actors' },
+      { char: '007', show: 'bond', reason: 'James Bond has 6+ actors' },
+      
+      // Batman - GUARANTEED multi-actor
+      { char: 'batman', show: 'batman', reason: 'Batman has 8+ actors' },
+      { char: 'bruce wayne', show: 'batman', reason: 'Batman has 8+ actors' },
+      
+      // Spider-Man - GUARANTEED multi-actor
+      { char: 'spider', show: 'spider', reason: 'Spider-Man has 3+ actors' },
+      { char: 'peter parker', show: 'spider', reason: 'Spider-Man has 3+ actors' },
+      
+      // Sherlock - GUARANTEED multi-actor
+      { char: 'sherlock', show: 'sherlock', reason: 'Sherlock has 10+ actors' }
     ];
     
-    for (const check of quickChecks) {
-      const charMatch = check.chars.some(c => character.includes(c));
-      const showMatch = check.shows.some(s => title.includes(s));
-      
-      if (charMatch && showMatch) {
-        console.log(`🎭 Quick multi-actor detection: ${characterName} in ${showTitle}`);
-        return check.hasMultiple;
+    // Check guaranteed cases first
+    for (const check of definiteMultiActor) {
+      if (character.includes(check.char) && title.includes(check.show)) {
+        console.log(`🎭 GUARANTEED multi-actor: ${characterName} in ${showTitle} (${check.reason})`);
+        return true;
       }
     }
     
-    return null; // Unknown, need AI detection
+    // Try AI detection for edge cases (with timeout)
+    if (this.hasOpenAI) {
+      try {
+        return await Promise.race([
+          this.aiDetectMultiActor(characterName, showTitle),
+          new Promise(resolve => setTimeout(() => resolve(false), 3000)) // 3 second timeout
+        ]);
+      } catch (error) {
+        console.log(`⚠️ AI detection failed, assuming single-actor: ${error.message}`);
+      }
+    }
+    
+    // Safe fallback: assume single actor
+    console.log(`🤖 Assuming single-actor character: ${characterName} in ${showTitle}`);
+    return false;
   }
 
   /**
