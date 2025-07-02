@@ -116,7 +116,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
   return (
     <div className="cyber-panel">
-      <div className="p-6">
+      <div style={{ padding: '12px' }}>
         
         {/* ROW 1 - Header Section */}
         <div className="mb-6">
