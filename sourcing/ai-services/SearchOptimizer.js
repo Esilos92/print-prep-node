@@ -124,79 +124,259 @@ class SearchOptimizer {
   }
 
   /**
-   * ENHANCED: Generate CLEAN CHARACTER-FIRST search terms (like manual search)
+   * ENHANCED: Generate SMART CHARACTER-FIRST search terms with multi-actor awareness
    */
   generateCharacterFirstTerms(celebrityName, character, title, medium, strategy) {
     const characterName = character || 'Unknown Character';
     const showTitle = title || 'Unknown Title';
     
+    // CRITICAL: Check if this is a multi-actor character role
+    const isMultiActorCharacter = await this.detectMultiActorCharacter(characterName, showTitle);
+    
     let terms = [];
     
-    switch (strategy) {
-      case 'character_pure':
-        // CLEAN character focus for voice/animation - like manual search
-        terms = [
-          `"${characterName}"`,
-          `"${characterName}" "${showTitle}"`,
-          `"${characterName}" ${showTitle.split(' ').slice(0, 2).join(' ')}`,
-          `"${showTitle}" "${characterName}"`,
-          `"${characterName}" anime`,
-          `"${showTitle}" character`
-        ];
-        break;
-        
-      case 'character_iconic':
-        // Clean character-first for iconic roles
-        terms = [
-          `"${characterName}"`,
-          `"${characterName}" "${showTitle}"`,
-          `"${showTitle}" "${characterName}"`,
-          `"${characterName}" character`,
-          `"${characterName}" official`,
-          `"${celebrityName}" "${characterName}"`
-        ];
-        break;
-        
-      case 'character_modern':
-        // Clean character-first for modern content
-        terms = [
-          `"${characterName}" "${showTitle}"`,
-          `"${characterName}" HD`,
-          `"${showTitle}" "${characterName}"`,
-          `"${characterName}" character`,
-          `"${celebrityName}" "${characterName}"`,
-          `"${characterName}" official`
-        ];
-        break;
-        
-      case 'balanced_classic':
-        // Clean balanced approach
-        terms = [
-          `"${characterName}" "${showTitle}"`,
-          `"${celebrityName}" "${characterName}"`,
-          `"${showTitle}" "${characterName}"`,
-          `"${characterName}" character`,
-          `"${celebrityName}" "${showTitle}"`,
-          `"${characterName}"`
-        ];
-        break;
-        
-      default:
-        // Clean fallback
-        terms = [
-          `"${characterName}" "${showTitle}"`,
-          `"${characterName}"`,
-          `"${showTitle}" "${characterName}"`,
-          `"${celebrityName}" "${characterName}"`,
-          `"${characterName}" character`,
-          `"${showTitle}" character`
-        ];
+    if (isMultiActorCharacter) {
+      // ACTOR-SPECIFIC searches for multi-actor characters
+      terms = this.generateActorSpecificTerms(celebrityName, characterName, showTitle, strategy);
+    } else {
+      // Standard character-first approach for single-actor characters
+      switch (strategy) {
+        case 'character_pure':
+          // CLEAN character focus for voice/animation - like manual search
+          terms = [
+            `"${characterName}"`,
+            `"${characterName}" "${showTitle}"`,
+            `"${characterName}" ${showTitle.split(' ').slice(0, 2).join(' ')}`,
+            `"${showTitle}" "${characterName}"`,
+            `"${characterName}" anime`,
+            `"${showTitle}" character`
+          ];
+          break;
+          
+        case 'character_iconic':
+          // Clean character-first for iconic roles
+          terms = [
+            `"${characterName}"`,
+            `"${characterName}" "${showTitle}"`,
+            `"${showTitle}" "${characterName}"`,
+            `"${characterName}" character`,
+            `"${characterName}" official`,
+            `"${celebrityName}" "${characterName}"`
+          ];
+          break;
+          
+        case 'character_modern':
+          // Clean character-first for modern content
+          terms = [
+            `"${characterName}" "${showTitle}"`,
+            `"${characterName}" HD`,
+            `"${showTitle}" "${characterName}"`,
+            `"${characterName}" character`,
+            `"${celebrityName}" "${characterName}"`,
+            `"${characterName}" official`
+          ];
+          break;
+          
+        case 'balanced_classic':
+          // Clean balanced approach
+          terms = [
+            `"${characterName}" "${showTitle}"`,
+            `"${celebrityName}" "${characterName}"`,
+            `"${showTitle}" "${characterName}"`,
+            `"${characterName}" character`,
+            `"${celebrityName}" "${showTitle}"`,
+            `"${characterName}"`
+          ];
+          break;
+          
+        default:
+          // Clean fallback
+          terms = [
+            `"${characterName}" "${showTitle}"`,
+            `"${characterName}"`,
+            `"${showTitle}" "${characterName}"`,
+            `"${celebrityName}" "${characterName}"`,
+            `"${characterName}" character`,
+            `"${showTitle}" character`
+          ];
+      }
     }
     
     // Filter out malformed terms and keep clean
     return terms
       .filter(term => term.length > 5 && term.length < 80) // Reasonable length
       .filter(term => !term.includes('Unknown')); // Remove unknown placeholders
+  }
+
+  /**
+   * SMART: AI-powered detection of multi-actor characters
+   */
+  async detectMultiActorCharacter(characterName, showTitle) {
+    // Quick hardcoded check for common cases (fast path)
+    const quickCheck = this.quickMultiActorCheck(characterName, showTitle);
+    if (quickCheck !== null) return quickCheck;
+    
+    // AI detection for unknown cases
+    if (this.hasOpenAI) {
+      return await this.aiDetectMultiActor(characterName, showTitle);
+    }
+    
+    // Fallback: assume single actor
+    return false;
+  }
+
+  /**
+   * Quick hardcoded check for most common multi-actor characters (performance optimization)
+   */
+  quickMultiActorCheck(characterName, showTitle) {
+    const character = characterName.toLowerCase();
+    const title = showTitle.toLowerCase();
+    
+    // Only the most common cases for speed
+    const quickChecks = [
+      { chars: ['the doctor', 'doctor'], shows: ['doctor who'], hasMultiple: true },
+      { chars: ['james bond', 'bond', '007'], shows: ['bond', 'james bond'], hasMultiple: true },
+      { chars: ['batman', 'bruce wayne'], shows: ['batman'], hasMultiple: true },
+      { chars: ['spider-man', 'spiderman', 'peter parker'], shows: ['spider', 'spiderman'], hasMultiple: true },
+      { chars: ['sherlock'], shows: ['sherlock'], hasMultiple: true }
+    ];
+    
+    for (const check of quickChecks) {
+      const charMatch = check.chars.some(c => character.includes(c));
+      const showMatch = check.shows.some(s => title.includes(s));
+      
+      if (charMatch && showMatch) {
+        console.log(`🎭 Quick multi-actor detection: ${characterName} in ${showTitle}`);
+        return check.hasMultiple;
+      }
+    }
+    
+    return null; // Unknown, need AI detection
+  }
+
+  /**
+   * AI-powered multi-actor detection
+   */
+  async aiDetectMultiActor(characterName, showTitle) {
+    try {
+      const prompt = `Has the character "${characterName}" from "${showTitle}" been played by multiple different actors across different movies, TV shows, or reboots?
+
+Consider:
+- Different actors in reboots/remakes
+- Recasting across film series
+- Different TV vs movie versions
+- Voice actors vs live-action actors for same character
+
+Answer with just "YES" if multiple actors have played this character, or "NO" if it's typically one actor.
+
+Examples:
+- The Doctor (Doctor Who) = YES (14+ actors)
+- James Bond = YES (6+ actors) 
+- Tyrion Lannister (Game of Thrones) = NO (only Peter Dinklage)
+- Tony Stark/Iron Man (MCU) = NO (only Robert Downey Jr in MCU)
+
+Answer:`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        max_tokens: 10
+      });
+
+      const response = completion.choices[0].message.content.trim().toUpperCase();
+      const isMultiActor = response.includes('YES');
+      
+      if (isMultiActor) {
+        console.log(`🤖 AI detected multi-actor character: ${characterName} in ${showTitle}`);
+      } else {
+        console.log(`🤖 AI confirmed single-actor character: ${characterName} in ${showTitle}`);
+      }
+      
+      return isMultiActor;
+      
+    } catch (error) {
+      console.log(`⚠️ AI multi-actor detection failed: ${error.message}`);
+      return false; // Safe fallback
+    }
+  }
+
+  /**
+   * NEW: Generate actor-specific search terms for multi-actor characters
+   */
+  generateActorSpecificTerms(celebrityName, characterName, showTitle, strategy) {
+    console.log(`🎯 Generating ACTOR-SPECIFIC terms for ${celebrityName} as ${characterName}`);
+    
+    // PRIORITY: Actor name comes FIRST to avoid other actors
+    const terms = [
+      `"${celebrityName}" "${showTitle}"`,           // Jodie Whittaker Doctor Who
+      `"${celebrityName}" "${characterName}"`,       // Jodie Whittaker The Doctor
+      `"${celebrityName}" as "${characterName}"`,    // Jodie Whittaker as The Doctor
+      `"${celebrityName}" "${showTitle}" "${characterName}"`, // Jodie Whittaker Doctor Who The Doctor
+      `"${showTitle}" "${celebrityName}"`,           // Doctor Who Jodie Whittaker
+      `"${celebrityName}" ${showTitle.split(' ').slice(0, 2).join(' ')}` // Jodie Whittaker Doctor Who (shortened)
+    ];
+    
+    // Add specific terms based on known multi-actor characters
+    const specificTerms = this.generateSpecificActorTerms(celebrityName, characterName, showTitle);
+    terms.push(...specificTerms);
+    
+    return terms;
+  }
+
+  /**
+   * NEW: Generate highly specific terms for known multi-actor characters
+   */
+  generateSpecificActorTerms(celebrityName, characterName, showTitle) {
+    const character = characterName.toLowerCase();
+    const title = showTitle.toLowerCase();
+    const actor = celebrityName.toLowerCase();
+    
+    const specificTerms = [];
+    
+    // Doctor Who specific terms
+    if (title.includes('doctor who') || character.includes('doctor')) {
+      if (actor.includes('jodie whittaker')) {
+        specificTerms.push('"Jodie Whittaker" "13th Doctor"');
+        specificTerms.push('"Jodie Whittaker" "Thirteenth Doctor"');
+        specificTerms.push('"13th Doctor" "Jodie Whittaker"');
+      } else if (actor.includes('david tennant')) {
+        specificTerms.push('"David Tennant" "10th Doctor"');
+        specificTerms.push('"David Tennant" "Tenth Doctor"');
+      } else if (actor.includes('matt smith')) {
+        specificTerms.push('"Matt Smith" "11th Doctor"');
+        specificTerms.push('"Matt Smith" "Eleventh Doctor"');
+      } else if (actor.includes('peter capaldi')) {
+        specificTerms.push('"Peter Capaldi" "12th Doctor"');
+        specificTerms.push('"Peter Capaldi" "Twelfth Doctor"');
+      }
+    }
+    
+    // James Bond specific terms
+    if (character.includes('bond') || character.includes('007')) {
+      if (actor.includes('daniel craig')) {
+        specificTerms.push('"Daniel Craig" "Bond"');
+        specificTerms.push('"Daniel Craig" "007"');
+      } else if (actor.includes('pierce brosnan')) {
+        specificTerms.push('"Pierce Brosnan" "Bond"');
+      } else if (actor.includes('sean connery')) {
+        specificTerms.push('"Sean Connery" "Bond"');
+      }
+    }
+    
+    // Batman specific terms
+    if (character.includes('batman') || character.includes('bruce wayne')) {
+      if (actor.includes('christian bale')) {
+        specificTerms.push('"Christian Bale" "Batman"');
+        specificTerms.push('"Christian Bale" "Dark Knight"');
+      } else if (actor.includes('michael keaton')) {
+        specificTerms.push('"Michael Keaton" "Batman"');
+      } else if (actor.includes('ben affleck')) {
+        specificTerms.push('"Ben Affleck" "Batman"');
+      }
+    }
+    
+    return specificTerms;
   }
 
   /**
