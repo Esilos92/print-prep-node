@@ -107,24 +107,24 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* Main Container - Perfectly Centered */}
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative z-10">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
-            CELEBRITY IMAGE SOURCING SYSTEM
-          </h1>
-          <p className="text-xl text-slate-400 font-ui">
-            Powered by GBot.EXE AI Assistant
-          </p>
-        </motion.div>
+      {/* Centered Container */}
+      <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+        <div className="w-full max-w-[1600px]">
+          {/* Header */}
+          <motion.div 
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-8"
+          >
+            <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
+              CELEBRITY IMAGE SOURCING SYSTEM
+            </h1>
+            <p className="text-xl text-slate-400 font-ui">
+              Powered by GBot.EXE AI Assistant
+            </p>
+          </motion.div>
 
-        {/* Dashboard Grid - Perfectly Centered */}
-        <div className="w-full max-w-[1400px] mx-auto">
+          {/* Dashboard Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Left Column - GBot Chat Terminal */}
             <motion.div 
