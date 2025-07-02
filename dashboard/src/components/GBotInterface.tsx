@@ -76,7 +76,7 @@ export default function GBotInterface({
       <div className="flex h-full p-3">
         
         {/* LEFT SIDE - GBot Info & Controls */}
-        <div className="w-1/2 pr-3 border-r border-blue-500/30 flex flex-col space-y-4">
+        <div className="w-80 pr-4 border-r border-blue-500/30 flex flex-col space-y-4">
           
           {/* GBot Info Section */}
           <div className="bg-slate-900/50 rounded-lg p-4">
@@ -103,24 +103,25 @@ export default function GBotInterface({
             <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-2">
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   <span className="text-xs text-green-400 font-cyber">SUBJECT@NetOp:</span>
                   <input
                     type="text"
                     value={celebrityName}
                     onChange={(e) => setCelebrityName(e.target.value)}
                     placeholder="input celebrity subject name..."
-                    className="cyber-input flex-1 text-sm py-2 px-3"
+                    className="cyber-input w-full text-sm py-2 px-3"
                     disabled={currentJob?.status === 'running'}
                   />
                   <button
                     type="submit"
                     disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                    className={`cyber-button px-4 py-2 text-sm ${
+                    className={`cyber-button w-full py-2 text-sm ${
                       currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
-                    <Send className="w-4 h-4" />
+                    <Send className="w-4 h-4 mr-2" />
+                    Execute
                   </button>
                 </div>
               </div>
@@ -150,7 +151,7 @@ export default function GBotInterface({
         </div>
 
         {/* RIGHT SIDE - Processing & Communication */}
-        <div className="w-1/2 pl-3 flex flex-col space-y-4">
+        <div className="flex-1 pl-4 flex flex-col space-y-4">
           
           {/* Processing Status */}
           {currentJob?.status === 'running' && (
