@@ -209,72 +209,113 @@ Return as JSON array:
     });
   }
 
-', 'episode', 'tv show', 'television',
-      'netflix', 'hbo', 'amc', 'cbs', 'nbc', 'abc', 'fox'
-    ];
-    
-    // Animation/Anime indicators
-    const animationKeywords = [
-      'anime', 'animation', 'animated', 'cartoon', 'studio ghibli',
-      'pixar', 'disney', 'dreamworks', 'character'
-    ];
-    
-    // Game indicators
-    const gameKeywords = [
-      'game', 'video game', 'gaming', 'nintendo', 'playstation',
-      'xbox', 'pc game', 'mobile game'
-    ];
+  /**
+   * SMART: Infer medium from context using AI patterns - no hardcoded titles needed
+   */
+  inferMediumFromContext(role) {
+    const title = (role.title || '').toLowerCase();
+    const character = (role.character || '').toLowerCase();
+    const description = (role.description || '').toLowerCase();
+    const year = parseInt(role.year) || 0;
     
     const allText = `${title} ${character} ${description}`.toLowerCase();
     
-    // Check for specific famous titles to get accurate medium
-    const famousTitles = {
-      'jurassic park': 'live_action_movie',
-      'bohemian rhapsody': 'live_action_movie', 
-      'the social network': 'live_action_movie',
-      'pacific rim': 'live_action_movie',
-      'transformers': 'live_action_movie',
-      'spider-man': year >= 2018 ? 'live_action_movie' : 'live_action_movie',
-      'the walking dead': 'live_action_tv',
-      'justified': 'live_action_tv',
-      'american horror story': 'live_action_tv'
-    };
-    
-    // Check for exact title matches first
-    for (const [famousTitle, medium] of Object.entries(famousTitles)) {
-      if (title.includes(famousTitle)) {
-        return medium;
-      }
-    }
-    
-    // Pattern-based detection
+    // PRIORITY 1: Game indicators (most specific)
+    const gameKeywords = [
+      'game', 'video game', 'gaming', 'nintendo', 'playstation', 'xbox', 
+      'pc game', 'mobile game', 'steam', 'epic games', 'console'
+    ];
     if (gameKeywords.some(keyword => allText.includes(keyword))) {
       return 'voice_game';
     }
     
+    // PRIORITY 2: Animation/Anime indicators
+    const animationKeywords = [
+      'anime', 'animation', 'animated', 'cartoon', 'studio ghibli',
+      'pixar', 'disney', 'dreamworks', 'adult swim', 'nickelodeon',
+      'cartoon network', 'voice actor', 'voice acting', 'dub', 'dubbing'
+    ];
     if (animationKeywords.some(keyword => allText.includes(keyword))) {
-      if (movieKeywords.some(keyword => allText.includes(keyword))) {
+      // Determine if it's movie or TV based on additional context
+      const movieAnimationKeywords = ['movie', 'film', 'feature', 'theatrical'];
+      if (movieAnimationKeywords.some(keyword => allText.includes(keyword))) {
         return 'voice_anime_movie';
       } else {
         return 'voice_anime_tv';
       }
     }
     
-    if (movieKeywords.some(keyword => allText.includes(keyword))) {
-      return 'live_action_movie';
-    }
-    
-    if (tvKeywords.some(keyword => allText.includes(keyword))) {
+    // PRIORITY 3: Strong TV indicators
+    const strongTvKeywords = [
+      'series', 'season', 'episode', 'tv show', 'television show',
+      'streaming series', 'web series', 'miniseries', 'limited series'
+    ];
+    if (strongTvKeywords.some(keyword => allText.includes(keyword))) {
       return 'live_action_tv';
     }
     
-    // Default based on year and context
-    if (year >= 1990) {
-      // Modern era - more likely to be movies
+    // PRIORITY 4: Strong movie indicators  
+    const strongMovieKeywords = [
+      'movie', 'film', 'cinema', 'theatrical', 'feature film',
+      'blockbuster', 'franchise', 'sequel', 'prequel', 'reboot'
+    ];
+    if (strongMovieKeywords.some(keyword => allText.includes(keyword))) {
       return 'live_action_movie';
+    }
+    
+    // PRIORITY 5: Network/Platform indicators (TV)
+    const tvNetworks = [
+      'netflix', 'hbo', 'amazon prime', 'disney+', 'hulu', 'showtime',
+      'amc', 'fx', 'cbs', 'nbc', 'abc', 'fox', 'cw', 'syfy',
+      'usa network', 'tnt', 'tbs', 'comedy central', 'mtv'
+    ];
+    if (tvNetworks.some(network => allText.includes(network))) {
+      return 'live_action_tv';
+    }
+    
+    // PRIORITY 6: Movie franchise/format indicators
+    const movieFormatKeywords = [
+      'saga', 'trilogy', 'cinematic universe', 'franchise',
+      'part', 'chapter', 'volume', 'the', 'returns', 'rises',
+      'begins', 'origins', 'forever', 'returns'
+    ];
+    if (movieFormatKeywords.some(keyword => allText.includes(keyword))) {
+      return 'live_action_movie';
+    }
+    
+    // PRIORITY 7: Title structure analysis
+    // Movie titles often have "The [Noun]" or single word titles
+    // TV shows often have longer, descriptive names
+    const titleWords = title.split(' ').filter(word => word.length > 2);
+    
+    if (titleWords.length === 1) {
+      // Single word titles more likely to be movies
+      return 'live_action_movie';
+    }
+    
+    if (title.startsWith('the ') && titleWords.length <= 3) {
+      // "The [Something]" format often movies
+      return 'live_action_movie';
+    }
+    
+    if (titleWords.length >= 4) {
+      // Longer titles often TV shows
+      return 'live_action_tv';
+    }
+    
+    // PRIORITY 8: Year-based intelligent defaults
+    if (year >= 2010) {
+      // Modern era: if unclear, lean toward movies (higher production values)
+      return 'live_action_movie';
+    } else if (year >= 1990) {
+      // 90s-2000s: balanced era
+      return 'live_action_movie';
+    } else if (year >= 1970) {
+      // 70s-80s: TV was king
+      return 'live_action_tv';
     } else {
-      // Older era - might be TV
-      return 'live_action_tv';
+      // Pre-1970: likely classic movies
+      return 'live_action_movie';
     }
   }
 
