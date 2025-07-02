@@ -77,7 +77,10 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           </div>
         </div>
         <div style={{ width: '65%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
-          <h3 className="font-cyber text-xl text-glow-blue">SUBJECT LOG</h3>
+          <div>
+            <FileArchive className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
+            <h3 className="font-cyber text-xl text-glow-blue">SUBJECT LOG</h3>
+          </div>
         </div>
       </div>
       
@@ -190,17 +193,20 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   
                   {/* Download Button for individual job */}
                   {job.status === 'completed' && job.downloadLink && (
-                    <div className="mt-3 pt-3 border-t border-slate-700">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="cyber-button text-sm px-4 py-2 flex items-center gap-2"
-                        onClick={() => window.open(job.downloadLink, '_blank')}
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>Download</span>
-                      </motion.button>
-                    </div>
+                    <>
+                      <br />
+                      <div className="mt-3 pt-3 border-t border-slate-700">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="cyber-button text-sm px-4 py-2 flex items-center gap-2"
+                          onClick={() => window.open(job.downloadLink, '_blank')}
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download</span>
+                        </motion.button>
+                      </div>
+                    </>
                   )}
                 </motion.div>
               ))
