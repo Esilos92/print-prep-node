@@ -205,7 +205,7 @@ Return as JSON array:
   }
 
   /**
-   * NEW: Enhanced voice acting detection - GENERIC approach
+   * NEW: Enhanced voice acting detection - CONSERVATIVE approach
    */
   detectVoiceActing(role) {
     const character = (role.character || '').toLowerCase();
@@ -213,20 +213,37 @@ Return as JSON array:
     const medium = (role.medium || '').toLowerCase();
     const description = (role.description || '').toLowerCase();
     
-    // Direct medium indicators
-    if (medium.includes('voice') || medium.includes('anime') || 
-        medium.includes('animation') || medium.includes('game') ||
-        medium.includes('animated') || medium.includes('cartoon')) {
+    // CONSERVATIVE: Only mark as voice if we have STRONG indicators
+    
+    // Direct medium indicators - only if explicitly stated
+    if (medium.includes('voice') || medium.includes('dub') || medium.includes('dubbing')) {
       return true;
     }
     
-    // Content indicators - generic patterns
-    const voiceKeywords = [
-      'anime', 'animated', 'animation', 'cartoon', 'character voice',
-      'dub', 'dubbing', 'voice actor', 'voice work', 'video game',
-      'game', 'character', 'animated series', 'animated movie'
-    ];
+    // Animation/anime indicators - but be careful about live-action adaptations
+    if (medium.includes('animation') || medium.includes('animated')) {
+      // Make sure it's not live-action with animation elements
+      if (!medium.includes('live') && !title.includes('movie')) {
+        return true;
+      }
+    }
     
+    // Game voice work
+    if (medium.includes('game') || medium.includes('video game')) {
+      return true;
+    }
+    
+    // Anime - but ONLY if not a live-action adaptation
+    if (medium.includes('anime')) {
+      // Check if this might be a live-action adaptation
+      if (title.includes('movie') || title.includes('film') || title.includes('live action')) {
+        return false; // Live-action adaptation of anime
+      }
+      return true;
+    }
+    
+    // Title-based detection - VERY CONSERVATIVE
+    const voiceKeywords = ['anime series', 'animated series', 'cartoon series', 'voice work'];
     const hasVoiceKeywords = voiceKeywords.some(keyword => 
       title.includes(keyword) || description.includes(keyword)
     );
@@ -235,52 +252,60 @@ Return as JSON array:
       return true;
     }
     
-    // Generic live-action indicators (if present, likely NOT voice acting)
+    // IMPORTANT: Live-action indicators (prioritize these)
     const liveActionKeywords = [
-      'movie', 'film', 'tv series', 'television', 'sitcom', 'drama',
-      'thriller', 'comedy series', 'netflix', 'hbo', 'broadcast'
+      'movie', 'film', 'tv series', 'television series', 'saga', 'trilogy',
+      'live action', 'live-action', 'theatrical', 'cinema', 'netflix series',
+      'hbo', 'broadcast', 'streaming series'
     ];
     
     const hasLiveActionKeywords = liveActionKeywords.some(keyword => 
-      title.includes(keyword) || description.includes(keyword)
+      title.includes(keyword) || description.includes(keyword) || medium.includes(keyword)
     );
     
-    // If has live action indicators but no voice indicators, probably live action
-    if (hasLiveActionKeywords && !hasVoiceKeywords) {
+    // If has live action indicators, it's NOT voice acting
+    if (hasLiveActionKeywords) {
       return false;
     }
     
-    // Default: if medium is unknown, use heuristics
-    if (medium === 'unknown' || !medium) {
-      // If it has character + title pattern with no clear live action indicators
-      return !hasLiveActionKeywords;
-    }
-    
+    // CONSERVATIVE DEFAULT: If unclear, assume live action for known actors
+    // Most performers are primarily live action unless explicitly voice actors
     return false;
   }
 
   /**
-   * NEW: Correct medium type for voice acting
+   * NEW: Correct medium type for voice acting - ONLY when actually voice acting
    */
   correctVoiceMedium(currentMedium, role) {
     const title = (role.title || '').toLowerCase();
+    
+    // IMPORTANT: Don't change medium unless we're certain it's voice acting
     
     // If already properly tagged, keep it
     if (currentMedium.includes('voice')) {
       return currentMedium;
     }
     
-    // Determine correct voice medium
-    if (title.includes('movie') || currentMedium.includes('movie')) {
+    // Only correct if we have STRONG voice indicators
+    if (title.includes('anime series') || title.includes('animated series')) {
+      return 'voice_anime_tv';
+    }
+    
+    if (title.includes('animated movie') || title.includes('anime movie')) {
       return 'voice_anime_movie';
     }
     
-    if (title.includes('game') || currentMedium.includes('game')) {
+    if (title.includes('game') || title.includes('video game')) {
       return 'voice_game';
     }
     
-    // Default to anime TV series
-    return 'voice_anime_tv';
+    if (title.includes('cartoon')) {
+      return 'voice_cartoon';
+    }
+    
+    // CONSERVATIVE: If unsure, don't change the medium
+    // Let it stay as live_action if that's what was originally detected
+    return currentMedium;
   }
 
   /**
