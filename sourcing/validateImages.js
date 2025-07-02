@@ -171,7 +171,7 @@ class ImageValidator {
   }
   
   /**
-   * Check for fan art content - KEEP THIS LOGIC (works well)
+   * FIXED: Check for fan art content - REMOVED fandom.com from blocking
    */
   checkFanArt(image) {
     const filename = (image.filename || '').toLowerCase();
@@ -187,10 +187,12 @@ class ImageValidator {
       }
     }
 
-    // Check for non-official domains that host fan content
+    // FIXED: Check for non-official domains that host fan content
+    // REMOVED fandom.com - it contains official content!
     const fanArtDomains = [
       'deviantart.com', 'tumblr.com', 'pinterest.com', 'reddit.com',
-      'fandom.com', 'wikia.com', 'wordpress.com', 'blogspot.com'
+      // 'fandom.com', // REMOVED - fandom.com has official content
+      'wikia.com', 'wordpress.com', 'blogspot.com'
     ];
     
     for (const domain of fanArtDomains) {
@@ -241,7 +243,7 @@ class ImageValidator {
   }
   
   /**
-   * Validate image metadata and quality
+   * FIXED: Validate image metadata and quality - Now uses ENV settings properly
    */
   async validateImageMetadata(image) {
     try {
@@ -250,11 +252,16 @@ class ImageValidator {
       const width = metadata.width;
       const height = metadata.height;
       
-      // Check minimum resolution
-      if (width < 800 || height < 800) {
+      // FIXED: Use ENV settings with proper fallbacks
+      const minWidth = parseInt(process.env.MIN_WIDTH_8X10) || 800;
+      const minHeight = parseInt(process.env.MIN_HEIGHT_8X10) || 600;
+      
+      // FIXED: Check minimum resolution - both width AND height must meet minimums
+      // This was the bug: 1400x700 failed because 700 < 800, but ENV is 800x600
+      if (width < minWidth || height < minHeight) {
         return {
           isValid: false,
-          reason: `Resolution too low: ${width}x${height}`
+          reason: `Resolution too low: ${width}x${height} (requires ${minWidth}x${minHeight})`
         };
       }
       
