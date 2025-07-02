@@ -72,58 +72,65 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
-      {/* NO HEADER - Start directly with content split */}
       <div className="flex h-full p-3">
         
-        {/* LEFT SIDE - GBot Info & Controls */}
-        <div className="w-80 pr-4 border-r border-blue-500/30 flex flex-col space-y-4">
+        {/* LEFT SIDE - Exactly 50% */}
+        <div className="w-1/2 pr-3 border-r border-blue-500/30 flex flex-col space-y-4">
           
-          {/* GBot Info Section */}
+          {/* Robot Emoji + GBot.EXE */}
           <div className="bg-slate-900/50 rounded-lg p-4">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                  <Bot className="w-8 h-8 text-white" />
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Bot className="w-6 h-6 text-white" />
                 </div>
                 <motion.div 
-                  className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
+                  className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-slate-900"
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ repeat: Infinity, duration: 2 }}
                 />
               </div>
               <div>
-                <h3 className="font-cyber text-xl font-bold text-glow-blue">GBot.EXE</h3>
-                <p className="text-sm text-slate-400">AI Image Sourcing Assistant</p>
+                <h3 className="font-cyber text-lg font-bold text-glow-blue">GBot.EXE</h3>
+                <p className="text-xs text-slate-400">AI Image Sourcing Assistant</p>
               </div>
             </div>
           </div>
 
-          {/* Subject Input Section */}
-          <div className="flex-1 bg-slate-900/30 rounded-lg p-4 flex flex-col justify-center">
-            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SUBJECT INPUT</h4>
+          {/* System Status */}
+          <div className="bg-slate-900/30 rounded-lg p-4">
+            <h4 className="text-xs font-cyber text-slate-300 mb-2 tracking-wide">SYSTEM STATUS</h4>
+            <div className="p-3 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
+              <p className="text-xs font-ui leading-relaxed">
+                GBot.EXE online! Ready to execute celebrity image sourcing missions.
+              </p>
+            </div>
+          </div>
+
+          {/* Subject Input */}
+          <div className="bg-slate-900/30 rounded-lg p-4">
+            <h4 className="text-xs font-cyber text-slate-300 mb-3 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-2">
-                <div className="space-y-2">
-                  <span className="text-xs text-green-400 font-cyber">SUBJECT@NetOp:</span>
-                  <input
-                    type="text"
-                    value={celebrityName}
-                    onChange={(e) => setCelebrityName(e.target.value)}
-                    placeholder="input celebrity subject name..."
-                    className="cyber-input w-full text-sm py-2 px-3"
-                    disabled={currentJob?.status === 'running'}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                    className={`cyber-button w-full py-2 text-sm ${
-                      currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Execute
-                  </button>
-                </div>
+                <label className="text-xs text-green-400 font-cyber">SUBJECT@NetOp:</label>
+                <input
+                  type="text"
+                  value={celebrityName}
+                  onChange={(e) => setCelebrityName(e.target.value)}
+                  placeholder="input celebrity subject name..."
+                  className="cyber-input w-full text-sm py-2 px-3"
+                  disabled={currentJob?.status === 'running'}
+                />
+                <button
+                  type="submit"
+                  disabled={!celebrityName.trim() || currentJob?.status === 'running'}
+                  className={`cyber-button w-full py-2 text-sm ${
+                    currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Execute
+                </button>
               </div>
               
               {currentJob?.status === 'running' && (
@@ -138,20 +145,10 @@ export default function GBotInterface({
               )}
             </form>
           </div>
-
-          {/* System Status Section */}
-          <div className="bg-slate-900/30 rounded-lg p-4">
-            <h4 className="text-sm font-cyber text-slate-300 mb-2 tracking-wide">SYSTEM STATUS</h4>
-            <div className="p-3 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
-              <p className="text-sm font-ui leading-relaxed">
-                GBot.EXE online! Ready to execute celebrity image sourcing missions.
-              </p>
-            </div>
-          </div>
         </div>
 
-        {/* RIGHT SIDE - Processing & Communication */}
-        <div className="flex-1 pl-4 flex flex-col space-y-4">
+        {/* RIGHT SIDE - Exactly 50% */}
+        <div className="w-1/2 pl-3 flex flex-col space-y-4">
           
           {/* Processing Status */}
           {currentJob?.status === 'running' && (
@@ -161,21 +158,32 @@ export default function GBotInterface({
                   animate={{ rotate: 360 }}
                   transition={{ repeat: Infinity, duration: 2 }}
                 >
-                  <Zap className="w-5 h-5 text-yellow-400" />
+                  <Zap className="w-4 h-4 text-yellow-400" />
                 </motion.div>
-                <span className="font-cyber text-lg text-yellow-400">PROCESSING</span>
+                <span className="font-cyber text-sm text-yellow-400">PROCESSING</span>
               </div>
               <div className="text-blue-300 font-cyber text-lg">{currentJob.celebrity}</div>
-              <div className="text-sm text-slate-400">{currentJob.currentPhase}</div>
             </div>
           )}
 
-          {/* Communication Log */}
+          {/* Communication Log - Embedded Chat Style */}
           <div className="flex-1 bg-slate-950/80 rounded-lg p-4">
-            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">COMMUNICATION LOG</h4>
-            <div className="bg-slate-900/50 rounded-lg border border-slate-700 p-3 h-full overflow-y-auto">
-              <div className="space-y-3">
-                {messages.slice(-3).map((message) => (
+            <h4 className="text-xs font-cyber text-slate-300 mb-3 tracking-wide">COMMUNICATION LOG</h4>
+            
+            {/* Embedded Chat Container */}
+            <div className="bg-slate-900/60 rounded-lg border border-slate-600 h-full flex flex-col">
+              
+              {/* Chat Header */}
+              <div className="bg-slate-800/50 px-3 py-2 border-b border-slate-600 rounded-t-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span className="text-xs font-cyber text-slate-300">GBot.EXE Chat Session</span>
+                </div>
+              </div>
+              
+              {/* Chat Messages */}
+              <div className="flex-1 p-3 overflow-y-auto space-y-3">
+                {messages.map((message) => (
                   <motion.div
                     key={message.id}
                     initial={{ opacity: 0, y: 5 }}
@@ -191,7 +199,7 @@ export default function GBotInterface({
                         {message.timestamp}
                       </span>
                     </div>
-                    <div className={`p-3 rounded border text-sm ${
+                    <div className={`p-2 rounded border text-xs ${
                       message.isBot 
                         ? 'bg-blue-900/20 text-blue-100 border-blue-500/30' 
                         : 'bg-pink-900/20 text-pink-100 border-pink-500/30'
@@ -212,7 +220,7 @@ export default function GBotInterface({
                         GBot.EXE
                       </span>
                     </div>
-                    <div className="bg-blue-900/20 text-blue-100 border border-blue-500/30 p-3 rounded">
+                    <div className="bg-blue-900/20 text-blue-100 border border-blue-500/30 p-2 rounded">
                       <div className="flex space-x-1">
                         <motion.div 
                           className="w-2 h-2 bg-blue-400 rounded-full"
