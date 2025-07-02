@@ -114,7 +114,7 @@ export default function GBotInterface({
           <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex gap-3 items-center">
+              <div className="flex gap-3 items-stretch">
                 <input
                   type="text"
                   value={celebrityName}
