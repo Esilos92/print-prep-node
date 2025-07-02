@@ -68,16 +68,23 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
 
   return (
     <div className="cyber-panel">
-      <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '12px' }}>
+      {/* Headers Row - Mission Archive and Subject Log on same line */}
+      <div style={{ display: 'flex', flexDirection: 'row', padding: '12px 12px 0px 12px' }}>
+        <div style={{ width: '35%', paddingRight: '16px' }}>
+          <div>
+            <FileArchive className="w-6 h-6 text-blue-400 mb-2" />
+            <h3 className="font-cyber text-xl text-glow-blue">MISSION ARCHIVE</h3>
+          </div>
+        </div>
+        <div style={{ width: '65%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
+          <h3 className="font-cyber text-xl text-glow-blue">SUBJECT LOG</h3>
+        </div>
+      </div>
+      
+      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 60px)', padding: '0px 12px 12px 12px' }}>
         
         {/* LEFT COLUMN - 35% */}
         <div style={{ width: '35%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
-          
-          {/* Mission Archive Header with Icon */}
-          <div className="flex items-center gap-3">
-            <FileArchive className="w-6 h-6 text-blue-400" />
-            <span className="font-cyber text-xl text-glow-blue">MISSION ARCHIVE</span>
-          </div>
           
           {/* Completed Count underneath */}
           <div className="font-cyber text-lg text-blue-300 mt-2">
@@ -133,10 +140,8 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         {/* RIGHT COLUMN - 65% */}
         <div style={{ width: '65%', paddingLeft: '16px' }}>
           
-          <h3 className="font-cyber text-xl text-glow-blue mb-4">SUBJECT LOG</h3>
-          
           {/* Scrollable Job Cards - Fixed height for scrolling */}
-          <div style={{ height: 'calc(100% - 60px)', overflowY: 'auto' }} className="space-y-4">
+          <div style={{ height: '100%', overflowY: 'auto' }} className="space-y-4">
             {jobs.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-slate-500 font-ui">
                 No missions logged
@@ -150,7 +155,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   transition={{ delay: index * 0.1 }}
                   className="bg-slate-800/30 border border-slate-700 rounded-lg p-4"
                 >
-                  {/* Celebrity Name + Status Icon on same line */}
+                  {/* Check + Celebrity Name on same line */}
                   <div className="flex items-center gap-3 mb-3">
                     {getStatusIcon(job.status)}
                     <h4 className="font-cyber text-lg text-blue-300">{job.celebrity}</h4>
