@@ -127,48 +127,44 @@ export default function Dashboard() {
             </p>
           </motion.div>
 
-          {/* Dashboard Grid - Centered */}
-          <div 
-            className="grid gap-6 w-full mx-auto"
-            style={{ 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-              maxWidth: '1400px'
-            }}
-          >
-            {/* Left Column - GBot Chat Terminal */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="w-full"
-            >
-              <GBotInterface 
-                currentJob={currentJob}
-                onStartJob={handleStartJob}
-                celebrityName={celebrityName}
-                setCelebrityName={setCelebrityName}
-              />
-            </motion.div>
+          {/* Dashboard Grid - Centered with proper spacing */}
+          <div className="flex justify-center">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-fit">
+              {/* Left Column - GBot Chat Terminal */}
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="w-[400px]"
+              >
+                <GBotInterface 
+                  currentJob={currentJob}
+                  onStartJob={handleStartJob}
+                  celebrityName={celebrityName}
+                  setCelebrityName={setCelebrityName}
+                />
+              </motion.div>
 
-            {/* Middle Column - Mission Status */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="w-full"
-            >
-              <ProgressDisplay currentJob={currentJob} />
-            </motion.div>
+              {/* Middle Column - Mission Status */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="w-[400px]"
+              >
+                <ProgressDisplay currentJob={currentJob} />
+              </motion.div>
 
-            {/* Right Column - Mission Archive */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="w-full"
-            >
-              <JobHistory jobs={jobHistory} />
-            </motion.div>
+              {/* Right Column - Mission Archive */}
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="w-[400px]"
+              >
+                <JobHistory jobs={jobHistory} />
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>
