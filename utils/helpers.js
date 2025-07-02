@@ -93,46 +93,147 @@ class ImageHelpers {
   }
 
   /**
-   * NEW: Generate filename with celebrity last name
-   * Format: LastName-Role-Index-Format.jpg
+   * FIXED: Generate clean filename - Number - Actor - Show - Size
+   * Format: 01 - Jackson Rathbone - Twilight - 8x10.jpg
    */
   static generateFilename(celebrityName, roleName, index, format) {
-    // Extract last name from celebrity name
-    const lastName = ImageHelpers.extractLastName(celebrityName);
+    // Pad index to 2 digits
+    const paddedIndex = String(index).padStart(2, '0');
     
-    // Clean up role name (remove special characters, spaces to dashes)
-    const cleanRole = ImageHelpers.cleanRoleName(roleName);
+    // Clean celebrity name (full name, not just last name)
+    const cleanCelebrity = ImageHelpers.cleanCelebrityName(celebrityName);
     
-    // Generate filename: Shatner-Star_Trek_II-1-8x10.jpg
-    return `${lastName}-${cleanRole}-${index}-${format}.jpg`;
+    // Clean show name (extract clean show title, not source title)
+    const cleanShow = ImageHelpers.cleanShowName(roleName);
+    
+    // Generate clean filename: 01 - Jackson Rathbone - Twilight - 8x10.jpg
+    return `${paddedIndex} - ${cleanCelebrity} - ${cleanShow} - ${format}.jpg`;
   }
 
   /**
-   * NEW: Extract last name from full celebrity name
+   * NEW: Clean celebrity name for filename
    */
-  static extractLastName(fullName) {
+  static cleanCelebrityName(fullName) {
     if (!fullName) return 'Unknown';
     
-    // Split by spaces and take the last part
-    const parts = fullName.trim().split(/\s+/);
-    return parts[parts.length - 1]
-      .replace(/[^a-zA-Z0-9]/g, '') // Remove special characters
+    return fullName
+      .trim()
+      .replace(/[^\w\s]/g, '') // Remove special characters, keep spaces
+      .replace(/\s+/g, ' ')    // Normalize multiple spaces to single space
       .trim();
   }
 
   /**
-   * NEW: Clean role name for filename use
+   * NEW: Clean show name from role/title data
+   */
+  static cleanShowName(roleName) {
+    if (!roleName) return 'Unknown';
+    
+    // Handle different role name formats that might come through
+    let cleanName = roleName;
+    
+    // If it looks like a source title (contains URLs, "eBay", etc.), try to extract show name
+    if (this.isSourceTitle(roleName)) {
+      cleanName = this.extractShowFromSourceTitle(roleName);
+    }
+    
+    // Clean up the name
+    return cleanName
+      .replace(/[^\w\s-]/g, '') // Remove special chars except spaces and dashes
+      .replace(/\s+/g, ' ')     // Normalize spaces
+      .replace(/\bthe\b/gi, '') // Remove "the" articles
+      .replace(/\bsaga\b/gi, '') // Remove "saga"
+      .replace(/\bseries\b/gi, '') // Remove "series"
+      .replace(/\bmovie\b/gi, '') // Remove "movie"
+      .replace(/\btv\b/gi, '') // Remove "tv"
+      .trim()
+      .replace(/\s+/g, ' ')     // Final space cleanup
+      .substring(0, 30);        // Limit length
+  }
+
+  /**
+   * NEW: Check if this looks like a source title rather than clean show name
+   */
+  static isSourceTitle(title) {
+    const sourceIndicators = [
+      'ebay', 'amazon', 'etsy', 'wallpaper', 'download', 'hd', '|', 
+      'tcg', 'holo', 'sr ver', 'poster', 'decorative', 'canvas', 
+      'wall art', 'painting', 'gifts', 'bedroom', 'living room'
+    ];
+    
+    const lowerTitle = title.toLowerCase();
+    return sourceIndicators.some(indicator => lowerTitle.includes(indicator));
+  }
+
+  /**
+   * NEW: Extract show name from messy source titles
+   */
+  static extractShowFromSourceTitle(sourceTitle) {
+    // Try to extract show names from common patterns
+    const showPatterns = [
+      /clannad/i,
+      /twilight/i, 
+      /attack on titan/i,
+      /my hero academia/i,
+      /last airbender/i,
+      /angel beats/i,
+      /naruto/i,
+      /one piece/i,
+      /dragon ball/i
+    ];
+    
+    for (const pattern of showPatterns) {
+      const match = sourceTitle.match(pattern);
+      if (match) {
+        return match[0];
+      }
+    }
+    
+    // Fallback: try to extract first meaningful words before common junk
+    const junkMarkers = ['|', 'ebay', 'amazon', 'hd wallpaper', 'poster', 'tcg'];
+    let cleanTitle = sourceTitle;
+    
+    for (const marker of junkMarkers) {
+      const index = cleanTitle.toLowerCase().indexOf(marker.toLowerCase());
+      if (index !== -1) {
+        cleanTitle = cleanTitle.substring(0, index).trim();
+      }
+    }
+    
+    // Take first few meaningful words
+    const words = cleanTitle.split(/\s+/).filter(word => 
+      word.length > 2 && 
+      !['the', 'and', 'of', 'in', 'to', 'for'].includes(word.toLowerCase())
+    );
+    
+    return words.slice(0, 3).join(' ') || 'Unknown';
+  }
+
+  /**
+   * LEGACY: Keep old functions for backward compatibility
+   */
+  static extractLastName(fullName) {
+    if (!fullName) return 'Unknown';
+    
+    const parts = fullName.trim().split(/\s+/);
+    return parts[parts.length - 1]
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .trim();
+  }
+
+  /**
+   * LEGACY: Clean role name for filename use
    */
   static cleanRoleName(roleName) {
     if (!roleName) return 'Unknown';
     
     return roleName
-      .replace(/[^\w\s-]/g, '') // Remove special chars except spaces and dashes
-      .replace(/\s+/g, '_')     // Spaces to underscores
-      .replace(/-+/g, '_')      // Dashes to underscores
-      .replace(/_+/g, '_')      // Multiple underscores to single
-      .replace(/^_|_$/g, '')    // Remove leading/trailing underscores
-      .substring(0, 30);        // Limit length
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '_')
+      .replace(/-+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .substring(0, 30);
   }
 }
 
@@ -145,7 +246,7 @@ module.exports = {
   calculateSimilarity: ImageHelpers.calculateSimilarity.bind(ImageHelpers),
   sanitizeFilename: ImageHelpers.sanitizeFilename.bind(ImageHelpers),
   extractTags: ImageHelpers.extractTags.bind(ImageHelpers),
-  // NEW EXPORTS
+  // UPDATED EXPORTS
   generateFilename: ImageHelpers.generateFilename.bind(ImageHelpers),
   extractLastName: ImageHelpers.extractLastName.bind(ImageHelpers),
   cleanRoleName: ImageHelpers.cleanRoleName.bind(ImageHelpers)
