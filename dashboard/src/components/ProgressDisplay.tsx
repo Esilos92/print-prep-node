@@ -70,7 +70,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
       <div className="flex h-full">
         
         {/* Left Section - Header & Overall Progress */}
-        <div className="w-80 flex flex-col border-r border-blue-500/30">
+        <div className="w-72 flex flex-col border-r border-blue-500/30">
           {/* Header */}
           <div className="flex items-center justify-between p-3 border-b border-blue-500/30 flex-shrink-0">
             <div className="flex items-center gap-2">
@@ -132,10 +132,10 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
             <>
               {/* Phase Breakdown */}
               <div className="flex-1 p-4 overflow-y-auto">
-                <h5 className="font-cyber text-xs text-slate-300 mb-3 tracking-wide">
+                <h5 className="font-cyber text-xs text-slate-300 mb-4 tracking-wide">
                   MISSION PHASES
                 </h5>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-6 gap-3">
                   {phases.map((phase, index) => {
                     const Icon = phase.icon;
                     const phaseProgress = getPhaseProgress(index);
@@ -147,12 +147,16 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                         key={phase.name}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`flex items-center gap-2 p-2 rounded-lg ${
-                          isActive ? 'bg-blue-900/30 border border-blue-500/30' : ''
+                        transition={{ delay: index * 0.2 }}
+                        className={`flex flex-col items-center gap-2 p-3 rounded-lg border ${
+                          isActive 
+                            ? 'bg-blue-900/30 border-blue-500' 
+                            : isComplete 
+                              ? 'bg-green-900/20 border-green-500/50'
+                              : 'bg-slate-800/30 border-slate-600'
                         }`}
                       >
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border flex-shrink-0 ${
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                           isComplete 
                             ? 'bg-green-500 border-green-400' 
                             : isActive 
@@ -160,20 +164,20 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                               : 'bg-slate-700 border-slate-600'
                         }`}>
                           {isComplete ? (
-                            <CheckCircle2 className="w-4 h-4 text-white" />
+                            <CheckCircle2 className="w-5 h-5 text-white" />
                           ) : (
-                            <Icon className={`w-4 h-4 ${
+                            <Icon className={`w-5 h-5 ${
                               isActive ? 'text-white' : 'text-slate-400'
                             }`} />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-ui font-medium ${
-                            isActive ? 'text-blue-300' : 'text-slate-400'
+                        <div className="text-center">
+                          <p className={`text-xs font-ui font-medium text-center leading-tight ${
+                            isActive ? 'text-blue-300' : isComplete ? 'text-green-300' : 'text-slate-400'
                           }`}>
                             {phase.name}
                           </p>
-                          <div className="w-full bg-slate-700 h-1 rounded-full mt-1">
+                          <div className="w-full bg-slate-700 h-1 rounded-full mt-2">
                             <motion.div 
                               className={`h-full rounded-full ${
                                 isComplete 
