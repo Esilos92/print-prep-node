@@ -56,7 +56,7 @@ class SearchOptimizer {
       // Determine search strategy based on role type
       const searchStrategy = this.determineSearchStrategy(role);
       
-      const characterFirstTerms = this.generateCharacterFirstTerms(
+      const characterFirstTerms = await this.generateCharacterFirstTerms(
         celebrityName,
         role.character, 
         role.title, 
@@ -126,7 +126,7 @@ class SearchOptimizer {
   /**
    * ENHANCED: Generate SMART CHARACTER-FIRST search terms with multi-actor awareness
    */
-  generateCharacterFirstTerms(celebrityName, character, title, medium, strategy) {
+  async generateCharacterFirstTerms(celebrityName, character, title, medium, strategy) {
     const characterName = character || 'Unknown Character';
     const showTitle = title || 'Unknown Title';
     
