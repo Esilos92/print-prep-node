@@ -33,6 +33,15 @@ export default function GBotInterface({
   ]);
 
   const [isTyping, setIsTyping] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Fix hydration by ensuring client-side only rendering of timestamps
+  useEffect(() => {
+    setMounted(true);
+    setMessages(prev => prev.map(msg => 
+      msg.id === 1 ? { ...msg, timestamp: 'System Boot' } : msg
+    ));
+  }, []);
 
   useEffect(() => {
     if (currentJob?.status === 'running') {
@@ -41,13 +50,6 @@ export default function GBotInterface({
       addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
     }
   }, [currentJob?.status]);
-
-  // Set timestamp after component mounts (client-side only)
-  useEffect(() => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === 1 ? { ...msg, timestamp: 'System Boot' } : msg
-    ));
-  }, []);
 
   const addBotMessage = (text: string) => {
     setIsTyping(true);
@@ -75,6 +77,16 @@ export default function GBotInterface({
     }]);
 
     onStartJob();
+  };
+
+  const getCurrentTime = () => {
+    if (!mounted) return '--:--:--';
+    return new Date().toLocaleTimeString('en-US', { 
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
   };
 
   return (
@@ -149,7 +161,7 @@ export default function GBotInterface({
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400 font-mono text-xs">
-                {typeof window !== 'undefined' ? new Date().toISOString().split('T')[1].split('.')[0] : '--:--:--'}
+                {getCurrentTime()}
               </span>
             </div>
             <div className={`p-3 rounded-lg border ${
