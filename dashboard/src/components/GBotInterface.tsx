@@ -28,7 +28,7 @@ export default function GBotInterface({
       id: 1,
       text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
       isBot: true,
-      timestamp: 'System Boot'
+      timestamp: 'System Status'
     }
   ]);
 
@@ -87,17 +87,7 @@ export default function GBotInterface({
               </div>
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-blue-300" />
-                <span className="font-cyber text-sm text-blue-300">GBot.EXE Terminal</span>
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <motion.div 
-                  className="flex items-center gap-1"
-                  animate={{ opacity: currentJob?.status === 'running' ? [1, 0.5, 1] : 1 }}
-                  transition={{ repeat: currentJob?.status === 'running' ? Infinity : 0, duration: 1 }}
-                >
-                  <Cpu className="w-4 h-4 text-green-400" />
-                  <span className="text-xs text-green-400 font-cyber">ONLINE</span>
-                </motion.div>
+                <span className="font-cyber text-sm text-blue-300">NetNavi Interface</span>
               </div>
             </div>
           </div>
@@ -202,18 +192,18 @@ export default function GBotInterface({
           </div>
 
           {/* Terminal Input */}
-          <div className="p-4 bg-slate-900/80 border-t border-blue-500/30 flex-shrink-0">
-            <form onSubmit={handleSubmit} className="space-y-2">
+          <div className="p-4 bg-slate-900/80 border-t border-blue-500/30 flex-shrink-0 mt-auto">
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div className="flex gap-2">
                 <div className="flex items-center gap-2 text-xs text-slate-400 font-cyber">
-                  <span className="text-green-400">USER@terminal:</span>
+                  <span className="text-green-400">TARGET@NetOp:</span>
                   <span className="text-blue-400">~$</span>
                 </div>
                 <input
                   type="text"
                   value={celebrityName}
                   onChange={(e) => setCelebrityName(e.target.value)}
-                  placeholder="enter celebrity name..."
+                  placeholder="input celebrity target name..."
                   className="cyber-input flex-1 text-sm py-1 px-3"
                   disabled={currentJob?.status === 'running'}
                 />
@@ -235,7 +225,7 @@ export default function GBotInterface({
                   className="flex items-center gap-2 text-xs text-yellow-400 font-ui"
                 >
                   <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span>Processing mission... Stand by for updates</span>
+                  <span>Battle routine executing... Stand by for mission updates</span>
                 </motion.div>
               )}
             </form>
