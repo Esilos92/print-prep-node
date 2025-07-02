@@ -67,7 +67,6 @@ a {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
-  height: 650px;
 }
 
 .cyber-panel::before {
@@ -206,22 +205,4 @@ a {
   animation: pulse-blue 1.5s infinite;
 }
 
-.status-error {
-  color: #ef4444;
-  animation: pulse-red 1.5s infinite;
-}
-
-@keyframes pulse-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes pulse-blue {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes pulse-red {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+.status-
