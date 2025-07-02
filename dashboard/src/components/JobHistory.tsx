@@ -65,12 +65,12 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
 
   return (
     <div className="cyber-panel">
-      <div className="flex h-full">
+      <div className="flex h-full p-2">
         
         {/* Left Section - Header & Summary */}
-        <div className="w-80 flex flex-col border-r border-blue-500/30">
+        <div className="w-80 flex flex-col border-r border-blue-500/30 mr-2">
           {/* Header */}
-          <div className="flex items-center justify-between p-3 border-b border-blue-500/30 flex-shrink-0">
+          <div className="flex items-center justify-between p-3 border-b border-blue-500/30 flex-shrink-0 bg-slate-900/30 rounded-lg mb-2">
             <div className="flex items-center gap-2">
               <FileArchive className="w-5 h-5 text-blue-400" />
               <h3 className="text-lg font-cyber font-bold text-glow-blue">
@@ -80,7 +80,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           </div>
 
           {/* Summary Stats */}
-          <div className="flex-1 flex flex-col justify-center p-4">
+          <div className="flex-1 flex flex-col justify-center p-4 bg-slate-900/30 rounded-lg mb-2">
             <div className="space-y-4">
               {/* Mission Stats */}
               <div className="text-center">
@@ -101,19 +101,6 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                     <div className="text-sm font-cyber text-blue-300">{jobs[0].celebrity}</div>
                     <div className="text-xs text-slate-400 font-ui">{jobs[0].status.toUpperCase()}</div>
                   </div>
-                  
-                  {/* Download Button */}
-                  {jobs[0].status === 'completed' && jobs[0].downloadLink && (
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="cyber-button pink text-sm px-4 py-2 flex items-center gap-2 mx-auto"
-                      onClick={() => window.open(jobs[0].downloadLink, '_blank')}
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Download</span>
-                    </motion.button>
-                  )}
                 </div>
               )}
               
@@ -129,16 +116,31 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
               )}
             </div>
           </div>
+
+          {/* Download Button */}
+          {jobs.length > 0 && jobs[0].status === 'completed' && jobs[0].downloadLink && (
+            <div className="p-4 bg-slate-900/30 rounded-lg">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="cyber-button pink text-sm px-4 py-2 flex items-center gap-2 w-full justify-center"
+                onClick={() => window.open(jobs[0].downloadLink, '_blank')}
+              >
+                <Download className="w-4 h-4" />
+                <span>Download</span>
+              </motion.button>
+            </div>
+          )}
         </div>
 
         {/* Right Section - Subject Log */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col ml-2">
           {jobs.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-slate-500 font-ui text-sm">
+            <div className="flex-1 flex items-center justify-center text-slate-500 font-ui text-sm bg-slate-950/80 rounded-lg">
               Completed missions will appear here
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-950/80 rounded-lg">
               <h4 className="text-xs font-cyber text-slate-400 mb-4 tracking-wide">SUBJECT LOG</h4>
               <div className="space-y-4">
                 {jobs.map((job, index) => (
