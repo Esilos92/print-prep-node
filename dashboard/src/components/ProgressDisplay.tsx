@@ -148,6 +148,15 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                 {currentJob.celebrity}
               </h4>
 
+              {/* Roles beneath celebrity name */}
+              {currentJob.roles && (
+                <div className="text-center mb-4">
+                  <span className="text-sm text-blue-200 font-ui">
+                    {currentJob.roles.slice(0, 3).join(', ')}
+                  </span>
+                </div>
+              )}
+
               {/* Line Break */}
               <br />
 
@@ -212,57 +221,32 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
             </div>
 
             {/* Stats Section */}
-            {(currentJob.roles || currentJob.imagesProcessed) && (
+            {currentJob.imagesProcessed && (
               <div className="mt-6 pt-4 border-t border-slate-700">
-                <div className="grid grid-cols-2 gap-6">
-                  {/* Roles Found */}
-                  {currentJob.roles && (
-                    <div>
-                      <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-1">
-                        <Star className="w-3 h-3" />
-                        ROLES ({currentJob.roles.length})
-                      </h6>
-                      <div className="flex flex-wrap gap-2">
-                        {currentJob.roles.slice(0, 3).map((role, index) => (
-                          <motion.span
-                            key={role}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: index * 0.1 }}
-                            className="text-xs bg-blue-900/30 text-blue-200 px-3 py-1 rounded border border-blue-500/30 font-ui"
-                          >
-                            {role}
-                          </motion.span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Image Stats */}
-                  {currentJob.imagesProcessed && (
-                    <div>
-                      <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-1">
-                        <Image className="w-3 h-3" />
-                        IMAGES
-                      </h6>
-                      <div className="flex gap-6">
-                        <div className="text-center">
-                          <div className="text-yellow-400 font-cyber text-lg font-bold">
-                            {currentJob.imagesProcessed}
-                          </div>
-                          <div className="text-xs text-slate-300 font-ui">Downloaded</div>
+                <div className="grid grid-cols-1 gap-6">
+                  {/* Image Stats Only */}
+                  <div>
+                    <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-1">
+                      <Image className="w-3 h-3" />
+                      IMAGES
+                    </h6>
+                    <div className="flex gap-6">
+                      <div className="text-center">
+                        <div className="text-yellow-400 font-cyber text-lg font-bold">
+                          {currentJob.imagesProcessed}
                         </div>
-                        {currentJob.imagesValidated && (
-                          <div className="text-center">
-                            <div className="text-green-400 font-cyber text-lg font-bold">
-                              {currentJob.imagesValidated}
-                            </div>
-                            <div className="text-xs text-slate-300 font-ui">Validated</div>
-                          </div>
-                        )}
+                        <div className="text-xs text-slate-300 font-ui">Downloaded</div>
                       </div>
+                      {currentJob.imagesValidated && (
+                        <div className="text-center">
+                          <div className="text-green-400 font-cyber text-lg font-bold">
+                            {currentJob.imagesValidated}
+                          </div>
+                          <div className="text-xs text-slate-300 font-ui">Validated</div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
