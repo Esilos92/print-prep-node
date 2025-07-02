@@ -117,8 +117,8 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           
           <h3 className="font-cyber text-xl text-glow-blue mb-4">SUBJECT LOG</h3>
           
-          {/* Scrollable Job Cards */}
-          <div className="h-full overflow-y-auto space-y-4">
+          {/* Scrollable Job Cards - Fixed height for scrolling */}
+          <div style={{ height: 'calc(100% - 60px)', overflowY: 'auto' }} className="space-y-4">
             {jobs.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-slate-500 font-ui">
                 No missions logged
