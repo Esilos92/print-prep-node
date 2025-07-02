@@ -23,14 +23,7 @@ export default function GBotInterface({
   celebrityName, 
   setCelebrityName 
 }: GBotInterfaceProps) {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
-      isBot: true,
-      timestamp: 'GBot.EXE'
-    }
-  ]);
+  const [messages, setMessages] = useState<any[]>([]);
 
   const [isTyping, setIsTyping] = useState(false);
 
@@ -175,9 +168,6 @@ export default function GBotInterface({
                 <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
               </div>
               
-              {/* LINE BREAK */}
-              <br />
-
               {/* LINE BREAK */}
               <br />
             </>
