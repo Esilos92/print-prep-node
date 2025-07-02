@@ -24,43 +24,77 @@ class AIRoleFetcher {
   }
 
   /**
-   * MAIN: Fetch top 5 character roles optimized for image searching
+   * OPTIMIZED: Fetch most recognizable performances for cost-effective discovery
    */
   async fetchRoles(celebrityName) {
     try {
-      console.log(`🎯 AI discovering top roles for: ${celebrityName}`);
+      console.log(`🎯 AI discovering most recognizable performances for: ${celebrityName}`);
       
-      // Try voice actor detection first
-      let roles = await this.performVoiceActorDiscovery(celebrityName);
-      
-      if (!roles || roles.length < 3) {
-        // Primary discovery using main prompt
-        const primaryRoles = await this.performPrimaryDiscovery(celebrityName);
-        roles = this.mergeRoles(roles, primaryRoles);
-      }
+      // Single optimized discovery call
+      const roles = await this.performOptimizedDiscovery(celebrityName);
       
       if (!roles || roles.length < 3) {
-        // Enhanced discovery with specialized prompts
-        const enhancedRoles = await this.performEnhancedDiscovery(celebrityName);
-        roles = this.mergeRoles(roles, enhancedRoles);
-      }
-
-      if (!roles || roles.length < 3) {
-        // Broad discovery with fallback strategies
-        const broadRoles = await this.performBroadDiscovery(celebrityName);
-        roles = this.mergeRoles(roles, broadRoles);
+        // Only fallback if primary fails
+        console.log(`⚠️ Primary discovery found ${roles?.length || 0} roles, trying fallback...`);
+        const fallbackRoles = await this.performPrimaryDiscovery(celebrityName);
+        return this.mergeRoles(roles, fallbackRoles);
       }
 
       // Process and optimize roles
       const processedRoles = this.enhanceRoleData(roles);
       const optimizedRoles = await this.optimizeByPopularity(processedRoles, celebrityName);
       
-      console.log(`✅ AI discovered ${optimizedRoles.length} roles for ${celebrityName}`);
+      console.log(`✅ AI discovered ${optimizedRoles.length} recognizable performances for ${celebrityName}`);
       return optimizedRoles;
 
     } catch (error) {
-      console.error(`❌ AI role discovery failed for ${celebrityName}:`, error.message);
+      console.error(`❌ Optimized AI role discovery failed for ${celebrityName}:`, error.message);
       return this.createMinimalFallback(celebrityName);
+    }
+  }
+
+  /**
+   * OPTIMIZED: Cost-effective primary discovery with better prompt
+   */
+  async performOptimizedDiscovery(celebrityName) {
+    if (!this.hasOpenAI) return null;
+
+    try {
+      const optimizedPrompt = `List the 5 most recognizable performances by "${celebrityName}", including both series regular roles and notable one-off appearances. Prioritize roles where the character/performance is memorable, widely discussed, or culturally significant.
+
+Include major movie roles, significant TV series, and notable guest appearances (like acclaimed anthology episodes).
+
+Return as JSON array:
+[{
+  "character": "Exact Character Name", 
+  "title": "Show/Movie Title",
+  "medium": "live_action_tv/live_action_movie/voice_anime_tv",
+  "year": "YYYY",
+  "popularity": "high/medium/low"
+}]`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert entertainment analyst. Focus on recognizable performances that audiences remember, regardless of whether they're series regular or one-off roles. Always use exact character names from official credits."
+          },
+          {
+            role: "user", 
+            content: optimizedPrompt
+          }
+        ],
+        temperature: 0.1, // Low temperature for consistency
+        max_tokens: 600
+      });
+
+      const response = completion.choices[0].message.content;
+      return this.parseAndValidateResponse(response, celebrityName);
+      
+    } catch (error) {
+      console.log(`Optimized discovery failed: ${error.message}`);
+      return null;
     }
   }
 
@@ -90,7 +124,7 @@ class AIRoleFetcher {
 
       console.log(`🎭 ${celebrityName} identified as voice actor, using specialized discovery`);
 
-      const voiceActorPrompt = `List the 5 most famous voice acting roles for "${celebrityName}" in anime, animation, or video games.
+      const voiceActorPrompt = `List the 5 most recognizable voice acting performances by "${celebrityName}" in anime, animation, or video games.
 
 Use exact character names from official sources.
 
@@ -115,7 +149,7 @@ Return as JSON array:
             content: voiceActorPrompt
           }
         ],
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 600
       });
 
@@ -214,7 +248,7 @@ Return as JSON array:
             content: prompt
           }
         ],
-        temperature: PROMPT_CONFIG.TEMPERATURE.ROLE_FETCHING,
+        temperature: 0.1, // Lower temperature for consistency
         max_tokens: PROMPT_CONFIG.MAX_TOKENS.ROLE_FETCHING
       });
 
@@ -240,7 +274,7 @@ Return as JSON array:
       const requestBody = {
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: PROMPT_CONFIG.MAX_TOKENS.ROLE_FETCHING,
-        temperature: PROMPT_CONFIG.TEMPERATURE.ROLE_FETCHING,
+        temperature: 0.1, // Lower temperature for consistency
         messages: [{
           role: 'user',
           content: prompt
@@ -468,7 +502,7 @@ Return JSON: [{"index": 1, "popularityScore": 8}, {"index": 2, "popularityScore"
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: scoringPrompt }],
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 300
       });
 
