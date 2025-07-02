@@ -114,7 +114,28 @@ export default function GBotInterface({
           <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex gap-3 items-center">
+              <div className="flex gap-3 items-end">
+                <input
+                  type="text"
+                  value={celebrityName}
+                  onChange={(e) => setCelebrityName(e.target.value)}
+                  placeholder="input celebrity subject name..."
+                  className="cyber-input flex-1 text-base"
+                  style={{ padding: '12px 16px', height: '52px' }}
+                  disabled={currentJob?.status === 'running'}
+                />
+                <button
+                  type="submit"
+                  disabled={!celebrityName.trim() || currentJob?.status === 'running'}
+                  className={`cyber-button text-base whitespace-nowrap ${
+                    currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  style={{ padding: '12px 32px', height: '52px' }}
+                >
+                  <Send className="w-5 h-5 mr-2" />
+                  Execute
+                </button>
+              </div>-3 items-stretch">
                 <input
                   type="text"
                   value={celebrityName}
@@ -155,8 +176,8 @@ export default function GBotInterface({
           {/* Processing (only when running) */}
           {currentJob?.status === 'running' && (
             <>
-              <div>
-                <div className="flex items-center gap-4 mb-2">
+              <div className="mb-2">
+                <div className="flex items-center gap-4">
                   <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
                 </div>
                 <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
