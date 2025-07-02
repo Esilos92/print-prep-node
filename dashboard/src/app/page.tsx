@@ -124,13 +124,14 @@ export default function Dashboard() {
             </p>
           </motion.div>
 
-          {/* Dashboard Grid - Responsive 3-column */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+         {/* Dashboard Grid - Responsive 3-column with proper constraints */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 justify-items-center max-w-[1320px] mx-auto">
             {/* Left Column - GBot Chat Terminal */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
+              className="w-full max-w-[420px]"
             >
               <GBotInterface 
                 currentJob={currentJob}
@@ -145,6 +146,7 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
+              className="w-full max-w-[420px]"
             >
               <ProgressDisplay currentJob={currentJob} />
             </motion.div>
@@ -154,6 +156,7 @@ export default function Dashboard() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
+              className="w-full max-w-[420px]"
             >
               <JobHistory jobs={jobHistory} />
             </motion.div>
