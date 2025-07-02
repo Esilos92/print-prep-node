@@ -181,6 +181,9 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                 )}
               </div>
 
+              {/* Line Break between Mission Status row and Progress row */}
+              <br />
+
               {/* Progress Bar Row - Full Width */}
               <div className="mt-4 mb-2">
                 <div className="flex justify-between items-center mb-2">
