@@ -59,7 +59,7 @@ body {
   100% { transform: translate(50px, 50px); }
 }
 
-/* Enhanced Terminal/Panel Styling - Horizontal Rectangles */
+/* Enhanced Terminal/Panel Styling - Horizontal Rectangles with content-fitting height */
 .cyber-panel {
   background: linear-gradient(145deg, var(--bg-panel), var(--bg-card));
   border: 2px solid var(--border-glow);
@@ -67,7 +67,7 @@ body {
   box-shadow: var(--shadow-blue);
   position: relative;
   overflow: hidden;
-  height: 200px;
+  height: 350px;
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
@@ -76,10 +76,10 @@ body {
   flex-direction: column;
 }
 
-/* Ensure all panels are horizontal rectangles */
+/* Ensure all panels are horizontal rectangles with content-fitting height */
 @media (min-width: 1024px) {
   .cyber-panel {
-    height: 200px;
+    height: 350px;
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
