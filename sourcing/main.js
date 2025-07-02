@@ -208,7 +208,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * FIXED: Process CHARACTER-FIRST results with detailed analytics
+   * 🎯 FIXED: Process CHARACTER-FIRST results with proper data structure for image fetcher
    */
   processCharacterFirstResults(celebrityName, optimizedRoles, optimizationStats) {
     return {
@@ -220,10 +220,18 @@ class CelebrityRoleOrchestrator {
       roles: optimizedRoles.map((role, index) => ({
         ...role,
         priority: index + 1,
-        // FIXED: Don't overwrite smart search terms - keep existing finalSearchTerms
+        // 🎯 CRITICAL FIX: Ensure image fetcher gets the smart search data
+        name: role.title, // For compatibility with fetchImages
+        characterName: role.character, // Alternative property name
+        
+        // Ensure smart search properties are preserved
         finalSearchTerms: role.finalSearchTerms || this.searchOptimizer.getBestSearchTerms(role, 6),
+        isMultiActorCharacter: role.isMultiActorCharacter || false,
+        smartSearchApproach: role.searchApproach || 'Standard',
+        maxImages: role.maxImages || 20,
+        
         imageSearchReady: true,
-        // Enhanced metadata for fetchImages.js
+        // Enhanced metadata for intelligent processing
         searchMetadata: {
           strategy: role.searchStrategy || 'mixed',
           characterProminent: role.characterProminent,
@@ -484,7 +492,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * ENHANCED: Get search terms optimized for fetchImages integration
+   * 🎯 FIXED: Get search terms optimized for fetchImages integration with proper data structure
    */
   getSearchTermsForImages(results) {
     if (!results.roles || results.roles.length === 0) {
@@ -493,13 +501,19 @@ class CelebrityRoleOrchestrator {
 
     return results.roles.map(role => ({
       character: role.character,
+      characterName: role.characterName || role.character, // 🎯 ADDED: Alternative property
       title: role.title,
       medium: role.medium,
       celebrity: role.celebrity,
-      name: role.title, // For compatibility with fetchImages
+      name: role.name || role.title, // For compatibility with fetchImages
+      
+      // 🎯 CRITICAL: Ensure smart search properties are available
+      finalSearchTerms: role.finalSearchTerms || [], // Highest priority - SMART terms
+      isMultiActorCharacter: role.isMultiActorCharacter || false,
+      smartSearchApproach: role.smartSearchApproach || 'Standard',
+      maxImages: role.maxImages || 20,
       
       // ENHANCED: Priority fields for CHARACTER-FIRST fetchImages.js
-      finalSearchTerms: role.finalSearchTerms || [], // Highest priority - CHARACTER-FIRST terms
       searchTerms: role.searchTerms, // Contains character_images array and strategy breakdown
       characterImageTerms: role.searchTerms?.character_images || [], // Pure character terms
       balancedTerms: role.searchTerms?.balanced || [], // Character+actor terms
@@ -515,12 +529,6 @@ class CelebrityRoleOrchestrator {
       isVoiceRole: role.medium?.includes('voice') || false,
       isHighPriority: (role.searchPriority || 0) >= 5,
       useCharacterFirstApproach: role.characterProminent !== 'low',
-      
-      // ➕ ADDED: Multi-actor flags
-      isMultiActorCharacter: role.isMultiActorCharacter || false,
-      maxImages: role.maxImages || 20,
-      smartSearchApproach: role.searchApproach || 'Standard',
-      // ➕ END ADDITION
       
       // Legacy compatibility
       priority: role.priority
