@@ -72,10 +72,10 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
-      <div className="flex h-full p-3">
+      <div className="flex flex-row h-full p-3">
         
         {/* LEFT SIDE - Exactly 50% */}
-        <div className="w-1/2 pr-3 border-r border-blue-500/30 flex flex-col space-y-4">
+        <div className="w-1/2 pr-4 border-r border-blue-500/30 flex flex-col space-y-4">
           
           {/* Robot Emoji + GBot.EXE */}
           <div className="bg-slate-900/50 rounded-lg p-4">
@@ -148,7 +148,7 @@ export default function GBotInterface({
         </div>
 
         {/* RIGHT SIDE - Exactly 50% */}
-        <div className="w-1/2 pl-3 flex flex-col space-y-4">
+        <div className="w-1/2 pl-4 flex flex-col space-y-4">
           
           {/* Processing Status */}
           {currentJob?.status === 'running' && (
