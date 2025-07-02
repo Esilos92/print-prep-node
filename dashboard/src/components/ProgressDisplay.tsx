@@ -227,18 +227,21 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               
               {/* Column 1 - 33.33% */}
               <div style={{ width: '33.33%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                <br />
                 <PhaseItem phase={phases[0]} index={0} />
                 <PhaseItem phase={phases[1]} index={1} />
               </div>
 
               {/* Column 2 - 33.33% */}
               <div style={{ width: '33.33%', paddingLeft: '16px', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                <br />
                 <PhaseItem phase={phases[2]} index={2} />
                 <PhaseItem phase={phases[3]} index={3} />
               </div>
 
               {/* Column 3 - 33.33% */}
               <div style={{ width: '33.33%', paddingLeft: '16px' }}>
+                <br />
                 <PhaseItem phase={phases[4]} index={4} />
                 <PhaseItem phase={phases[5]} index={5} />
               </div>
