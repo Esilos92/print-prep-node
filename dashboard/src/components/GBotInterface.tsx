@@ -114,7 +114,7 @@ export default function GBotInterface({
           <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex gap-3 items-end">
+              <div className="flex gap-3 items-center">
                 <input
                   type="text"
                   value={celebrityName}
@@ -156,8 +156,10 @@ export default function GBotInterface({
           {currentJob?.status === 'running' && (
             <>
               <div>
+              <div className="flex items-center gap-3">
                 <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
-                <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
+              </div>
+              <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
               </div>
               
               {/* LINE BREAK */}
