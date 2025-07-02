@@ -64,9 +64,9 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
   };
 
   return (
-    <div className="cyber-panel p-6 h-[650px] flex flex-col">
+    <div className="cyber-panel">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-blue-500/30">
+      <div className="flex items-center justify-between p-6 pb-4 border-b border-blue-500/30 flex-shrink-0">
         <div className="flex items-center gap-3">
           <FileArchive className="w-6 h-6 text-blue-400" />
           <h3 className="text-xl font-cyber font-bold text-glow-blue">
@@ -85,24 +85,26 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
 
       {jobs.length === 0 ? (
         /* Empty State */
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center h-full text-center"
-        >
-          <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
-            <Calendar className="w-12 h-12 text-slate-600" />
-          </div>
-          <h4 className="text-lg font-cyber text-slate-400 mb-2">
-            NO MISSIONS LOGGED
-          </h4>
-          <p className="text-sm text-slate-500 font-ui">
-            Completed missions will appear here
-          </p>
-        </motion.div>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center h-full"
+          >
+            <div className="w-24 h-24 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+              <Calendar className="w-12 h-12 text-slate-600" />
+            </div>
+            <h4 className="text-lg font-cyber text-slate-400 mb-2">
+              NO MISSIONS LOGGED
+            </h4>
+            <p className="text-sm text-slate-500 font-ui">
+              Completed missions will appear here
+            </p>
+          </motion.div>
+        </div>
       ) : (
         /* Job List */
-        <div className="flex-1 overflow-y-auto space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {jobs.map((job, index) => (
             <motion.div
               key={job.id}
@@ -113,12 +115,12 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
             >
               {/* Job Header */}
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   {getStatusIcon(job.status)}
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-blue-300" />
-                      <h4 className="font-cyber text-lg text-blue-300">
+                      <User className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                      <h4 className="font-cyber text-lg text-blue-300 truncate">
                         {job.celebrity}
                       </h4>
                     </div>
@@ -132,7 +134,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="cyber-button pink text-sm px-4 py-2 flex items-center gap-2 min-w-fit"
+                    className="cyber-button pink text-sm px-4 py-2 flex items-center gap-2 flex-shrink-0"
                     onClick={() => window.open(job.downloadLink, '_blank')}
                   >
                     <Download className="w-4 h-4" />
@@ -149,7 +151,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   <div className="space-y-1">
                     {job.startTime && (
                       <div className="flex items-center gap-2 text-xs">
-                        <Clock className="w-3 h-3 text-slate-500" />
+                        <Clock className="w-3 h-3 text-slate-500 flex-shrink-0" />
                         <span className="text-slate-300 font-ui">
                           {job.startTime.toLocaleTimeString()}
                         </span>
@@ -157,7 +159,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                     )}
                     {job.endTime && (
                       <div className="flex items-center gap-2 text-xs">
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
                         <span className="text-slate-300 font-ui">
                           {formatDuration(job.startTime, job.endTime)}
                         </span>
@@ -172,7 +174,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   <div className="space-y-1">
                     {job.roles && (
                       <div className="flex items-center gap-2 text-xs">
-                        <Star className="w-3 h-3 text-yellow-500" />
+                        <Star className="w-3 h-3 text-yellow-500 flex-shrink-0" />
                         <span className="text-slate-300 font-ui">
                           {job.roles.length} roles found
                         </span>
@@ -180,7 +182,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                     )}
                     {job.imagesValidated && (
                       <div className="flex items-center gap-2 text-xs">
-                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <CheckCircle2 className="w-3 h-3 text-green-500 flex-shrink-0" />
                         <span className="text-slate-300 font-ui">
                           {job.imagesValidated} images validated
                         </span>
