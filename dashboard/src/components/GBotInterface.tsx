@@ -63,45 +63,8 @@ export default function GBotInterface({
   };
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Lightning Animation Around ENTIRE Container */}
-      <div 
-        style={{ 
-          position: 'absolute', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          pointerEvents: 'none', 
-          zIndex: 10 
-        }}
-      >
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-          style={{ width: '100%', height: '100%', position: 'relative' }}
-        >
-          {/* Top */}
-          <div style={{ position: 'absolute', top: '8px', left: '50%', transform: 'translateX(-50%)' }}>
-            <Zap className="w-4 h-4 text-yellow-400" />
-          </div>
-          {/* Right */}
-          <div style={{ position: 'absolute', top: '50%', right: '8px', transform: 'translateY(-50%)' }}>
-            <Zap className="w-4 h-4 text-yellow-400" />
-          </div>
-          {/* Bottom */}
-          <div style={{ position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)' }}>
-            <Zap className="w-4 h-4 text-yellow-400" />
-          </div>
-          {/* Left */}
-          <div style={{ position: 'absolute', top: '50%', left: '8px', transform: 'translateY(-50%)' }}>
-            <Zap className="w-4 h-4 text-yellow-400" />
-          </div>
-        </motion.div>
-      </div>
-
-      <div className="cyber-panel">
-        <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '12px' }}>
+    <div className="cyber-panel">
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '12px' }}>
           
           {/* LEFT SIDE - Exactly 50% */}
           <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
