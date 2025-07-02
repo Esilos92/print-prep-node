@@ -170,30 +170,23 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                       <Image className="w-4 h-4" />
                       IMAGES
                     </h6>
-                    <br />
-                    <div className="flex gap-8">
-                      <div className="text-center">
-                        <div className="text-yellow-400 font-cyber text-2xl font-bold">
-                          {currentJob.imagesProcessed}
-                        </div>
-                        <div className="text-sm text-slate-300 font-ui">Downloaded</div>
+                    <div className="text-center">
+                      <div className="text-2xl font-cyber font-bold text-blue-200">
+                        {currentJob.imagesProcessed}
+                        {currentJob.imagesValidated && (
+                          <>/{currentJob.imagesValidated}</>
+                        )}
                       </div>
-                      {currentJob.imagesValidated && (
-                        <div className="text-center">
-                          <div className="text-green-400 font-cyber text-2xl font-bold">
-                            {currentJob.imagesValidated}
-                          </div>
-                          <div className="text-sm text-slate-300 font-ui">Validated</div>
-                        </div>
-                      )}
+                      <div className="text-sm text-slate-300 font-ui">
+                        Downloaded{currentJob.imagesValidated && ' / Validated'}
+                      </div>
                     </div>
-                    <br />
                   </div>
                 )}
               </div>
 
               {/* Progress Bar Row - Full Width */}
-              <div className="mt-6 mb-4">
+              <div className="mt-4 mb-2">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-2xl font-cyber font-bold text-blue-400">
                     {currentJob.progress}%
@@ -226,8 +219,8 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
         {/* BENEATH THE ROW - Mission Phases in 3 Columns */}
         {currentJob && (
-          <div className="border-t border-slate-700 pt-6">
-            <h5 className="font-cyber text-sm text-slate-300 mb-6 tracking-wide">
+          <div className="border-t border-slate-700 pt-4">
+            <h5 className="font-cyber text-sm text-slate-300 mb-4 tracking-wide">
               MISSION PHASES
             </h5>
             
