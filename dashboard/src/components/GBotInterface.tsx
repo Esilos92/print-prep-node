@@ -28,20 +28,11 @@ export default function GBotInterface({
       id: 1,
       text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
       isBot: true,
-      timestamp: ''
+      timestamp: 'System Boot'
     }
   ]);
 
   const [isTyping, setIsTyping] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // Fix hydration by ensuring client-side only rendering of timestamps
-  useEffect(() => {
-    setMounted(true);
-    setMessages(prev => prev.map(msg => 
-      msg.id === 1 ? { ...msg, timestamp: 'System Boot' } : msg
-    ));
-  }, []);
 
   useEffect(() => {
     if (currentJob?.status === 'running') {
@@ -79,20 +70,10 @@ export default function GBotInterface({
     onStartJob();
   };
 
-  const getCurrentTime = () => {
-    if (!mounted) return '';
-    return new Date().toLocaleTimeString('en-US', { 
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
   return (
-    <div className="cyber-panel p-0 h-[650px] flex flex-col overflow-hidden">
+    <div className="cyber-panel">
       {/* Terminal Header */}
-      <div className="bg-gradient-to-r from-blue-900/80 to-blue-800/80 px-4 py-3 border-b border-blue-500/30">
+      <div className="bg-gradient-to-r from-blue-900/80 to-blue-800/80 px-4 py-3 border-b border-blue-500/30 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -117,7 +98,7 @@ export default function GBotInterface({
       </div>
 
       {/* GBot Avatar & Status */}
-      <div className="px-4 py-3 bg-slate-900/50 border-b border-blue-500/20">
+      <div className="px-4 py-3 bg-slate-900/50 border-b border-blue-500/20 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
@@ -159,10 +140,6 @@ export default function GBotInterface({
               }`}>
                 {message.timestamp}
               </span>
-              <span className="text-slate-500">•</span>
-              <span className="text-slate-400 font-mono text-xs">
-                {mounted && getCurrentTime()}
-              </span>
             </div>
             <div className={`p-3 rounded-lg border ${
               message.isBot 
@@ -184,8 +161,6 @@ export default function GBotInterface({
               <span className="font-cyber px-2 py-1 rounded text-xs bg-blue-900/50 text-blue-300">
                 GBot.EXE
               </span>
-              <span className="text-slate-500">•</span>
-              <span className="text-slate-400 font-mono text-xs">typing...</span>
             </div>
             <div className="bg-blue-900/20 text-blue-100 border border-blue-500/30 p-3 rounded-lg">
               <div className="flex space-x-1">
@@ -211,7 +186,7 @@ export default function GBotInterface({
       </div>
 
       {/* Terminal Input */}
-      <div className="p-4 bg-slate-900/80 border-t border-blue-500/30">
+      <div className="p-4 bg-slate-900/80 border-t border-blue-500/30 flex-shrink-0">
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex gap-2">
             <div className="flex items-center gap-2 text-xs text-slate-400 font-cyber min-w-0">
