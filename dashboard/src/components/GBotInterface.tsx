@@ -120,8 +120,16 @@ export default function GBotInterface({
                   value={celebrityName}
                   onChange={(e) => setCelebrityName(e.target.value)}
                   placeholder="input celebrity subject name..."
-                  className="cyber-input flex-1 text-base"
-                  style={{ padding: '12px 16px', height: '48px', boxSizing: 'border-box' }}
+                  className="flex-1 text-base"
+                  style={{ 
+                    background: 'var(--bg-dark)',
+                    border: '2px solid var(--border-glow)',
+                    borderRadius: '8px',
+                    padding: '12px 16px', 
+                    height: '48px', 
+                    boxSizing: 'border-box',
+                    color: 'var(--text-primary)'
+                  }}
                   disabled={currentJob?.status === 'running'}
                 />
                 <button
