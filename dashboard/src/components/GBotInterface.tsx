@@ -157,7 +157,7 @@ export default function GBotInterface({
             <>
               <div>
                 <div className="flex items-center gap-4 mb-2">
-                  <Zap className="w-6 h-6 text-blue-400 opacity-0" />
+                  <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
                 </div>
                 <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
                 <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
