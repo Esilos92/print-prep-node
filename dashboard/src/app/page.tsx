@@ -1,10 +1,6 @@
-'use client';
-
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import GBotInterface from '@/components/GBotInterface';
-import ProgressDisplay from '@/components/ProgressDisplay';
-import JobHistory from '@/components/JobHistory';
+import { Bot, Send, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface JobStatus {
   id: string;
@@ -12,166 +8,255 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  roles?: string[];
-  imagesProcessed?: number;
-  imagesValidated?: number;
-  downloadLink?: string;
-  startTime?: Date;
-  endTime?: Date;
 }
 
-export default function Dashboard() {
-  const [celebrityName, setCelebrityName] = useState('');
-  const [currentJob, setCurrentJob] = useState<JobStatus | null>({
-    id: 'mock-1',
-    celebrity: 'Ryan Reynolds',
-    status: 'running',
-    currentPhase: 'Downloading image candidates...',
-    progress: 65,
-    roles: ['Deadpool', 'Green Lantern', 'The Proposal'],
-    imagesProcessed: 28,
-    imagesValidated: 15,
-    startTime: new Date(Date.now() - 120000) // 2 minutes ago
-  });
-  const [jobHistory, setJobHistory] = useState<JobStatus[]>([
-    // Mock data for now
+interface GBotInterfaceProps {
+  currentJob: JobStatus | null;
+  onStartJob: () => void;
+  celebrityName: string;
+  setCelebrityName: (name: string) => void;
+}
+
+export default function GBotInterface({ 
+  currentJob, 
+  onStartJob, 
+  celebrityName, 
+  setCelebrityName 
+}: GBotInterfaceProps) {
+  const [messages, setMessages] = useState([
     {
-      id: '1',
-      celebrity: 'Ryan Gosling',
-      status: 'completed',
-      currentPhase: 'Complete',
-      progress: 100,
-      roles: ['Blade Runner 2049', 'La La Land', 'Drive'],
-      imagesProcessed: 47,
-      imagesValidated: 23,
-      downloadLink: '#',
-      startTime: new Date(Date.now() - 300000),
-      endTime: new Date(Date.now() - 60000)
+      id: 1,
+      text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
+      isBot: true,
+      timestamp: 'System Status'
     }
   ]);
 
-  const handleStartJob = async () => {
-    if (!celebrityName.trim()) return;
+  const [isTyping, setIsTyping] = useState(false);
 
-    const newJob: JobStatus = {
-      id: Date.now().toString(),
-      celebrity: celebrityName,
-      status: 'running',
-      currentPhase: 'Initializing AI systems...',
-      progress: 0,
-      startTime: new Date()
-    };
-
-    setCurrentJob(newJob);
-    setCelebrityName('');
-
-    // Mock progress simulation (will be replaced with real backend calls)
-    simulateProgress(newJob);
-  };
-
-  const simulateProgress = async (job: JobStatus) => {
-    const phases = [
-      { phase: 'Scanning filmography database...', progress: 10, delay: 1000 },
-      { phase: 'Analyzing most recognizable performances...', progress: 25, delay: 2000 },
-      { phase: 'Generating precision search protocols...', progress: 40, delay: 1500 },
-      { phase: 'Downloading image candidates...', progress: 70, delay: 3000 },
-      { phase: 'AI validation in progress...', progress: 90, delay: 2000 },
-      { phase: 'Compiling print-ready files...', progress: 100, delay: 1000 }
-    ];
-
-    for (const { phase, progress, delay } of phases) {
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      setCurrentJob(prev => prev ? {
-        ...prev,
-        currentPhase: phase,
-        progress,
-        roles: progress > 25 ? ['Blade Runner 2049', 'La La Land', 'Drive'] : undefined,
-        imagesProcessed: progress > 70 ? Math.floor((progress - 70) * 2) : undefined,
-        imagesValidated: progress > 90 ? Math.floor((progress - 90) * 2) : undefined
-      } : null);
+  useEffect(() => {
+    if (currentJob?.status === 'running') {
+      addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
+    } else if (currentJob?.status === 'completed') {
+      addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
     }
+  }, [currentJob?.status]);
 
-    // Complete the job
+  const addBotMessage = (text: string) => {
+    setIsTyping(true);
     setTimeout(() => {
-      setCurrentJob(prev => prev ? {
-        ...prev,
-        status: 'completed',
-        currentPhase: 'Mission Complete!',
-        downloadLink: '#',
-        endTime: new Date()
-      } : null);
-
-      // Add to history after 2 seconds
-      setTimeout(() => {
-        if (currentJob) {
-          setJobHistory(prev => [{ ...currentJob, status: 'completed', endTime: new Date() }, ...prev]);
-          setCurrentJob(null);
-        }
-      }, 2000);
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text,
+        isBot: true,
+        timestamp: 'GBot.EXE'
+      }]);
+      setIsTyping(false);
     }, 1000);
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!celebrityName.trim() || currentJob?.status === 'running') return;
+
+    // Add user message
+    setMessages(prev => [...prev, {
+      id: Date.now(),
+      text: `Process images for: ${celebrityName}`,
+      isBot: false,
+      timestamp: 'USER'
+    }]);
+
+    onStartJob();
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900 relative">
-      {/* Animated background grid */}
-      <div className="cyber-grid"></div>
-      
-      {/* Main Container - Structured Layout */}
-      <div className="min-h-screen flex flex-col justify-center px-8 py-8 relative z-10">
+    <div className="cyber-panel relative">
+      {/* Rotating Animation Around Entire Container */}
+      <motion.div 
+        className="absolute inset-0 pointer-events-none"
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
+      >
+        <div className="absolute top-2 left-1/2 transform -translate-x-1/2">
+          <Zap className="w-4 h-4 text-yellow-400" />
+        </div>
+      </motion.div>
+
+      <div className="flex h-full p-4 gap-4">
         
-        {/* Header Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-4xl font-cyber font-bold text-glow-blue mb-3">
-            CELEBRITY IMAGE SOURCING SYSTEM
-          </h1>
-          <p className="text-lg text-slate-400 font-ui">
-            Powered by GBot.EXE AI Assistant
-          </p>
-        </motion.div>
-
-        {/* Three Horizontal Panels with Better Spacing */}
-        <div className="max-w-7xl mx-auto w-full space-y-16">
+        {/* LEFT COLUMN - 50% width */}
+        <div className="w-1/2 flex flex-col gap-4">
           
-          {/* Panel 1 - GBot Terminal */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="w-full"
-          >
-            <GBotInterface 
-              currentJob={currentJob}
-              onStartJob={handleStartJob}
-              celebrityName={celebrityName}
-              setCelebrityName={setCelebrityName}
-            />
-          </motion.div>
+          {/* Robot Avatar & Title */}
+          <div className="bg-slate-900/50 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+                <motion.div 
+                  className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-slate-900"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                />
+              </div>
+              <div>
+                <h3 className="font-cyber text-lg font-bold text-glow-blue">GBot.EXE</h3>
+                <p className="text-sm text-slate-400">AI Image Sourcing Assistant</p>
+              </div>
+            </div>
+          </div>
 
-          {/* Panel 2 - Mission Status */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="w-full"
-          >
-            <ProgressDisplay currentJob={currentJob} />
-          </motion.div>
+          {/* System Status */}
+          <div className="bg-slate-900/30 rounded-lg p-4 flex-1">
+            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SYSTEM STATUS</h4>
+            <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
+              <p className="text-sm font-ui leading-relaxed">
+                GBot.EXE online! Ready to execute celebrity image sourcing missions.
+              </p>
+            </div>
+          </div>
 
-          {/* Panel 3 - Mission Archive */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="w-full"
-          >
-            <JobHistory jobs={jobHistory} />
-          </motion.div>
+          {/* Processing Status - Only show when running */}
+          {currentJob?.status === 'running' && (
+            <div className="bg-slate-800/40 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                >
+                  <Zap className="w-5 h-5 text-blue-400" />
+                </motion.div>
+                <span className="font-cyber text-lg text-glow-blue">PROCESSING</span>
+              </div>
+              <div className="text-blue-300 font-cyber text-xl">{currentJob.celebrity}</div>
+            </div>
+          )}
 
+          {/* Subject Input */}
+          <div className="bg-slate-900/30 rounded-lg p-4">
+            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SUBJECT INPUT</h4>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={celebrityName}
+                  onChange={(e) => setCelebrityName(e.target.value)}
+                  placeholder="input celebrity subject name..."
+                  className="cyber-input flex-1 text-sm py-3 px-3"
+                  disabled={currentJob?.status === 'running'}
+                />
+                <button
+                  type="submit"
+                  disabled={!celebrityName.trim() || currentJob?.status === 'running'}
+                  className={`cyber-button px-6 py-3 text-sm whitespace-nowrap ${
+                    currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  Execute
+                </button>
+              </div>
+              
+              {currentJob?.status === 'running' && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-2 text-sm text-yellow-400 font-ui"
+                >
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  <span>Battle routine executing... Stand by for mission updates</span>
+                </motion.div>
+              )}
+            </form>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN - 50% width */}
+        <div className="w-1/2 flex flex-col">
+          
+          {/* Communication Log - Full height terminal */}
+          <div className="bg-slate-950/80 rounded-lg p-4 flex-1 flex flex-col">
+            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">COMMUNICATION LOG</h4>
+            
+            {/* Embedded Terminal-Style Chat */}
+            <div className="bg-black/80 rounded-lg border-2 border-slate-600 flex-1 flex flex-col overflow-hidden">
+              
+              {/* Terminal Header Bar */}
+              <div className="bg-slate-700 px-3 py-2 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-xs font-mono text-slate-300 ml-2">chat://gbot.exe</span>
+              </div>
+              
+              {/* Chat Messages Area */}
+              <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-black/90">
+                {messages.map((message) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono px-2 py-1 rounded text-xs ${
+                        message.isBot 
+                          ? 'bg-blue-800/60 text-blue-200' 
+                          : 'bg-pink-800/60 text-pink-200'
+                      }`}>
+                        [{message.timestamp}]
+                      </span>
+                    </div>
+                    <div className={`p-3 rounded border-l-4 text-sm ${
+                      message.isBot 
+                        ? 'bg-slate-900/80 text-green-300 border-blue-500 font-mono' 
+                        : 'bg-slate-900/80 text-cyan-300 border-pink-500 font-mono'
+                    }`}>
+                      <p className="leading-relaxed">{message.text}</p>
+                    </div>
+                  </motion.div>
+                ))}
+                
+                {isTyping && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono px-2 py-1 rounded text-xs bg-blue-800/60 text-blue-200">
+                        [GBot.EXE]
+                      </span>
+                    </div>
+                    <div className="bg-slate-900/80 text-green-300 border-l-4 border-blue-500 p-3 rounded font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">Typing</span>
+                        <div className="flex space-x-1">
+                          <motion.div 
+                            className="w-1.5 h-1.5 bg-green-400 rounded-full"
+                            animate={{ scale: [1, 1.5, 1] }}
+                            transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
+                          />
+                          <motion.div 
+                            className="w-1.5 h-1.5 bg-green-400 rounded-full"
+                            animate={{ scale: [1, 1.5, 1] }}
+                            transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                          />
+                          <motion.div 
+                            className="w-1.5 h-1.5 bg-green-400 rounded-full"
+                            animate={{ scale: [1, 1.5, 1] }}
+                            transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
