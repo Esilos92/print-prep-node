@@ -66,7 +66,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
   return (
     <div className="cyber-panel">
       {/* Header */}
-      <div className="flex items-center justify-between p-6 pb-4 border-b border-blue-500/30 flex-shrink-0">
+      <div className="flex items-center justify-between p-4 pb-3 border-b border-blue-500/30 flex-shrink-0">
         <div className="flex items-center gap-3">
           <FileArchive className="w-6 h-6 text-blue-400" />
           <h3 className="text-xl font-cyber font-bold text-glow-blue">
@@ -85,7 +85,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
 
       {jobs.length === 0 ? (
         /* Empty State */
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -104,7 +104,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         </div>
       ) : (
         /* Job List */
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {jobs.map((job, index) => (
             <motion.div
               key={job.id}
