@@ -80,7 +80,7 @@ export default function GBotInterface({
   };
 
   const getCurrentTime = () => {
-    if (!mounted) return '--:--:--';
+    if (!mounted) return '';
     return new Date().toLocaleTimeString('en-US', { 
       hour12: false,
       hour: '2-digit',
@@ -161,7 +161,7 @@ export default function GBotInterface({
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400 font-mono text-xs">
-                {getCurrentTime()}
+                {mounted && getCurrentTime()}
               </span>
             </div>
             <div className={`p-3 rounded-lg border ${
