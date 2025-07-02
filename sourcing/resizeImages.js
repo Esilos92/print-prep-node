@@ -139,7 +139,7 @@ class ImageResizer {
       formats.push('8x10');
     }
     
-    logger.debug(`Image ${image.filename} (${width}x${height}, ratio: ${aspectRatio.toFixed(3)}) -> formats: ${formats.join(', ')}`);
+    logger.info(`Image ${image.filename} (${width}x${height}, ratio: ${aspectRatio.toFixed(3)}) -> formats: ${formats.join(', ')}`);
     
     return formats;
   }
