@@ -208,7 +208,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * ENHANCED: Process CHARACTER-FIRST results with detailed analytics
+   * FIXED: Process CHARACTER-FIRST results with detailed analytics
    */
   processCharacterFirstResults(celebrityName, optimizedRoles, optimizationStats) {
     return {
@@ -220,8 +220,8 @@ class CelebrityRoleOrchestrator {
       roles: optimizedRoles.map((role, index) => ({
         ...role,
         priority: index + 1,
-        // PRIMARY: CHARACTER-FIRST search terms
-        finalSearchTerms: this.searchOptimizer.getBestSearchTerms(role, 6),
+        // FIXED: Don't overwrite smart search terms - keep existing finalSearchTerms
+        finalSearchTerms: role.finalSearchTerms || this.searchOptimizer.getBestSearchTerms(role, 6),
         imageSearchReady: true,
         // Enhanced metadata for fetchImages.js
         searchMetadata: {
