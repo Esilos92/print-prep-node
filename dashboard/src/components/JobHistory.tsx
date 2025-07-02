@@ -112,7 +112,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                 )}
                 {(lastJob.imagesProcessed || lastJob.imagesValidated) && (
                   <div className="text-sm font-ui text-slate-300">
-                    <span className="text-slate-400">Images:</span> {lastJob.imagesValidated || 0} Validated / {lastJob.imagesProcessed || 0} Downloaded
+                    <span className="text-slate-400">Images:</span> {lastJob.imagesProcessed || 0} Downloaded / {lastJob.imagesValidated || 0} Validated
                   </div>
                 )}
               </div>
@@ -155,7 +155,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   className="bg-slate-800/30 border border-slate-700 rounded-lg p-4"
                 >
                   {/* Check + Celebrity Name on same line */}
-                  <div className="flex items-center gap-2 mb-3">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                     {getStatusIcon(job.status)}
                     <h4 className="font-cyber text-lg text-blue-300">{job.celebrity}</h4>
                   </div>
@@ -170,7 +170,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                     
                     {(job.imagesProcessed || job.imagesValidated) && (
                       <div className="text-sm font-ui text-slate-300">
-                        <span className="text-slate-400">Images:</span> {job.imagesValidated || 0} Validated / {job.imagesProcessed || 0} Downloaded
+                        <span className="text-slate-400">Images:</span> {job.imagesProcessed || 0} Downloaded / {job.imagesValidated || 0} Validated
                       </div>
                     )}
                     
