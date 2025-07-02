@@ -171,14 +171,11 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                       IMAGES
                     </h6>
                     <div className="text-center">
-                      <div className="text-2xl font-cyber font-bold text-blue-200">
-                        {currentJob.imagesProcessed}
+                      <div className="text-lg font-cyber font-bold text-blue-200">
+                        {currentJob.imagesProcessed} Downloaded
                         {currentJob.imagesValidated && (
-                          <>/{currentJob.imagesValidated}</>
+                          <> / {currentJob.imagesValidated} Validated</>
                         )}
-                      </div>
-                      <div className="text-sm text-slate-300 font-ui">
-                        Downloaded{currentJob.imagesValidated && ' / Validated'}
                       </div>
                     </div>
                   </div>
