@@ -93,32 +93,22 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
         transition={{ delay: index * 0.2 }}
         className="flex items-center gap-3 mb-4"
       >
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-          isComplete 
-            ? 'bg-green-500 border-green-400' 
-            : isCurrent 
-              ? 'bg-blue-500 border-blue-400' 
-              : 'bg-slate-700 border-slate-600'
-        }`}>
-          {isComplete ? (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.5, type: "spring" }}
-            >
-              <CheckCircle2 className="w-5 h-5 text-white" />
-            </motion.div>
-          ) : (
-            <Icon className={`w-4 h-4 ${
-              isCurrent ? 'text-white' : 'text-slate-400'
-            }`} />
-          )}
-        </div>
         <span className={`text-sm font-ui ${
           isComplete ? 'text-green-300' : isCurrent ? 'text-blue-300' : 'text-slate-400'
         }`}>
           {phase.name}
         </span>
+        
+        {/* Checkmark next to phase name */}
+        {isComplete && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, type: "spring" }}
+          >
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+          </motion.div>
+        )}
       </motion.div>
     );
   };
@@ -196,24 +186,24 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               MISSION PHASES
             </h5>
             
-            <div className="grid grid-cols-3 gap-8">
+            <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
               
-              {/* Column 1 */}
-              <div>
+              {/* Column 1 - 33.33% */}
+              <div style={{ width: '33.33%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
                 <PhaseItem phase={phases[0]} index={0} />
                 {isPhaseActive(0) && <br />}
                 <PhaseItem phase={phases[1]} index={1} />
               </div>
 
-              {/* Column 2 */}
-              <div>
+              {/* Column 2 - 33.33% */}
+              <div style={{ width: '33.33%', paddingLeft: '16px', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
                 <PhaseItem phase={phases[2]} index={2} />
                 {isPhaseActive(2) && <br />}
                 <PhaseItem phase={phases[3]} index={3} />
               </div>
 
-              {/* Column 3 */}
-              <div>
+              {/* Column 3 - 33.33% */}
+              <div style={{ width: '33.33%', paddingLeft: '16px' }}>
                 <PhaseItem phase={phases[4]} index={4} />
                 {isPhaseActive(4) && <br />}
                 <PhaseItem phase={phases[5]} index={5} />
