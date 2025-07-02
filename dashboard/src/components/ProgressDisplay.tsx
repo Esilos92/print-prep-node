@@ -99,16 +99,18 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           {phase.name}
         </span>
         
-        {/* Checkmark next to phase name */}
-        {isComplete && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.5, type: "spring" }}
-          >
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
-          </motion.div>
-        )}
+        {/* Checkmark directly next to phase name on same line */}
+        <span className="flex items-center">
+          {isComplete && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.5, type: "spring" }}
+            >
+              <CheckCircle2 className="w-4 h-4 text-green-400 ml-2" />
+            </motion.div>
+          )}
+        </span>
       </motion.div>
     );
   };
