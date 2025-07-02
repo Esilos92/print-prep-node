@@ -83,79 +83,70 @@ export default function GBotInterface({
         </div>
       </motion.div>
 
-      <div className="flex h-full p-4 gap-4">
+      <div className="flex h-full">
         
-        {/* LEFT COLUMN - 50% width */}
-        <div className="w-1/2 flex flex-col gap-4">
+        {/* LEFT SIDE - 50% */}
+        <div className="w-1/2 p-6 border-r border-blue-500/30 flex flex-col">
           
-          {/* Robot Avatar & Title */}
-          <div className="bg-slate-900/50 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                  <Bot className="w-6 h-6 text-white" />
-                </div>
-                <motion.div 
-                  className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-slate-900"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                />
+          {/* Robot Emoji + GBot.EXE + AI Image Sourcing Assistant */}
+          <div className="flex items-center gap-4 mb-8">
+            <div className="relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                <Bot className="w-8 h-8 text-white" />
               </div>
-              <div>
-                <h3 className="font-cyber text-lg font-bold text-glow-blue">GBot.EXE</h3>
-                <p className="text-sm text-slate-400">AI Image Sourcing Assistant</p>
-              </div>
+              <motion.div 
+                className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              />
+            </div>
+            <div>
+              <h3 className="font-cyber text-2xl font-bold text-glow-blue">GBot.EXE</h3>
+              <p className="text-base text-slate-400">AI Image Sourcing Assistant</p>
             </div>
           </div>
 
+          {/* Intentional Space */}
+          <div className="mb-8"></div>
+
           {/* System Status */}
-          <div className="bg-slate-900/30 rounded-lg p-4 flex-1">
-            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SYSTEM STATUS</h4>
+          <div className="mb-8">
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SYSTEM STATUS</h4>
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
-              <p className="text-sm font-ui leading-relaxed">
+              <p className="text-base font-ui leading-relaxed">
                 GBot.EXE online! Ready to execute celebrity image sourcing missions.
               </p>
             </div>
           </div>
 
-          {/* Processing Status - Only show when running */}
-          {currentJob?.status === 'running' && (
-            <div className="bg-slate-800/40 rounded-lg p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <motion.div 
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 2 }}
-                >
-                  <Zap className="w-5 h-5 text-blue-400" />
-                </motion.div>
-                <span className="font-cyber text-lg text-glow-blue">PROCESSING</span>
-              </div>
-              <div className="text-blue-300 font-cyber text-xl">{currentJob.celebrity}</div>
-            </div>
-          )}
+          {/* Intentional Space */}
+          <div className="mb-8"></div>
 
-          {/* Subject Input */}
-          <div className="bg-slate-900/30 rounded-lg p-4">
-            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">SUBJECT INPUT</h4>
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex gap-2 items-center">
+          {/* Intentional Space */}
+          <div className="mb-8"></div>
+
+          {/* SUBJECT INPUT - At bottom */}
+          <div className="mt-auto">
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex gap-3 items-center">
                 <input
                   type="text"
                   value={celebrityName}
                   onChange={(e) => setCelebrityName(e.target.value)}
                   placeholder="input celebrity subject name..."
-                  className="cyber-input flex-1 text-sm py-3 px-3"
+                  className="cyber-input flex-1 text-base py-4 px-4"
                   disabled={currentJob?.status === 'running'}
                 />
                 <button
                   type="submit"
                   disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button px-6 py-3 text-sm whitespace-nowrap ${
+                  className={`cyber-button px-8 py-4 text-base whitespace-nowrap ${
                     currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  <Send className="w-4 h-4 mr-2" />
-                  Execute
+                  <Send className="w-5 h-5 mr-2" />
+                  EXECUTE
                 </button>
               </div>
               
@@ -163,9 +154,9 @@ export default function GBotInterface({
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 text-sm text-yellow-400 font-ui"
+                  className="flex items-center gap-2 text-base text-yellow-400 font-ui"
                 >
-                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span>Battle routine executing... Stand by for mission updates</span>
                 </motion.div>
               )}
@@ -173,26 +164,47 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT COLUMN - 50% width */}
-        <div className="w-1/2 flex flex-col">
+        {/* RIGHT SIDE - 50% */}
+        <div className="w-1/2 p-6 flex flex-col">
           
-          {/* Communication Log - Full height terminal */}
-          <div className="bg-slate-950/80 rounded-lg p-4 flex-1 flex flex-col">
-            <h4 className="text-sm font-cyber text-slate-300 mb-3 tracking-wide">COMMUNICATION LOG</h4>
+          {/* Processing (only when running) */}
+          {currentJob?.status === 'running' && (
+            <>
+              <div className="mb-4">
+                <div className="flex items-center gap-4 mb-2">
+                  <motion.div 
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                  >
+                    <Zap className="w-6 h-6 text-blue-400" />
+                  </motion.div>
+                  <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
+                </div>
+                <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
+              </div>
+              
+              {/* Intentional Space */}
+              <div className="mb-8"></div>
+            </>
+          )}
+
+          {/* Communication Log */}
+          <div className="flex-1 flex flex-col">
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
-            {/* Embedded Terminal-Style Chat */}
+            {/* Embedded Terminal Chat Box */}
             <div className="bg-black/80 rounded-lg border-2 border-slate-600 flex-1 flex flex-col overflow-hidden">
               
-              {/* Terminal Header Bar */}
-              <div className="bg-slate-700 px-3 py-2 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
+              {/* Terminal Header */}
+              <div className="bg-slate-700 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-xs font-mono text-slate-300 ml-2">chat://gbot.exe</span>
+                <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
               </div>
               
-              {/* Chat Messages Area */}
-              <div className="flex-1 p-3 overflow-y-auto space-y-3 bg-black/90">
+              {/* Scrollable Chat Messages */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-black/90 min-h-0">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
@@ -201,7 +213,7 @@ export default function GBotInterface({
                     className="space-y-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`font-mono px-2 py-1 rounded text-xs ${
+                      <span className={`font-mono px-3 py-1 rounded text-sm ${
                         message.isBot 
                           ? 'bg-blue-800/60 text-blue-200' 
                           : 'bg-pink-800/60 text-pink-200'
@@ -209,7 +221,7 @@ export default function GBotInterface({
                         [{message.timestamp}]
                       </span>
                     </div>
-                    <div className={`p-3 rounded border-l-4 text-sm ${
+                    <div className={`p-4 rounded border-l-4 text-base ${
                       message.isBot 
                         ? 'bg-slate-900/80 text-green-300 border-blue-500 font-mono' 
                         : 'bg-slate-900/80 text-cyan-300 border-pink-500 font-mono'
@@ -226,26 +238,26 @@ export default function GBotInterface({
                     className="space-y-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-mono px-2 py-1 rounded text-xs bg-blue-800/60 text-blue-200">
+                      <span className="font-mono px-3 py-1 rounded text-sm bg-blue-800/60 text-blue-200">
                         [GBot.EXE]
                       </span>
                     </div>
-                    <div className="bg-slate-900/80 text-green-300 border-l-4 border-blue-500 p-3 rounded font-mono">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">Typing</span>
+                    <div className="bg-slate-900/80 text-green-300 border-l-4 border-blue-500 p-4 rounded font-mono">
+                      <div className="flex items-center gap-3">
+                        <span className="text-base">Typing</span>
                         <div className="flex space-x-1">
                           <motion.div 
-                            className="w-1.5 h-1.5 bg-green-400 rounded-full"
+                            className="w-2 h-2 bg-green-400 rounded-full"
                             animate={{ scale: [1, 1.5, 1] }}
                             transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
                           />
                           <motion.div 
-                            className="w-1.5 h-1.5 bg-green-400 rounded-full"
+                            className="w-2 h-2 bg-green-400 rounded-full"
                             animate={{ scale: [1, 1.5, 1] }}
                             transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
                           />
                           <motion.div 
-                            className="w-1.5 h-1.5 bg-green-400 rounded-full"
+                            className="w-2 h-2 bg-green-400 rounded-full"
                             animate={{ scale: [1, 1.5, 1] }}
                             transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
                           />
