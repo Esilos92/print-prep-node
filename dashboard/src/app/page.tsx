@@ -107,12 +107,9 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* CSS Grid Layout for Perfect Centering */}
-      <div 
-        className="min-h-screen grid place-items-center px-6 py-8 relative z-10"
-        style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }}
-      >
-        <div className="w-full max-w-[1400px] space-y-8">
+      {/* Centered Container */}
+      <div className="min-h-screen flex items-center justify-center px-6 py-8 relative z-10">
+        <div className="w-full max-w-6xl space-y-8">
           {/* Header */}
           <motion.div 
             initial={{ opacity: 0, y: -30 }}
@@ -127,44 +124,39 @@ export default function Dashboard() {
             </p>
           </motion.div>
 
-          {/* Dashboard Grid - Centered with proper spacing */}
-          <div className="flex justify-center">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-fit">
-              {/* Left Column - GBot Chat Terminal */}
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-                className="w-[400px]"
-              >
-                <GBotInterface 
-                  currentJob={currentJob}
-                  onStartJob={handleStartJob}
-                  celebrityName={celebrityName}
-                  setCelebrityName={setCelebrityName}
-                />
-              </motion.div>
+          {/* Dashboard Grid - Responsive 3-column */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - GBot Chat Terminal */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <GBotInterface 
+                currentJob={currentJob}
+                onStartJob={handleStartJob}
+                celebrityName={celebrityName}
+                setCelebrityName={setCelebrityName}
+              />
+            </motion.div>
 
-              {/* Middle Column - Mission Status */}
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="w-[400px]"
-              >
-                <ProgressDisplay currentJob={currentJob} />
-              </motion.div>
+            {/* Middle Column - Mission Status */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <ProgressDisplay currentJob={currentJob} />
+            </motion.div>
 
-              {/* Right Column - Mission Archive */}
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="w-[400px]"
-              >
-                <JobHistory jobs={jobHistory} />
-              </motion.div>
-            </div>
+            {/* Right Column - Mission Archive */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <JobHistory jobs={jobHistory} />
+            </motion.div>
           </div>
         </div>
       </div>
