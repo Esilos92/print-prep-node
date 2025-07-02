@@ -87,7 +87,6 @@ export default function GBotInterface({
               </div>
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-blue-300" />
-                <span className="font-cyber text-sm text-blue-300">NetNavi Interface</span>
               </div>
             </div>
           </div>
