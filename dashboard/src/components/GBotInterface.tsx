@@ -28,7 +28,7 @@ export default function GBotInterface({
       id: 1,
       text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
       isBot: true,
-      timestamp: 'System Status'
+      timestamp: 'GBot.EXE'
     }
   ]);
 
