@@ -190,6 +190,11 @@ Return as JSON array:
         enhanced.medium = this.correctVoiceMedium(enhanced.medium, role);
       }
       
+      // FIXED: If medium is still "unknown", infer it from title/character
+      if (enhanced.medium === 'unknown') {
+        enhanced.medium = this.inferMediumFromContext(role);
+      }
+      
       // Add voice-specific tags
       if (isVoiceRole) {
         enhanced.tags = enhanced.tags || [];
@@ -202,6 +207,75 @@ Return as JSON array:
       
       return enhanced;
     });
+  }
+
+', 'episode', 'tv show', 'television',
+      'netflix', 'hbo', 'amc', 'cbs', 'nbc', 'abc', 'fox'
+    ];
+    
+    // Animation/Anime indicators
+    const animationKeywords = [
+      'anime', 'animation', 'animated', 'cartoon', 'studio ghibli',
+      'pixar', 'disney', 'dreamworks', 'character'
+    ];
+    
+    // Game indicators
+    const gameKeywords = [
+      'game', 'video game', 'gaming', 'nintendo', 'playstation',
+      'xbox', 'pc game', 'mobile game'
+    ];
+    
+    const allText = `${title} ${character} ${description}`.toLowerCase();
+    
+    // Check for specific famous titles to get accurate medium
+    const famousTitles = {
+      'jurassic park': 'live_action_movie',
+      'bohemian rhapsody': 'live_action_movie', 
+      'the social network': 'live_action_movie',
+      'pacific rim': 'live_action_movie',
+      'transformers': 'live_action_movie',
+      'spider-man': year >= 2018 ? 'live_action_movie' : 'live_action_movie',
+      'the walking dead': 'live_action_tv',
+      'justified': 'live_action_tv',
+      'american horror story': 'live_action_tv'
+    };
+    
+    // Check for exact title matches first
+    for (const [famousTitle, medium] of Object.entries(famousTitles)) {
+      if (title.includes(famousTitle)) {
+        return medium;
+      }
+    }
+    
+    // Pattern-based detection
+    if (gameKeywords.some(keyword => allText.includes(keyword))) {
+      return 'voice_game';
+    }
+    
+    if (animationKeywords.some(keyword => allText.includes(keyword))) {
+      if (movieKeywords.some(keyword => allText.includes(keyword))) {
+        return 'voice_anime_movie';
+      } else {
+        return 'voice_anime_tv';
+      }
+    }
+    
+    if (movieKeywords.some(keyword => allText.includes(keyword))) {
+      return 'live_action_movie';
+    }
+    
+    if (tvKeywords.some(keyword => allText.includes(keyword))) {
+      return 'live_action_tv';
+    }
+    
+    // Default based on year and context
+    if (year >= 1990) {
+      // Modern era - more likely to be movies
+      return 'live_action_movie';
+    } else {
+      // Older era - might be TV
+      return 'live_action_tv';
+    }
   }
 
   /**
@@ -725,11 +799,21 @@ Return JSON: [{"index": 1, "popularityScore": 8, "reasoning": "brief reason"}, .
     }];
   }
 
+  /**
+   * FIXED: Normalize role with improved medium inference
+   */
   normalizeRole(role) {
+    let medium = role.medium || 'unknown';
+    
+    // If medium is unknown or generic, try to infer it
+    if (medium === 'unknown' || medium === 'movie' || medium === 'tv' || medium === 'film') {
+      medium = this.inferMediumFromContext(role);
+    }
+    
     return {
       character: (role.character || '').trim(),
       title: (role.title || '').trim(),
-      medium: role.medium || 'unknown',
+      medium: medium,
       year: role.year || 'unknown',
       description: role.description || '',
       popularity: role.popularity || 'medium',
