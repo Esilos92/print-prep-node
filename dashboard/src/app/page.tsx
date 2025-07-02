@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -28,11 +27,11 @@ export default function Dashboard() {
     // Mock data for now
     {
       id: '1',
-      celebrity: 'Ryan Reynolds',
+      celebrity: 'Ryan Gosling',
       status: 'completed',
       currentPhase: 'Complete',
       progress: 100,
-      roles: ['Deadpool', 'Green Lantern', 'The Proposal'],
+      roles: ['La La Land', 'Drive', 'Blade Runner 2049'],
       imagesProcessed: 47,
       imagesValidated: 23,
       downloadLink: '#',
@@ -77,7 +76,7 @@ export default function Dashboard() {
         ...prev,
         currentPhase: phase,
         progress,
-        roles: progress > 25 ? ['Deadpool', 'Green Lantern', 'The Proposal'] : undefined,
+        roles: progress > 25 ? ['La La Land', 'Drive', 'Blade Runner 2049'] : undefined,
         imagesProcessed: progress > 70 ? Math.floor((progress - 70) * 2) : undefined,
         imagesValidated: progress > 90 ? Math.floor((progress - 90) * 2) : undefined
       } : null);
@@ -108,11 +107,8 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* CSS Grid Layout for Perfect Centering */}
-      <div 
-        className="min-h-screen grid place-items-center px-6 py-8 relative z-10"
-        style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }}
-      >
+      {/* Viewport Container with Flexbox Centering */}
+      <div className="min-h-screen flex items-center justify-center p-6 relative z-10">
         <div className="w-full max-w-[1400px] space-y-8">
           {/* Header */}
           <motion.div 
@@ -120,28 +116,21 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
+            <h1 className="text-4xl lg:text-5xl font-cyber font-bold text-glow-blue mb-3">
               CELEBRITY IMAGE SOURCING SYSTEM
             </h1>
-            <p className="text-xl text-slate-400 font-ui">
+            <p className="text-lg lg:text-xl text-slate-400 font-ui">
               Powered by GBot.EXE AI Assistant
             </p>
           </motion.div>
 
-          {/* Dashboard Grid - Centered */}
-          <div 
-            className="grid gap-6 w-full mx-auto"
-            style={{ 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-              maxWidth: '1400px'
-            }}
-          >
+          {/* Dashboard Grid - 3 Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - GBot Chat Terminal */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className="w-full"
             >
               <GBotInterface 
                 currentJob={currentJob}
@@ -156,7 +145,6 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="w-full"
             >
               <ProgressDisplay currentJob={currentJob} />
             </motion.div>
@@ -166,11 +154,27 @@ export default function Dashboard() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
-              className="w-full"
             >
               <JobHistory jobs={jobHistory} />
             </motion.div>
           </div>
+
+          {/* Footer Status */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-center text-sm text-blue-400 font-ui"
+          >
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span>SYSTEM ONLINE</span>
+              <span className="mx-2">•</span>
+              <span>Phase 1.5 Complete</span>
+              <span className="mx-2">•</span>
+              <span>Ready for Backend Integration</span>
+            </div>
+          </motion.div>
         </div>
       </div>
     </div>
