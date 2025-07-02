@@ -108,7 +108,7 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      <div className="container mx-auto px-4 py-8 relative z-10">
+      <div className="container mx-auto px-6 py-8 relative z-10 max-w-[1600px]">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -123,7 +123,7 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
           {/* Left Column - GBot Interface */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
