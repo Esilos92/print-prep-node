@@ -24,8 +24,7 @@ class ImageValidator {
     this.bannedDomains = [
       'alamy.com', 'gettyimages.com', 'shutterstock.com', 
       'istockphoto.com', 'depositphotos.com', 'bigstock.com',
-      'dreamstime.com', 'deviantart.com', 'tumblr.com', 
-      'pinterest.com', 'reddit.com'
+      'dreamstime.com', 'deviantart.com', 'pinterest.com'
     ];
     
     // Role-specific hash storage for deduplication
