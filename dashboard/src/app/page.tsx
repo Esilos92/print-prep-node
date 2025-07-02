@@ -103,63 +103,65 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900 relative">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900 relative overflow-x-hidden">
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* Centered Container */}
-      <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
-        <div className="w-full">
-          {/* Header */}
-          <motion.div 
-            initial={{ opacity: 0, y: -30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
-          >
-            <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
-              CELEBRITY IMAGE SOURCING SYSTEM
-            </h1>
-            <p className="text-xl text-slate-400 font-ui">
-              Powered by GBot.EXE AI Assistant
-            </p>
-          </motion.div>
+      {/* Force Centered Layout */}
+      <div className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-8 relative z-10">
+        {/* Header - Centered */}
+        <motion.div 
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full text-center mb-8"
+        >
+          <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
+            CELEBRITY IMAGE SOURCING SYSTEM
+          </h1>
+          <p className="text-xl text-slate-400 font-ui">
+            Powered by GBot.EXE AI Assistant
+          </p>
+        </motion.div>
 
-          {/* Dashboard Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 max-w-[1400px] mx-auto">
-            {/* Left Column - GBot Chat Terminal */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="xl:col-span-1"
-            >
-              <GBotInterface 
-                currentJob={currentJob}
-                onStartJob={handleStartJob}
-                celebrityName={celebrityName}
-                setCelebrityName={setCelebrityName}
-              />
-            </motion.div>
+        {/* Dashboard Container - Force Center */}
+        <div className="w-full flex justify-center">
+          <div className="w-full max-w-[1200px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - GBot Chat Terminal */}
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="w-full"
+              >
+                <GBotInterface 
+                  currentJob={currentJob}
+                  onStartJob={handleStartJob}
+                  celebrityName={celebrityName}
+                  setCelebrityName={setCelebrityName}
+                />
+              </motion.div>
 
-            {/* Middle Column - Mission Status */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="xl:col-span-1"
-            >
-              <ProgressDisplay currentJob={currentJob} />
-            </motion.div>
+              {/* Middle Column - Mission Status */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="w-full"
+              >
+                <ProgressDisplay currentJob={currentJob} />
+              </motion.div>
 
-            {/* Right Column - Mission Archive */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="xl:col-span-1"
-            >
-              <JobHistory jobs={jobHistory} />
-            </motion.div>
+              {/* Right Column - Mission Archive */}
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="w-full"
+              >
+                <JobHistory jobs={jobHistory} />
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>
