@@ -67,7 +67,7 @@ body {
   box-shadow: var(--shadow-blue);
   position: relative;
   overflow: hidden;
-  height: 600px;
+  height: 520px;
   width: 100%;
   padding: 0;
   display: flex;
@@ -77,9 +77,9 @@ body {
 /* Ensure all panels are the same size and properly constrained */
 @media (min-width: 1024px) {
   .cyber-panel {
-    height: 600px;
+    height: 520px;
     width: 100%;
-    max-width: 420px;
+    max-width: 380px;
     margin: 0 auto;
   }
 }
