@@ -107,24 +107,24 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* Viewport Container with Flexbox Centering */}
-      <div className="min-h-screen flex items-center justify-center p-6 relative z-10">
-        <div className="w-full max-w-[1400px] space-y-8">
+      {/* SIMPLE CENTERING FIX - Just add justify-center to your existing layout */}
+      <div className="min-h-screen flex justify-center items-start pt-8 px-6 relative z-10">
+        <div className="space-y-8">
           {/* Header */}
           <motion.div 
             initial={{ opacity: 0, y: -30 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <h1 className="text-4xl lg:text-5xl font-cyber font-bold text-glow-blue mb-3">
+            <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
               CELEBRITY IMAGE SOURCING SYSTEM
             </h1>
-            <p className="text-lg lg:text-xl text-slate-400 font-ui">
+            <p className="text-xl text-slate-400 font-ui">
               Powered by GBot.EXE AI Assistant
             </p>
           </motion.div>
 
-          {/* Dashboard Grid - 3 Column Layout */}
+          {/* Dashboard Grid - EXACTLY as you had it */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - GBot Chat Terminal */}
             <motion.div 
@@ -158,23 +158,6 @@ export default function Dashboard() {
               <JobHistory jobs={jobHistory} />
             </motion.div>
           </div>
-
-          {/* Footer Status */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-center text-sm text-blue-400 font-ui"
-          >
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span>SYSTEM ONLINE</span>
-              <span className="mx-2">•</span>
-              <span>Phase 1.5 Complete</span>
-              <span className="mx-2">•</span>
-              <span>Ready for Backend Integration</span>
-            </div>
-          </motion.div>
         </div>
       </div>
     </div>
