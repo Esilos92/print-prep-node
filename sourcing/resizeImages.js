@@ -7,7 +7,7 @@ const { sanitizeFilename, generateFilename } = require('../utils/helpers');
 class ImageResizer {
   
   /**
-   * FIXED: Resize images with continuous numbering across all roles
+   * FIXED: Resize images with separate numbering for 8x10 and 11x17
    */
   static async resizeImages(validatedImages, workDir, celebrityName) {
     try {
@@ -17,28 +17,62 @@ class ImageResizer {
       const outputDir = path.join(workDir, 'resized');
       await fs.mkdir(outputDir, { recursive: true });
       
-      // FIXED: Use continuous counter instead of grouping by role
-      let globalCounter = 1; // Start at 1 and keep incrementing
+      // Create separate subdirectories for each format
+      const format8x10Dir = path.join(outputDir, '8x10');
+      const format11x17Dir = path.join(outputDir, '11x17');
+      await fs.mkdir(format8x10Dir, { recursive: true });
+      await fs.mkdir(format11x17Dir, { recursive: true });
+      
+      // Separate counters for each format
+      let counter8x10 = 1;
+      let counter11x17 = 1;
       
       for (const image of validatedImages) {
         // Add missing data for filename generation
         image.celebrityName = celebrityName;
         image.cleanRoleName = this.extractCleanRoleName(image);
-        image.globalIndex = globalCounter; // Use global counter instead of role-specific
         
         try {
-          const resizeResults = await this.resizeImageToFormats(image, outputDir);
-          resizedImages.push(...resizeResults);
+          // Determine which formats this image should be resized to
+          const formats = this.determineFormats(image);
           
-          globalCounter++; // Increment for next image regardless of role
+          for (const format of formats) {
+            const counter = format === '8x10' ? counter8x10 : counter11x17;
+            const formatDir = format === '8x10' ? format8x10Dir : format11x17Dir;
+            
+            // Add format-specific counter to image data
+            image.formatIndex = counter;
+            image.currentFormat = format;
+            
+            const outputPath = await this.resizeToFormat(image, format, formatDir);
+            
+            resizedImages.push({
+              ...image,
+              resizedPath: outputPath,
+              format: format,
+              originalPath: image.filepath,
+              formatIndex: counter
+            });
+            
+            logger.info(`Resized ${image.filename} to ${format} (#${counter})`);
+            
+            // Increment the appropriate counter
+            if (format === '8x10') {
+              counter8x10++;
+            } else {
+              counter11x17++;
+            }
+          }
           
         } catch (error) {
           logger.warn(`Error resizing ${image.filename}:`, error.message);
-          globalCounter++; // Still increment counter even on error
         }
       }
       
-      logger.info(`Resizing complete: ${resizedImages.length} output files with continuous numbering`);
+      logger.info(`Resizing complete: ${resizedImages.length} output files`);
+      logger.info(`- 8x10 images: ${counter8x10 - 1}`);
+      logger.info(`- 11x17 images: ${counter11x17 - 1}`);
+      
       return resizedImages;
       
     } catch (error) {
@@ -48,8 +82,67 @@ class ImageResizer {
   }
   
   /**
-   * REMOVED: No longer group by role - we want continuous numbering
+   * NEW: Determine which formats an image should be resized to based on dimensions
    */
+  static determineFormats(image) {
+    const width = image.actualWidth || image.width || 0;
+    const height = image.actualHeight || image.height || 0;
+    
+    if (width === 0 || height === 0) {
+      logger.warn(`Image ${image.filename} has no dimension data, defaulting to 8x10`);
+      return ['8x10'];
+    }
+    
+    const aspectRatio = width / height;
+    const formats = [];
+    
+    // 8x10 aspect ratio is 0.8 (4:5)
+    // 11x17 aspect ratio is ~0.647 (roughly 2:3)
+    
+    // For portrait images (height > width)
+    if (aspectRatio <= 1.0) {
+      if (aspectRatio >= 0.75 && aspectRatio <= 0.85) {
+        // Close to 8x10 ratio (0.8)
+        formats.push('8x10');
+      } else if (aspectRatio >= 0.55 && aspectRatio <= 0.75) {
+        // Close to 11x17 ratio (0.647)
+        formats.push('11x17');
+      } else {
+        // Default for portrait: try both if very tall/wide, otherwise 8x10
+        formats.push('8x10');
+        if (aspectRatio < 0.6) {
+          formats.push('11x17'); // Very tall images work better as 11x17
+        }
+      }
+    } 
+    // For landscape images (width > height)
+    else {
+      const landscapeRatio = height / width; // Flip for landscape
+      
+      if (landscapeRatio >= 0.75 && landscapeRatio <= 0.85) {
+        // Close to 8x10 ratio when flipped
+        formats.push('8x10');
+      } else if (landscapeRatio >= 0.55 && landscapeRatio <= 0.75) {
+        // Close to 11x17 ratio when flipped  
+        formats.push('11x17');
+      } else {
+        // Default for landscape
+        formats.push('8x10');
+        if (landscapeRatio < 0.6) {
+          formats.push('11x17'); // Very wide images work better as 11x17
+        }
+      }
+    }
+    
+    // Ensure we always have at least one format
+    if (formats.length === 0) {
+      formats.push('8x10');
+    }
+    
+    logger.debug(`Image ${image.filename} (${width}x${height}, ratio: ${aspectRatio.toFixed(3)}) -> formats: ${formats.join(', ')}`);
+    
+    return formats;
+  }
   
   /**
    * Extract clean role name from image data
@@ -132,52 +225,22 @@ class ImageResizer {
   }
   
   /**
-   * Resize single image to all supported formats
+   * FIXED: Resize image to specific print format with format-specific numbering
    */
-  static async resizeImageToFormats(image, outputDir) {
-    const results = [];
-    
-    for (const format of image.formats) {
-      try {
-        const outputPath = await this.resizeToFormat(image, format, outputDir);
-        
-        results.push({
-          ...image,
-          resizedPath: outputPath,
-          format: format,
-          originalPath: image.filepath
-        });
-        
-        logger.info(`Resized ${image.filename} to ${format}`);
-        
-      } catch (error) {
-        logger.warn(`Failed to resize ${image.filename} to ${format}:`, error.message);
-      }
-    }
-    
-    return results;
-  }
-  
-  /**
-   * FIXED: Resize image to specific print format with continuous numbering
-   */
-  static async resizeToFormat(image, format, outputDir) {
+  static async resizeToFormat(image, format, formatDir) {
     const dimensions = this.getPrintDimensions(format);
     
     // Use clean role name for filename generation
     const cleanRoleName = image.cleanRoleName || 'Unknown';
     
-    // DEBUG: Log what we're using (but cleaner message)
-    console.log(`🔧 Generating clean filename: ${image.globalIndex} - ${image.celebrityName} - ${cleanRoleName} - ${format}`);
-    
-    // FIXED: Generate clean filename with GLOBAL counter: 01 - Jackson Rathbone - Twilight - 8x10.jpg
+    // FIXED: Generate clean filename with FORMAT-SPECIFIC counter
     const outputFilename = generateFilename(
       image.celebrityName || 'Unknown',
       cleanRoleName,
-      image.globalIndex || 1, // Use globalIndex instead of indexInRole
+      image.formatIndex || 1, // Use format-specific counter
       format
     );
-    const outputPath = path.join(outputDir, outputFilename);
+    const outputPath = path.join(formatDir, outputFilename);
     
     await sharp(image.filepath)
       .resize(dimensions.width, dimensions.height, {
