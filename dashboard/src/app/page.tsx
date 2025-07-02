@@ -103,64 +103,65 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900 relative">
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* Main Container - Perfect Center with No Dead Space */}
-      <div className="h-full flex flex-col items-center justify-center p-8 relative z-10">
-        {/* Header - Compact */}
+      {/* Main Container - Structured Layout */}
+      <div className="min-h-screen flex flex-col justify-center px-12 py-16 relative z-10">
+        
+        {/* Header Section */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-6 flex-shrink-0"
+          className="text-center mb-12"
         >
-          <h1 className="text-3xl font-cyber font-bold text-glow-blue mb-2">
+          <h1 className="text-4xl font-cyber font-bold text-glow-blue mb-3">
             CELEBRITY IMAGE SOURCING SYSTEM
           </h1>
-          <p className="text-sm text-slate-400 font-ui">
+          <p className="text-lg text-slate-400 font-ui">
             Powered by GBot.EXE AI Assistant
           </p>
         </motion.div>
 
-        {/* Dashboard Grid - Centered 3 Columns with Spacing */}
-        <div className="flex-1 flex items-center justify-center max-w-6xl w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full h-full max-h-[520px]">
-            {/* Left Column - GBot Chat Terminal */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="flex items-center justify-center"
-            >
-              <GBotInterface 
-                currentJob={currentJob}
-                onStartJob={handleStartJob}
-                celebrityName={celebrityName}
-                setCelebrityName={setCelebrityName}
-              />
-            </motion.div>
+        {/* Three Horizontal Panels with Proper Spacing */}
+        <div className="max-w-7xl mx-auto w-full space-y-12">
+          
+          {/* Panel 1 - GBot Terminal */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="w-full"
+          >
+            <GBotInterface 
+              currentJob={currentJob}
+              onStartJob={handleStartJob}
+              celebrityName={celebrityName}
+              setCelebrityName={setCelebrityName}
+            />
+          </motion.div>
 
-            {/* Middle Column - Mission Status */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex items-center justify-center"
-            >
-              <ProgressDisplay currentJob={currentJob} />
-            </motion.div>
+          {/* Panel 2 - Mission Status */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="w-full"
+          >
+            <ProgressDisplay currentJob={currentJob} />
+          </motion.div>
 
-            {/* Right Column - Mission Archive */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center justify-center"
-            >
-              <JobHistory jobs={jobHistory} />
-            </motion.div>
-          </div>
+          {/* Panel 3 - Mission Archive */}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="w-full"
+          >
+            <JobHistory jobs={jobHistory} />
+          </motion.div>
+
         </div>
       </div>
     </div>
