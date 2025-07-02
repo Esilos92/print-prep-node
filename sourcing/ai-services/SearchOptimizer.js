@@ -473,10 +473,13 @@ Return exactly 6 CLEAN search terms as JSON array:
   }
 
   /**
-   * NEW: Parse JSON response handling markdown code blocks
+   * ENHANCED: Parse JSON response handling markdown code blocks and partial responses
    */
   parseJSONResponse(response) {
     try {
+      // Remove any leading/trailing whitespace
+      response = response.trim();
+      
       // First try direct JSON parsing
       return JSON.parse(response);
     } catch (error) {
@@ -484,7 +487,7 @@ Return exactly 6 CLEAN search terms as JSON array:
         // Try extracting from markdown code blocks
         const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
         if (jsonMatch && jsonMatch[1]) {
-          return JSON.parse(jsonMatch[1]);
+          return JSON.parse(jsonMatch[1].trim());
         }
         
         // Try extracting any array pattern
@@ -493,13 +496,44 @@ Return exactly 6 CLEAN search terms as JSON array:
           return JSON.parse(arrayMatch[0]);
         }
         
+        // Try to handle truncated JSON responses
+        const truncatedMatch = response.match(/\[[\s\S]*/);
+        if (truncatedMatch) {
+          let truncatedJson = truncatedMatch[0];
+          
+          // Try to close incomplete arrays/objects
+          if (!truncatedJson.endsWith(']') && !truncatedJson.endsWith('}')) {
+            // Count unclosed brackets and quotes
+            const openBrackets = (truncatedJson.match(/\[/g) || []).length;
+            const closeBrackets = (truncatedJson.match(/\]/g) || []).length;
+            const openBraces = (truncatedJson.match(/\{/g) || []).length;
+            const closeBraces = (truncatedJson.match(/\}/g) || []).length;
+            
+            // Add missing closing brackets
+            for (let i = 0; i < (openBraces - closeBraces); i++) {
+              truncatedJson += '}';
+            }
+            for (let i = 0; i < (openBrackets - closeBrackets); i++) {
+              truncatedJson += ']';
+            }
+            
+            try {
+              return JSON.parse(truncatedJson);
+            } catch (e) {
+              // If still invalid, try to extract just the completed items
+              console.log(`Attempting to extract partial data from truncated JSON`);
+            }
+          }
+        }
+        
         throw new Error('No valid JSON found');
       } catch (parseError) {
-        console.log(`JSON parsing failed for response: ${response.substring(0, 200)}...`);
+        console.log(`⚠️ JSON parsing failed for response: ${response.substring(0, 200)}...`);
         return null;
       }
     }
   }
+  
   getOptimizationStats(roles) {
     if (!roles || !Array.isArray(roles)) return {};
 
