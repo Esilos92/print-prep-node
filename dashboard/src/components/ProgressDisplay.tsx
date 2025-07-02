@@ -91,7 +91,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.2 }}
-        className="flex items-center gap-3 mb-4"
+        className="flex items-center mb-4"
       >
         <span className={`text-sm font-ui ${
           isComplete ? 'text-green-300' : isCurrent ? 'text-blue-300' : 'text-slate-400'
@@ -99,18 +99,17 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           {phase.name}
         </span>
         
-        {/* Checkmark directly next to phase name on same line */}
-        <span className="flex items-center">
-          {isComplete && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.5, type: "spring" }}
-            >
-              <CheckCircle2 className="w-4 h-4 text-green-400 ml-2" />
-            </motion.div>
-          )}
-        </span>
+        {/* Checkmark directly to the right of phase name */}
+        {isComplete && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, type: "spring" }}
+            className="ml-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+          </motion.div>
+        )}
       </motion.div>
     );
   };
