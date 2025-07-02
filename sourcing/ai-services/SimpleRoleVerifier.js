@@ -5,6 +5,48 @@ class SimpleRoleVerifier {
     this.openai = null;
     this.hasOpenAI = false;
     this.initializeOpenAI();
+    
+    // INTEGRATED: Refined safety net of major multi-actor roles
+    this.definiteMultiActorRoles = [
+      // Iconic Superheroes (Multiple Live-Action Actors)
+      { char: ['batman', 'bruce wayne'], shows: ['batman'], reason: '8+ live-action actors (Keaton, Bale, Affleck, Pattinson, etc.)' },
+      { char: ['superman', 'clark kent'], shows: ['superman'], reason: '6+ live-action actors (Reeve, Routh, Cavill, etc.)' },
+      { char: ['spider-man', 'spiderman', 'peter parker'], shows: ['spider'], reason: '3+ live-action actors (Maguire, Garfield, Holland)' },
+      { char: ['joker'], shows: ['batman', 'joker'], reason: '10+ actors (Nicholson, Ledger, Phoenix, etc.)' },
+      
+      // Long-Running TV Characters (Cast Changes)
+      { char: ['doctor', 'the doctor'], shows: ['doctor who'], reason: '15+ actors across 60+ years' },
+      { char: ['james bond', 'bond', '007'], shows: ['bond', '007', 'james bond'], reason: '6+ actors (Connery, Moore, Brosnan, Craig, etc.)' },
+      
+      // Classic Literature Characters (Multiple Adaptations)
+      { char: ['sherlock holmes', 'sherlock'], shows: ['sherlock'], reason: '20+ actors across films/TV (Cumberbatch, RDJ, Brett, Rathbone, etc.)' },
+      { char: ['dracula'], shows: ['dracula'], reason: '15+ actors across horror films' },
+      { char: ['tarzan'], shows: ['tarzan'], reason: '12+ actors across films/TV' },
+      { char: ['robin hood'], shows: ['robin hood'], reason: '10+ actors across adaptations' },
+      { char: ['hamlet'], shows: ['hamlet'], reason: '50+ actors across stage/film adaptations' },
+      
+      // Franchise Characters (Reboots/Continuations)
+      { char: ['luke skywalker'], shows: ['star wars'], reason: 'Multiple actors (Hamill, voice actors, etc.)' },
+      { char: ['han solo'], shows: ['star wars'], reason: 'Multiple actors (Ford, Ehrenreich)' },
+      { char: ['jack ryan'], shows: ['jack ryan'], reason: '4+ actors (Baldwin, Ford, Affleck, Krasinski)' },
+      
+      // Animated Characters (Multiple Voice Actors)
+      { char: ['mickey mouse'], shows: ['disney', 'mickey'], reason: '5+ voice actors over decades' },
+      { char: ['bugs bunny'], shows: ['looney tunes', 'bugs bunny'], reason: '8+ voice actors' },
+      { char: ['scooby doo', 'scooby-doo'], shows: ['scooby'], reason: '6+ voice actors' },
+      { char: ['mario'], shows: ['mario', 'nintendo'], reason: '5+ voice actors across games/films' },
+      { char: ['sonic'], shows: ['sonic'], reason: 'Multiple voice actors across games/shows/films' },
+      
+      // Horror/Monster Characters
+      { char: ['frankenstein', 'frankenstein monster'], shows: ['frankenstein'], reason: '20+ actors across horror films' },
+      { char: ['dracula'], shows: ['dracula'], reason: '15+ actors across Universal/modern films' },
+      { char: ['mummy'], shows: ['mummy'], reason: '8+ actors across Universal/modern films' },
+      { char: ['king kong'], shows: ['king kong'], reason: 'Multiple motion-capture and voice actors' },
+      
+      // Universal Icons
+      { char: ['santa claus', 'santa'], shows: ['christmas', 'santa'], reason: 'Countless actors across films/TV' },
+      { char: ['jesus christ', 'jesus'], shows: ['jesus', 'christ', 'passion'], reason: '50+ actors in religious films' }
+    ];
   }
 
   initializeOpenAI() {
@@ -30,7 +72,7 @@ class SimpleRoleVerifier {
     
     for (const role of discoveredRoles) {
       const verification = await this.verifyRoleWithConfidence(celebrityName, role);
-      verificationCost += 0.0002; // Slightly higher cost for enhanced prompt
+      verificationCost += 0.0002;
       
       if (verification.isValid) {
         verifiedRoles.push({
@@ -77,9 +119,9 @@ class SimpleRoleVerifier {
       const prompt = this.buildCorrectedVerificationPrompt(celebrityName, role);
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o", // Use better model for accuracy
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.05, // Lower temperature for consistency
+        temperature: 0.05,
         max_tokens: 100
       });
 
@@ -108,12 +150,6 @@ IMPORTANT VERIFICATION GUIDELINES:
 - Include voice acting in animation, anime, video games
 - Include early career and lesser-known work
 - Be CAUTIOUS about rejecting - only reject if you're absolutely certain it's wrong
-
-SPECIFIC EXAMPLES FOR JODIE WHITTAKER:
-- Sam in "Attack the Block" (2011) = YES (she plays Sam, a teen character)
-- Ffion in "Black Mirror" episode = YES (guest role in anthology series)
-- The Doctor in "Doctor Who" = YES (13th Doctor, 2017-2022)
-- Beth Latimer in "Broadchurch" = YES (supporting character)
 
 CONFIDENCE LEVELS:
 - HIGH: Definitely correct or definitely wrong (only for very well-known cases)
@@ -173,13 +209,13 @@ Answer:`;
   }
 
   /**
-   * ENHANCED: AI-powered search strategy with multi-actor detection
+   * UNIVERSAL: AI-powered search strategy with integrated multi-actor detection
    */
   async getSearchStrategy(celebrityName, role) {
     const character = (role.character || '').toLowerCase();
     const title = (role.title || '').toLowerCase();
     
-    // Check if this is a multi-actor character
+    // Use integrated multi-actor detection
     const isMultiActor = await this.isMultiActorCharacter(character, title);
     
     if (isMultiActor) {
@@ -210,57 +246,108 @@ Answer:`;
   }
 
   /**
-   * ENHANCED: Multi-actor detection with better examples and logic
+   * UNIVERSAL: Multi-actor detection with refined safety net + AI
    */
   async isMultiActorCharacter(character, title) {
-    if (!this.hasOpenAI) {
-      return false; // Safe fallback
+    // Step 1: Check refined safety net first
+    const safetyNetResult = this.checkSafetyNet(character, title);
+    if (safetyNetResult.isMultiActor) {
+      console.log(`🎭 SAFETY NET: ${character} in ${title} - ${safetyNetResult.reason}`);
+      return true;
     }
+    
+    // Step 2: AI detection for everything else
+    if (this.hasOpenAI) {
+      try {
+        const aiResult = await this.aiDetectMultiActor(character, title);
+        if (aiResult !== null) {
+          if (aiResult) {
+            console.log(`🤖 AI DETECTED: ${character} in ${title} - Multi-actor character`);
+          } else {
+            console.log(`🤖 AI CONFIRMED: ${character} in ${title} - Single-actor character`);
+          }
+          return aiResult;
+        }
+      } catch (error) {
+        console.log(`⚠️ AI detection failed for ${character}: ${error.message}`);
+      }
+    }
+    
+    // Step 3: Safe fallback
+    console.log(`🔄 FALLBACK: Assuming ${character} in ${title} is single-actor`);
+    return false;
+  }
+
+  /**
+   * Check refined safety net of major multi-actor roles
+   */
+  checkSafetyNet(character, title) {
+    for (const role of this.definiteMultiActorRoles) {
+      // Check if character name matches
+      const characterMatches = role.char.some(charVariant => 
+        character.includes(charVariant) || charVariant.includes(character)
+      );
+      
+      // Check if show/title matches
+      const titleMatches = role.shows.some(showVariant => 
+        title.includes(showVariant) || showVariant.includes(title)
+      );
+      
+      if (characterMatches && titleMatches) {
+        return {
+          isMultiActor: true,
+          reason: role.reason
+        };
+      }
+    }
+    
+    return { isMultiActor: false };
+  }
+
+  /**
+   * AI-powered multi-actor detection for unknown cases
+   */
+  async aiDetectMultiActor(characterName, showTitle) {
+    if (!this.hasOpenAI) return null;
 
     try {
-      const prompt = `Has the character "${character}" from "${title}" been played by multiple different actors across different movies, TV shows, reboots, or adaptations?
+      const prompt = `Has the character "${characterName}" from "${showTitle}" been played by multiple different actors across different movies, TV shows, reboots, adaptations, or voice acting roles?
 
-Consider these scenarios:
-- Different actors in reboots/remakes (Batman, Spider-Man, etc.)
-- Recasting across film/TV series (James Bond, Doctor Who)
-- Different versions (animated vs live-action, different studios)
-- Franchise characters across multiple films
+Consider ALL scenarios:
+- Different actors in reboots/remakes (like Spider-Man: Maguire, Garfield, Holland)
+- Recasting across film/TV series (like James Bond across decades)
+- Different adaptations (book-to-film, animated-to-live-action)
+- Voice actors vs live-action actors for same character
 - Long-running series with cast changes
+- Anthology series with different actors per episode/season
+- International versions (different actors in different countries)
+- Age-based recasting (child vs adult versions)
 
-Answer with just YES or NO.
-
-EXAMPLES:
-- The Doctor (Doctor Who) = YES (14+ actors across decades)
-- James Bond = YES (6+ actors: Connery, Moore, Brosnan, Craig, etc.)
-- Batman = YES (Keaton, Bale, Affleck, Pattinson, etc.)
-- Spider-Man = YES (Maguire, Garfield, Holland + animated versions)
-- Iron Man/Tony Stark (MCU) = NO (only Robert Downey Jr in MCU)
-- Tyrion Lannister (Game of Thrones) = NO (only Peter Dinklage)
+Examples:
+- Sherlock Holmes = YES (Cumberbatch, RDJ, Brett, Rathbone, etc.)
+- Dracula = YES (Lugosi, Lee, Oldman, etc.)
+- Tony Stark/Iron Man (MCU only) = NO (only RDJ in MCU specifically)
 - Walter White (Breaking Bad) = NO (only Bryan Cranston)
-- Elsa (Frozen) = NO (only Idina Menzel for main version)
 
-Character: "${character}" from "${title}"
+Be thorough - consider ALL adaptations and versions across ALL media.
+
+Answer with just "YES" if multiple actors have played this character across any adaptations, or "NO" if typically one actor is associated with this specific version.
+
 Answer:`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 5
+        max_tokens: 10
       });
 
       const response = completion.choices[0].message.content.trim().toUpperCase();
-      const isMulti = response.includes('YES');
-      
-      if (isMulti) {
-        console.log(`🎭 Multi-actor character detected: ${character} in ${title}`);
-      }
-      
-      return isMulti;
+      return response.includes('YES');
       
     } catch (error) {
-      console.log(`⚠️ Multi-actor detection failed: ${error.message}`);
-      return false; // Safe fallback
+      console.log(`⚠️ AI multi-actor detection failed: ${error.message}`);
+      return null;
     }
   }
 
@@ -334,6 +421,30 @@ Answer:`;
     });
     
     return stats;
+  }
+
+  /**
+   * NEW: Get multi-actor detection statistics
+   */
+  getMultiActorStats() {
+    return {
+      safetyNetEntries: this.definiteMultiActorRoles.length,
+      hasAI: this.hasOpenAI,
+      categories: {
+        superheroes: this.definiteMultiActorRoles.filter(r => 
+          r.char.some(c => ['batman', 'superman', 'spider'].some(hero => c.includes(hero)))
+        ).length,
+        classicLiterature: this.definiteMultiActorRoles.filter(r => 
+          r.char.some(c => ['sherlock', 'dracula', 'tarzan'].some(lit => c.includes(lit)))
+        ).length,
+        franchiseCharacters: this.definiteMultiActorRoles.filter(r => 
+          r.reason.includes('franchise') || r.reason.includes('series')
+        ).length,
+        animatedCharacters: this.definiteMultiActorRoles.filter(r => 
+          r.char.some(c => ['mickey', 'bugs', 'mario'].some(anim => c.includes(anim)))
+        ).length
+      }
+    };
   }
 }
 
