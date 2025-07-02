@@ -24,23 +24,32 @@ export default function GBotInterface({
   setCelebrityName 
 }: GBotInterfaceProps) {
   const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
-      isBot: true,
-      timestamp: new Date().toLocaleTimeString()
-    }
-  ]);
+  {
+    id: 1,
+    text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
+    isBot: true,
+    timestamp: ''
+  }
+]);
 
   const [isTyping, setIsTyping] = useState(false);
 
-  useEffect(() => {
-    if (currentJob?.status === 'running') {
-      addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
-    } else if (currentJob?.status === 'completed') {
-      addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
-    }
-  }, [currentJob?.status]);
+useEffect(() => {
+  if (currentJob?.status === 'running') {
+    addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
+  } else if (currentJob?.status === 'completed') {
+    addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
+  }
+}, [currentJob?.status]);
+
+// Add this NEW useEffect here:
+useEffect(() => {
+  setMessages(prev => prev.map(msg => 
+    msg.id === 1 ? { ...msg, timestamp: new Date().toLocaleTimeString() } : msg
+  ));
+}, []);
+
+  
 
 const addBotMessage = (text: string) => {
   setIsTyping(true);
@@ -113,7 +122,8 @@ const addBotMessage = (text: string) => {
             }`}>
               <p className="text-sm font-ui">{message.text}</p>
              <p className="text-xs opacity-60 mt-1">
-              {message.timestamp}
+              {typeof window !== 'undefined' ? message.timestamp : ''}
+            </p>
             </p>
             </div>
           </motion.div>
