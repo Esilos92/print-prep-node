@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Download, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import GBotInterface from '@/components/GBotInterface';
 import ProgressDisplay from '@/components/ProgressDisplay';
 import JobHistory from '@/components/JobHistory';
@@ -96,7 +95,7 @@ export default function Dashboard() {
       // Add to history after 2 seconds
       setTimeout(() => {
         if (currentJob) {
-          setJobHistory(prev => [currentJob, ...prev]);
+          setJobHistory(prev => [{ ...currentJob, status: 'completed', endTime: new Date() }, ...prev]);
           setCurrentJob(null);
         }
       }, 2000);
@@ -108,60 +107,62 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      <div className="flex flex-col items-center justify-center min-h-screen px-8 py-12 relative z-10">
-  {/* Header */}
-  <motion.div 
-    initial={{ opacity: 0, y: -20 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="text-center mb-12"
-  >
-    <h1 className="text-4xl font-cyber font-bold text-glow-blue mb-2">
-      CELEBRITY IMAGE SOURCING SYSTEM
-    </h1>
-    <p className="text-xl text-slate-400 font-ui">
-      Powered by GBot.EXE AI Assistant
-    </p>
-  </motion.div>
+      {/* Main Container - Perfectly Centered */}
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative z-10">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
+            CELEBRITY IMAGE SOURCING SYSTEM
+          </h1>
+          <p className="text-xl text-slate-400 font-ui">
+            Powered by GBot.EXE AI Assistant
+          </p>
+        </motion.div>
 
-  <div className="w-full max-w-[1200px] mx-auto">
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - GBot Interface */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="lg:col-span-1"
-          >
-            <GBotInterface 
-              currentJob={currentJob}
-              onStartJob={handleStartJob}
-              celebrityName={celebrityName}
-              setCelebrityName={setCelebrityName}
-            />
-          </motion.div>
+        {/* Dashboard Grid - Perfectly Centered */}
+        <div className="w-full max-w-[1400px] mx-auto">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Left Column - GBot Chat Terminal */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="xl:col-span-1"
+            >
+              <GBotInterface 
+                currentJob={currentJob}
+                onStartJob={handleStartJob}
+                celebrityName={celebrityName}
+                setCelebrityName={setCelebrityName}
+              />
+            </motion.div>
 
-          {/* Middle Column - Progress Display */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="lg:col-span-1"
-          >
-            <ProgressDisplay currentJob={currentJob} />
-          </motion.div>
+            {/* Middle Column - Mission Status */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="xl:col-span-1"
+            >
+              <ProgressDisplay currentJob={currentJob} />
+            </motion.div>
 
-          {/* Right Column - Job History */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="lg:col-span-1"
-          >
-            <JobHistory jobs={jobHistory} />
-          </motion.div>
+            {/* Right Column - Mission Archive */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="xl:col-span-1"
+            >
+              <JobHistory jobs={jobHistory} />
+            </motion.div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }
