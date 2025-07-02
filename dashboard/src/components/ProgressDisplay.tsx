@@ -170,7 +170,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                       IMAGES
                     </h6>
                     <div className="text-center">
-                      <div className="text-lg font-cyber font-bold text-blue-200">
+                      <div className="text-2xl font-cyber font-bold text-blue-300">
                         {currentJob.imagesProcessed} Downloaded
                         {currentJob.imagesValidated && (
                           <> / {currentJob.imagesValidated} Validated</>
