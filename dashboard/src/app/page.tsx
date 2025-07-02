@@ -27,11 +27,11 @@ export default function Dashboard() {
     // Mock data for now
     {
       id: '1',
-      celebrity: 'Ryan Reynolds',
+      celebrity: 'Ryan Gosling',
       status: 'completed',
       currentPhase: 'Complete',
       progress: 100,
-      roles: ['Deadpool', 'Green Lantern', 'The Proposal'],
+      roles: ['Blade Runner 2049', 'La La Land', 'Drive'],
       imagesProcessed: 47,
       imagesValidated: 23,
       downloadLink: '#',
@@ -76,7 +76,7 @@ export default function Dashboard() {
         ...prev,
         currentPhase: phase,
         progress,
-        roles: progress > 25 ? ['Deadpool', 'Green Lantern', 'The Proposal'] : undefined,
+        roles: progress > 25 ? ['Blade Runner 2049', 'La La Land', 'Drive'] : undefined,
         imagesProcessed: progress > 70 ? Math.floor((progress - 70) * 2) : undefined,
         imagesValidated: progress > 90 ? Math.floor((progress - 90) * 2) : undefined
       } : null);
@@ -107,60 +107,58 @@ export default function Dashboard() {
       {/* Animated background grid */}
       <div className="cyber-grid"></div>
       
-      {/* Centered Container */}
-      <div className="min-h-screen flex items-center justify-center px-6 py-8 relative z-10">
-        <div className="w-full max-w-6xl space-y-8">
-          {/* Header */}
+      {/* Main Container - Centered Layout */}
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-6 relative z-10">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-4xl md:text-5xl font-cyber font-bold text-glow-blue mb-3">
+            CELEBRITY IMAGE SOURCING SYSTEM
+          </h1>
+          <p className="text-lg md:text-xl text-slate-400 font-ui">
+            Powered by GBot.EXE AI Assistant
+          </p>
+        </motion.div>
+
+        {/* Dashboard Grid - 3 Columns Centered */}
+        <div className="w-full max-w-[1320px] grid grid-cols-1 lg:grid-cols-3 gap-6 place-items-stretch">
+          {/* Left Column - GBot Chat Terminal */}
           <motion.div 
-            initial={{ opacity: 0, y: -30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="w-full"
           >
-            <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
-              CELEBRITY IMAGE SOURCING SYSTEM
-            </h1>
-            <p className="text-xl text-slate-400 font-ui">
-              Powered by GBot.EXE AI Assistant
-            </p>
+            <GBotInterface 
+              currentJob={currentJob}
+              onStartJob={handleStartJob}
+              celebrityName={celebrityName}
+              setCelebrityName={setCelebrityName}
+            />
           </motion.div>
 
-         {/* Dashboard Grid - Responsive 3-column with proper constraints */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 justify-items-center max-w-[1320px] mx-auto">
-            {/* Left Column - GBot Chat Terminal */}
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="w-full max-w-[420px]"
-            >
-              <GBotInterface 
-                currentJob={currentJob}
-                onStartJob={handleStartJob}
-                celebrityName={celebrityName}
-                setCelebrityName={setCelebrityName}
-              />
-            </motion.div>
+          {/* Middle Column - Mission Status */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="w-full"
+          >
+            <ProgressDisplay currentJob={currentJob} />
+          </motion.div>
 
-            {/* Middle Column - Mission Status */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="w-full max-w-[420px]"
-            >
-              <ProgressDisplay currentJob={currentJob} />
-            </motion.div>
-
-            {/* Right Column - Mission Archive */}
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="w-full max-w-[420px]"
-            >
-              <JobHistory jobs={jobHistory} />
-            </motion.div>
-          </div>
+          {/* Right Column - Mission Archive */}
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="w-full"
+          >
+            <JobHistory jobs={jobHistory} />
+          </motion.div>
         </div>
       </div>
     </div>
