@@ -252,7 +252,7 @@ export default function GBotInterface({
                   </motion.div>
                 )}
               </div>
-            </div> 
+            </div>
           </div>
         </div>
       </div>
