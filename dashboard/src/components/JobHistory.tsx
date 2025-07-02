@@ -6,7 +6,8 @@ import {
   AlertCircle, 
   User,
   Calendar,
-  ExternalLink
+  FileArchive,
+  Star
 } from 'lucide-react';
 
 interface JobStatus {
@@ -31,13 +32,13 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="w-5 h-5 text-green-400" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-400" />;
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-400" />;
+        return <AlertCircle className="w-4 h-4 text-red-400" />;
       case 'running':
-        return <Clock className="w-5 h-5 text-blue-400 animate-spin" />;
+        return <Clock className="w-4 h-4 text-blue-400 animate-spin" />;
       default:
-        return <Clock className="w-5 h-5 text-slate-400" />;
+        return <Clock className="w-4 h-4 text-slate-400" />;
     }
   };
 
@@ -63,15 +64,23 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
   };
 
   return (
-    <div className="cyber-panel p-6 h-[600px] flex flex-col">
+    <div className="cyber-panel p-6 h-[650px] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-cyber font-bold text-glow-blue">
-          MISSION ARCHIVE
-        </h3>
-        <span className="text-sm text-slate-400 font-ui">
-          {jobs.length} total missions
-        </span>
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-blue-500/30">
+        <div className="flex items-center gap-3">
+          <FileArchive className="w-6 h-6 text-blue-400" />
+          <h3 className="text-xl font-cyber font-bold text-glow-blue">
+            MISSION ARCHIVE
+          </h3>
+        </div>
+        <div className="text-right">
+          <span className="text-sm text-slate-400 font-ui block">
+            {jobs.length} total missions
+          </span>
+          <span className="text-xs text-slate-500 font-ui">
+            {jobs.filter(j => j.status === 'completed').length} completed
+          </span>
+        </div>
       </div>
 
       {jobs.length === 0 ? (
@@ -93,24 +102,26 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         </motion.div>
       ) : (
         /* Job List */
-        <div className="flex-1 overflow-y-auto space-y-3">
+        <div className="flex-1 overflow-y-auto space-y-4">
           {jobs.map((job, index) => (
             <motion.div
               key={job.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 hover:border-blue-500/50 transition-colors"
+              className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 hover:border-blue-500/50 transition-all duration-300 hover:bg-slate-800/50"
             >
               {/* Job Header */}
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   {getStatusIcon(job.status)}
                   <div>
-                    <h4 className="font-cyber text-lg text-blue-300 flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      {job.celebrity}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-blue-300" />
+                      <h4 className="font-cyber text-lg text-blue-300">
+                        {job.celebrity}
+                      </h4>
+                    </div>
                     <p className={`text-sm font-ui ${getStatusColor(job.status)}`}>
                       {job.status.toUpperCase()}
                     </p>
@@ -121,66 +132,85 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className="cyber-button pink text-xs px-3 py-1 flex items-center gap-1"
+                    className="cyber-button pink text-sm px-4 py-2 flex items-center gap-2 min-w-fit"
                     onClick={() => window.open(job.downloadLink, '_blank')}
                   >
-                    <Download className="w-3 h-3" />
-                    Download
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Download</span>
                   </motion.button>
                 )}
               </div>
 
-              {/* Job Details */}
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              {/* Job Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 {/* Timeline */}
-                <div>
-                  <h5 className="text-slate-400 mb-1 font-cyber">TIMELINE</h5>
-                  {job.startTime && (
-                    <p className="text-slate-300 font-ui">
-                      Started: {job.startTime.toLocaleTimeString()}
-                    </p>
-                  )}
-                  {job.endTime && (
-                    <p className="text-slate-300 font-ui">
-                      Duration: {formatDuration(job.startTime, job.endTime)}
-                    </p>
-                  )}
+                <div className="space-y-2">
+                  <h5 className="text-slate-400 text-xs font-cyber tracking-wide">TIMELINE</h5>
+                  <div className="space-y-1">
+                    {job.startTime && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        <span className="text-slate-300 font-ui">
+                          {job.startTime.toLocaleTimeString()}
+                        </span>
+                      </div>
+                    )}
+                    {job.endTime && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="text-slate-300 font-ui">
+                          {formatDuration(job.startTime, job.endTime)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Stats */}
-                <div>
-                  <h5 className="text-slate-400 mb-1 font-cyber">RESULTS</h5>
-                  {job.roles && (
-                    <p className="text-slate-300 font-ui">
-                      Roles: {job.roles.length}
-                    </p>
-                  )}
-                  {job.imagesValidated && (
-                    <p className="text-slate-300 font-ui">
-                      Images: {job.imagesValidated} validated
-                    </p>
-                  )}
+                <div className="space-y-2">
+                  <h5 className="text-slate-400 text-xs font-cyber tracking-wide">RESULTS</h5>
+                  <div className="space-y-1">
+                    {job.roles && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Star className="w-3 h-3 text-yellow-500" />
+                        <span className="text-slate-300 font-ui">
+                          {job.roles.length} roles found
+                        </span>
+                      </div>
+                    )}
+                    {job.imagesValidated && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <CheckCircle2 className="w-3 h-3 text-green-500" />
+                        <span className="text-slate-300 font-ui">
+                          {job.imagesValidated} images validated
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Roles Preview */}
+              {/* Discovered Roles */}
               {job.roles && job.roles.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-slate-700">
-                  <h5 className="text-slate-400 text-xs mb-2 font-cyber">
+                <div className="pt-3 border-t border-slate-700">
+                  <h5 className="text-slate-400 text-xs mb-3 font-cyber tracking-wide">
                     DISCOVERED ROLES
                   </h5>
-                  <div className="flex flex-wrap gap-1">
-                    {job.roles.slice(0, 3).map((role) => (
-                      <span
+                  <div className="flex flex-wrap gap-2">
+                    {job.roles.slice(0, 4).map((role, roleIndex) => (
+                      <motion.span
                         key={role}
-                        className="text-xs bg-blue-900/30 text-blue-200 px-2 py-1 rounded"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: roleIndex * 0.1 }}
+                        className="text-xs bg-blue-900/40 text-blue-200 px-3 py-1.5 rounded-full border border-blue-500/30 font-ui"
                       >
                         {role}
-                      </span>
+                      </motion.span>
                     ))}
-                    {job.roles.length > 3 && (
-                      <span className="text-xs text-slate-400 px-2 py-1">
-                        +{job.roles.length - 3} more
+                    {job.roles.length > 4 && (
+                      <span className="text-xs text-slate-400 px-3 py-1.5 font-ui">
+                        +{job.roles.length - 4} more
                       </span>
                     )}
                   </div>
@@ -189,12 +219,12 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
 
               {/* Progress Bar for Running Jobs */}
               {job.status === 'running' && (
-                <div className="mt-3 pt-3 border-t border-slate-700">
-                  <div className="flex justify-between items-center mb-1">
+                <div className="mt-4 pt-3 border-t border-slate-700">
+                  <div className="flex justify-between items-center mb-2">
                     <span className="text-xs text-slate-400 font-cyber">
                       {job.currentPhase}
                     </span>
-                    <span className="text-xs text-blue-400 font-cyber">
+                    <span className="text-sm text-blue-400 font-cyber font-bold">
                       {job.progress}%
                     </span>
                   </div>
