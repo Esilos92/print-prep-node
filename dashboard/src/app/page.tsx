@@ -108,7 +108,7 @@ export default function Dashboard() {
       <div className="cyber-grid"></div>
       
       {/* Main Container - Structured Layout */}
-      <div className="min-h-screen flex flex-col justify-center px-12 py-16 relative z-10">
+      <div className="min-h-screen flex flex-col justify-center px-8 py-8 relative z-10">
         
         {/* Header Section */}
         <motion.div 
@@ -124,8 +124,8 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        {/* Three Horizontal Panels with Proper Spacing */}
-        <div className="max-w-7xl mx-auto w-full space-y-12">
+        {/* Three Horizontal Panels with Optimal Spacing */}
+        <div className="max-w-7xl mx-auto w-full space-y-8">
           
           {/* Panel 1 - GBot Terminal */}
           <motion.div 
