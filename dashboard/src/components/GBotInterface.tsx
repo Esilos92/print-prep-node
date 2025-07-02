@@ -114,7 +114,7 @@ export default function GBotInterface({
           <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="flex gap-3 items-stretch">
+              <div className="flex gap-3 items-center">
                 <input
                   type="text"
                   value={celebrityName}
@@ -129,6 +129,7 @@ export default function GBotInterface({
                   className={`cyber-button px-8 py-4 text-base whitespace-nowrap ${
                     currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
+                  style={{ marginTop: '8px' }}
                 >
                   <Send className="w-5 h-5 mr-2" />
                   Execute
