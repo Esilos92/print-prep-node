@@ -1,70 +1,174 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 import GBotInterface from '@/components/GBotInterface';
 import ProgressDisplay from '@/components/ProgressDisplay';
 import JobHistory from '@/components/JobHistory';
 
-export default function Dashboard() {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+interface JobStatus {
+  id: string;
+  celebrity: string;
+  status: 'idle' | 'running' | 'completed' | 'error';
+  currentPhase: string;
+  progress: number;
+  roles?: string[];
+  imagesProcessed?: number;
+  imagesValidated?: number;
+  downloadLink?: string;
+  startTime?: Date;
+  endTime?: Date;
+}
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-        <div className="text-blue-400 font-cyber text-xl animate-pulse">
-          INITIALIZING GBOT.EXE...
-        </div>
-      </div>
-    );
-  }
+export default function Dashboard() {
+  const [celebrityName, setCelebrityName] = useState('');
+  const [currentJob, setCurrentJob] = useState<JobStatus | null>(null);
+  const [jobHistory, setJobHistory] = useState<JobStatus[]>([
+    // Mock data for now
+    {
+      id: '1',
+      celebrity: 'Ryan Reynolds',
+      status: 'completed',
+      currentPhase: 'Complete',
+      progress: 100,
+      roles: ['Deadpool', 'Green Lantern', 'The Proposal'],
+      imagesProcessed: 47,
+      imagesValidated: 23,
+      downloadLink: '#',
+      startTime: new Date(Date.now() - 300000),
+      endTime: new Date(Date.now() - 60000)
+    }
+  ]);
+
+  const handleStartJob = async () => {
+    if (!celebrityName.trim()) return;
+
+    const newJob: JobStatus = {
+      id: Date.now().toString(),
+      celebrity: celebrityName,
+      status: 'running',
+      currentPhase: 'Initializing AI systems...',
+      progress: 0,
+      startTime: new Date()
+    };
+
+    setCurrentJob(newJob);
+    setCelebrityName('');
+
+    // Mock progress simulation (will be replaced with real backend calls)
+    simulateProgress(newJob);
+  };
+
+  const simulateProgress = async (job: JobStatus) => {
+    const phases = [
+      { phase: 'Scanning filmography database...', progress: 10, delay: 1000 },
+      { phase: 'Analyzing most recognizable performances...', progress: 25, delay: 2000 },
+      { phase: 'Generating precision search protocols...', progress: 40, delay: 1500 },
+      { phase: 'Downloading image candidates...', progress: 70, delay: 3000 },
+      { phase: 'AI validation in progress...', progress: 90, delay: 2000 },
+      { phase: 'Compiling print-ready files...', progress: 100, delay: 1000 }
+    ];
+
+    for (const { phase, progress, delay } of phases) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      setCurrentJob(prev => prev ? {
+        ...prev,
+        currentPhase: phase,
+        progress,
+        roles: progress > 25 ? ['Deadpool', 'Green Lantern', 'The Proposal'] : undefined,
+        imagesProcessed: progress > 70 ? Math.floor((progress - 70) * 2) : undefined,
+        imagesValidated: progress > 90 ? Math.floor((progress - 90) * 2) : undefined
+      } : null);
+    }
+
+    // Complete the job
+    setTimeout(() => {
+      setCurrentJob(prev => prev ? {
+        ...prev,
+        status: 'completed',
+        currentPhase: 'Mission Complete!',
+        downloadLink: '#',
+        endTime: new Date()
+      } : null);
+
+      // Add to history after 2 seconds
+      setTimeout(() => {
+        if (currentJob) {
+          setJobHistory(prev => [{ ...currentJob, status: 'completed', endTime: new Date() }, ...prev]);
+          setCurrentJob(null);
+        }
+      }, 2000);
+    }, 1000);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Centered Container Wrapper */}
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-[1400px]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900 relative">
+      {/* Animated background grid */}
+      <div className="cyber-grid"></div>
+      
+      {/* CSS Grid Layout for Perfect Centering */}
+      <div 
+        className="min-h-screen grid place-items-center px-6 py-8 relative z-10"
+        style={{ gridTemplateColumns: '1fr', gridTemplateRows: '1fr' }}
+      >
+        <div className="w-full max-w-[1400px] space-y-8">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-cyber bg-gradient-to-r from-blue-400 to-pink-400 bg-clip-text text-transparent mb-2">
-              CELEBRITY IMAGE SOURCING DASHBOARD
+          <motion.div 
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+          >
+            <h1 className="text-5xl font-cyber font-bold text-glow-blue mb-3">
+              CELEBRITY IMAGE SOURCING SYSTEM
             </h1>
-            <p className="text-blue-300 font-ui text-lg">
-              GBot.EXE • Mission Control • Archive System
+            <p className="text-xl text-slate-400 font-ui">
+              Powered by GBot.EXE AI Assistant
             </p>
-          </div>
+          </motion.div>
 
-          {/* Main Dashboard Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-fr">
-            {/* Left Panel - GBot Interface */}
-            <div className="cyber-panel h-[650px] overflow-hidden">
-              <GBotInterface />
-            </div>
+          {/* Dashboard Grid - Centered */}
+          <div 
+            className="grid gap-6 w-full mx-auto"
+            style={{ 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+              maxWidth: '1400px'
+            }}
+          >
+            {/* Left Column - GBot Chat Terminal */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+              className="w-full"
+            >
+              <GBotInterface 
+                currentJob={currentJob}
+                onStartJob={handleStartJob}
+                celebrityName={celebrityName}
+                setCelebrityName={setCelebrityName}
+              />
+            </motion.div>
 
-            {/* Middle Panel - Progress Display */}
-            <div className="cyber-panel h-[650px] overflow-hidden">
-              <ProgressDisplay />
-            </div>
+            {/* Middle Column - Mission Status */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="w-full"
+            >
+              <ProgressDisplay currentJob={currentJob} />
+            </motion.div>
 
-            {/* Right Panel - Job History */}
-            <div className="cyber-panel h-[650px] overflow-hidden">
-              <JobHistory />
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="text-center mt-8 text-sm text-blue-400 font-ui">
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span>SYSTEM ONLINE</span>
-              <span className="mx-2">•</span>
-              <span>Phase 1.5 Complete</span>
-              <span className="mx-2">•</span>
-              <span>Ready for Backend Integration</span>
-            </div>
+            {/* Right Column - Mission Archive */}
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="w-full"
+            >
+              <JobHistory jobs={jobHistory} />
+            </motion.div>
           </div>
         </div>
       </div>
