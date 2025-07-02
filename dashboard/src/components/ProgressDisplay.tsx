@@ -8,7 +8,9 @@ import {
   Package,
   Clock,
   CheckCircle2,
-  Image
+  Image,
+  Activity,
+  Star
 } from 'lucide-react';
 
 interface JobStatus {
@@ -64,16 +66,19 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
   };
 
   return (
-    <div className="cyber-panel p-6 h-[600px]">
+    <div className="cyber-panel p-6 h-[650px] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-cyber font-bold text-glow-blue">
-          MISSION STATUS
-        </h3>
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-blue-500/30">
+        <div className="flex items-center gap-3">
+          <Activity className="w-6 h-6 text-blue-400" />
+          <h3 className="text-xl font-cyber font-bold text-glow-blue">
+            MISSION STATUS
+          </h3>
+        </div>
         {currentJob && (
           <div className="flex items-center gap-2 text-sm text-slate-400">
             <Clock className="w-4 h-4" />
-            {formatDuration(currentJob.startTime)}
+            <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
           </div>
         )}
       </div>
@@ -85,30 +90,30 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           animate={{ opacity: 1 }}
           className="flex flex-col items-center justify-center h-full text-center"
         >
-          <div className="w-32 h-32 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
+          <div className="w-32 h-32 bg-slate-800/50 rounded-full flex items-center justify-center mb-6">
             <Search className="w-16 h-16 text-slate-600" />
           </div>
-          <h4 className="text-lg font-cyber text-slate-400 mb-2">
+          <h4 className="text-xl font-cyber text-slate-400 mb-3">
             AWAITING MISSION PARAMETERS
           </h4>
-          <p className="text-sm text-slate-500 font-ui">
-            Enter celebrity name to begin image sourcing protocol
+          <p className="text-sm text-slate-500 font-ui max-w-xs">
+            Enter celebrity name in the terminal to begin image sourcing protocol
           </p>
         </motion.div>
       ) : (
         /* Active Job */
-        <div className="space-y-6">
+        <div className="flex-1 space-y-6">
           {/* Overall Progress */}
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="font-cyber text-lg text-glow-pink">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-cyber text-xl text-glow-pink">
                 {currentJob.celebrity}
               </h4>
-              <span className="text-2xl font-cyber font-bold text-blue-400">
+              <span className="text-3xl font-cyber font-bold text-blue-400">
                 {currentJob.progress}%
               </span>
             </div>
-            <div className="progress-bar mb-2">
+            <div className="progress-bar mb-3 h-3">
               <motion.div 
                 className="progress-fill"
                 initial={{ width: 0 }}
@@ -123,7 +128,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
           {/* Phase Breakdown */}
           <div className="space-y-3">
-            <h5 className="font-cyber text-sm text-slate-300 mb-3">
+            <h5 className="font-cyber text-sm text-slate-300 mb-4 tracking-wide">
               MISSION PHASES
             </h5>
             {phases.map((phase, index) => {
@@ -138,16 +143,16 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className={`flex items-center gap-3 p-2 rounded ${
+                  className={`flex items-center gap-4 p-3 rounded-lg ${
                     isActive ? 'bg-blue-900/30 border border-blue-500/30' : ''
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                     isComplete 
-                      ? 'bg-green-500' 
+                      ? 'bg-green-500 border-green-400' 
                       : isActive 
-                        ? 'bg-blue-500' 
-                        : 'bg-slate-700'
+                        ? 'bg-blue-500 border-blue-400' 
+                        : 'bg-slate-700 border-slate-600'
                   }`}>
                     {isComplete ? (
                       <CheckCircle2 className="w-5 h-5 text-white" />
@@ -157,15 +162,15 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                       }`} />
                     )}
                   </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-ui ${
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-ui font-medium ${
                       isActive ? 'text-blue-300' : 'text-slate-400'
                     }`}>
                       {phase.name}
                     </p>
-                    <div className="w-full bg-slate-700 h-1 rounded mt-1">
+                    <div className="w-full bg-slate-700 h-2 rounded-full mt-2">
                       <motion.div 
-                        className={`h-full rounded ${
+                        className={`h-full rounded-full ${
                           isComplete 
                             ? 'bg-green-400' 
                             : 'bg-blue-400'
@@ -181,47 +186,57 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
             })}
           </div>
 
-          {/* Stats */}
+          {/* Stats Section */}
           {(currentJob.roles || currentJob.imagesProcessed) && (
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700">
+            <div className="grid grid-cols-1 gap-4 pt-4 border-t border-slate-700">
+              {/* Roles Found */}
               {currentJob.roles && (
                 <div>
-                  <h6 className="text-xs font-cyber text-slate-400 mb-2">
-                    ROLES FOUND
+                  <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-2">
+                    <Star className="w-3 h-3" />
+                    ROLES DISCOVERED
                   </h6>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {currentJob.roles.slice(0, 3).map((role, index) => (
                       <motion.div
                         key={role}
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: index * 0.1 }}
-                        className="text-xs bg-blue-900/30 text-blue-200 px-2 py-1 rounded"
+                        className="flex items-center gap-3 bg-blue-900/30 text-blue-200 px-3 py-2 rounded-lg border border-blue-500/30"
                       >
-                        {role}
+                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <span className="text-sm font-ui">{role}</span>
                       </motion.div>
                     ))}
+                    {currentJob.roles.length > 3 && (
+                      <div className="text-xs text-slate-400 px-3 py-2 text-center">
+                        +{currentJob.roles.length - 3} additional roles found
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
               
+              {/* Image Stats */}
               {currentJob.imagesProcessed && (
                 <div>
-                  <h6 className="text-xs font-cyber text-slate-400 mb-2">
-                    IMAGE STATS
+                  <h6 className="text-xs font-cyber text-slate-400 mb-3 tracking-wide flex items-center gap-2">
+                    <Image className="w-3 h-3" />
+                    IMAGE PROCESSING
                   </h6>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Image className="w-3 h-3 text-yellow-400" />
-                      <span className="text-slate-300">
-                        {currentJob.imagesProcessed} downloaded
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between bg-slate-800/50 px-3 py-2 rounded-lg">
+                      <span className="text-sm text-slate-300 font-ui">Downloaded</span>
+                      <span className="text-yellow-400 font-cyber text-sm font-bold">
+                        {currentJob.imagesProcessed}
                       </span>
                     </div>
                     {currentJob.imagesValidated && (
-                      <div className="flex items-center gap-2 text-xs">
-                        <CheckCircle2 className="w-3 h-3 text-green-400" />
-                        <span className="text-slate-300">
-                          {currentJob.imagesValidated} validated
+                      <div className="flex items-center justify-between bg-slate-800/50 px-3 py-2 rounded-lg">
+                        <span className="text-sm text-slate-300 font-ui">Validated</span>
+                        <span className="text-green-400 font-cyber text-sm font-bold">
+                          {currentJob.imagesValidated}
                         </span>
                       </div>
                     )}
