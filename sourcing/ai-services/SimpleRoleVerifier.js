@@ -1,10 +1,15 @@
 const OpenAI = require('openai');
+const axios = require('axios');
 
 class SimpleRoleVerifier {
   constructor() {
     this.openai = null;
     this.hasOpenAI = false;
     this.initializeOpenAI();
+    
+    // Web search configuration
+    this.serpApiKey = process.env.SERP_API_KEY;
+    this.hasWebSearch = !!this.serpApiKey;
     
     // INTEGRATED: Refined safety net of major multi-actor roles
     this.definiteMultiActorRoles = [
@@ -66,13 +71,21 @@ class SimpleRoleVerifier {
   async verifyRoles(celebrityName, discoveredRoles) {
     console.log(`🔍 Verifying ${discoveredRoles.length} roles for ${celebrityName}...`);
     
+    if (this.hasWebSearch) {
+      console.log(`🌐 Using web search verification (authoritative sources)`);
+    } else if (this.hasOpenAI) {
+      console.log(`🤖 Using AI verification (fallback)`);
+    } else {
+      console.log(`⚠️ No verification available, allowing all roles`);
+    }
+    
     const verifiedRoles = [];
     const rejectedRoles = [];
     let verificationCost = 0;
     
     for (const role of discoveredRoles) {
       const verification = await this.verifyRoleWithConfidence(celebrityName, role);
-      verificationCost += 0.0002;
+      verificationCost += this.hasWebSearch ? 0.002 : 0.0002; // Higher cost for web search
       
       if (verification.isValid) {
         verifiedRoles.push({
@@ -91,7 +104,7 @@ class SimpleRoleVerifier {
       }
     }
     
-    console.log(`💰 Verification cost: $${verificationCost.toFixed(4)}`);
+    console.log(`💰 Verification cost: ${verificationCost.toFixed(4)} (${this.hasWebSearch ? 'web search' : 'AI only'})`);
     console.log(`🎭 ${verifiedRoles.length}/${discoveredRoles.length} roles verified as real`);
     
     if (rejectedRoles.length > 0) {
@@ -104,38 +117,201 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * CORRECTED: Role verification with better accuracy and less false negatives
+   * ENHANCED: Role verification with web search fallback
    */
   async verifyRoleWithConfidence(celebrityName, role) {
-    if (!this.hasOpenAI) {
+    // Try web search verification first (most accurate)
+    if (this.hasWebSearch) {
+      try {
+        const webResult = await this.verifyRoleWithWebSearch(celebrityName, role);
+        if (webResult.confidence !== 'UNKNOWN') {
+          return webResult;
+        }
+      } catch (error) {
+        console.log(`⚠️ Web search verification failed: ${error.message}`);
+      }
+    }
+
+    // Fallback to AI verification
+    if (this.hasOpenAI) {
+      try {
+        const prompt = this.buildCorrectedVerificationPrompt(celebrityName, role);
+
+        const completion = await this.openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.05,
+          max_tokens: 100
+        });
+
+        const response = completion.choices[0].message.content.trim();
+        return this.parseVerificationResponse(response);
+        
+      } catch (error) {
+        console.log(`⚠️ AI verification failed: ${error.message}`);
+      }
+    }
+
+    // Final fallback - allow role
+    return { 
+      isValid: true, 
+      confidence: 'UNKNOWN', 
+      reason: 'No verification available, allowing role' 
+    };
+  }
+
+  /**
+   * NEW: Web search verification using SerpAPI
+   */
+  async verifyRoleWithWebSearch(celebrityName, role) {
+    try {
+      console.log(`🔍 Web searching: ${celebrityName} as ${role.character} in ${role.title}`);
+      
+      // Search authoritative sources
+      const searchQueries = [
+        `"${celebrityName}" "${role.character}" "${role.title}" site:imdb.com`,
+        `"${celebrityName}" "${role.title}" cast site:imdb.com`,
+        `"${celebrityName}" "${role.character}" "${role.title}" site:wikipedia.org`,
+        `"${celebrityName}" filmography "${role.title}"`
+      ];
+
+      for (const query of searchQueries) {
+        try {
+          const searchResult = await this.performWebSearch(query);
+          const verification = this.analyzeSearchResults(searchResult, celebrityName, role);
+          
+          if (verification.confidence !== 'UNKNOWN') {
+            console.log(`🌐 Web verification: ${verification.confidence} - ${verification.reason}`);
+            return verification;
+          }
+        } catch (error) {
+          console.log(`⚠️ Search query failed: ${query}`);
+        }
+      }
+
       return { 
         isValid: true, 
         confidence: 'UNKNOWN', 
-        reason: 'No AI verification available' 
+        reason: 'No definitive web search results found' 
       };
-    }
 
-    try {
-      const prompt = this.buildCorrectedVerificationPrompt(celebrityName, role);
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.05,
-        max_tokens: 100
-      });
-
-      const response = completion.choices[0].message.content.trim();
-      return this.parseVerificationResponse(response);
-      
     } catch (error) {
-      console.log(`⚠️ Role verification failed: ${error.message}`);
-      return { 
-        isValid: true, 
-        confidence: 'ERROR', 
-        reason: 'Verification failed, allowing role' 
+      throw new Error(`Web search verification failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Perform web search using SerpAPI
+   */
+  async performWebSearch(query) {
+    const params = {
+      api_key: this.serpApiKey,
+      engine: 'google',
+      q: query,
+      num: 10
+    };
+
+    const response = await axios.get('https://serpapi.com/search', { 
+      params,
+      timeout: 10000
+    });
+
+    return response.data;
+  }
+
+  /**
+   * Analyze search results for role verification
+   */
+  analyzeSearchResults(searchData, celebrityName, role) {
+    const results = searchData.organic_results || [];
+    const snippets = results.map(r => (r.snippet || '').toLowerCase()).join(' ');
+    const titles = results.map(r => (r.title || '').toLowerCase()).join(' ');
+    const allText = `${snippets} ${titles}`.toLowerCase();
+
+    const celebrityLower = celebrityName.toLowerCase();
+    const characterLower = role.character.toLowerCase();
+    const titleLower = role.title.toLowerCase();
+
+    // Look for positive confirmation patterns
+    const positivePatterns = [
+      `${celebrityLower}.*${characterLower}`,
+      `${characterLower}.*${celebrityLower}`,
+      `${celebrityLower}.*plays.*${characterLower}`,
+      `${celebrityLower}.*as.*${characterLower}`,
+      `cast.*${celebrityLower}.*${characterLower}`,
+      `${characterLower}.*played by.*${celebrityLower}`
+    ];
+
+    const hasPositiveMatch = positivePatterns.some(pattern => {
+      const regex = new RegExp(pattern, 'i');
+      return regex.test(allText);
+    });
+
+    // Look for negative confirmation patterns
+    const negativePatterns = [
+      `${characterLower}.*played by.*(?!${celebrityLower})\\w+`,
+      `${characterLower}.*portrayed by.*(?!${celebrityLower})\\w+`,
+      `cast.*${characterLower}.*(?!${celebrityLower})\\w+`
+    ];
+
+    const hasNegativeMatch = negativePatterns.some(pattern => {
+      const regex = new RegExp(pattern, 'i');
+      return regex.test(allText);
+    });
+
+    // Check for IMDB or Wikipedia results (high authority)
+    const hasAuthorativeSource = results.some(r => 
+      r.link && (r.link.includes('imdb.com') || r.link.includes('wikipedia.org'))
+    );
+
+    // Make verification decision
+    if (hasPositiveMatch && hasAuthorativeSource) {
+      return {
+        isValid: true,
+        confidence: 'HIGH',
+        reason: 'Confirmed by authoritative web sources'
       };
     }
+
+    if (hasPositiveMatch) {
+      return {
+        isValid: true,
+        confidence: 'MEDIUM', 
+        reason: 'Confirmed by web search results'
+      };
+    }
+
+    if (hasNegativeMatch && hasAuthorativeSource) {
+      return {
+        isValid: false,
+        confidence: 'HIGH',
+        reason: 'Contradicted by authoritative web sources'
+      };
+    }
+
+    if (results.length === 0) {
+      return {
+        isValid: false,
+        confidence: 'MEDIUM',
+        reason: 'No web search results found for this role'
+      };
+    }
+
+    // If celebrity and title are mentioned but not character, might be wrong character name
+    const hasCelebrityAndTitle = allText.includes(celebrityLower) && allText.includes(titleLower);
+    if (hasCelebrityAndTitle && !allText.includes(characterLower)) {
+      return {
+        isValid: false,
+        confidence: 'MEDIUM',
+        reason: 'Celebrity and title found but not this character name'
+      };
+    }
+
+    return {
+      isValid: true,
+      confidence: 'UNKNOWN',
+      reason: 'Inconclusive web search results'
+    };
   }
 
   /**
@@ -167,7 +343,7 @@ Answer:`;
   }
 
   /**
-   * CORRECTED: Parse verification response with bias toward accepting roles
+   * CORRECTED: Parse verification response with proper confidence handling
    */
   parseVerificationResponse(response) {
     const parts = response.split('|');
@@ -177,12 +353,10 @@ Answer:`;
       const decision = parts[1].trim().toUpperCase();
       const reason = parts[2].trim();
       
-      // CORRECTED: Be more lenient - only reject HIGH confidence NOs
+      // FIXED: Reject if AI says NO with any confidence (but be lenient with UNCERTAIN)
       const isValid = decision.includes('YES') || 
-                     confidence === 'LOW' ||
-                     confidence === 'MEDIUM' ||
-                     confidence === 'UNCERTAIN' ||
-                     (confidence === 'HIGH' && !decision.includes('NO'));
+                     (confidence === 'UNCERTAIN' && !decision.includes('NO')) ||
+                     (decision.includes('NO') ? false : true); // If NO, reject regardless of confidence
       
       return {
         isValid,
@@ -194,17 +368,22 @@ Answer:`;
     // Fallback parsing for malformed responses
     const upperResponse = response.toUpperCase();
     
-    // Only reject if explicitly HIGH confidence NO
-    if (upperResponse.includes('HIGH') && upperResponse.includes('NO') && 
-        (upperResponse.includes('DEFINITELY') || upperResponse.includes('NEVER'))) {
-      return { isValid: false, confidence: 'HIGH', reason: 'High confidence rejection' };
+    // Reject if AI clearly says NO or gives specific wrong information
+    if (upperResponse.includes('NO') || upperResponse.includes('DID NOT') || 
+        upperResponse.includes('NEVER') || upperResponse.includes('NOT LISTED')) {
+      return { isValid: false, confidence: 'MEDIUM', reason: 'AI provided specific rejection' };
     }
     
-    // Default to allowing role - be conservative about rejecting
+    // Only allow if explicitly says YES
+    if (upperResponse.includes('YES')) {
+      return { isValid: true, confidence: 'UNCERTAIN', reason: 'Could not parse fully but AI said YES' };
+    }
+    
+    // Default to rejecting unclear responses that mention wrong information
     return { 
-      isValid: true, 
+      isValid: false, 
       confidence: 'UNCERTAIN', 
-      reason: 'Could not parse verification, allowing role' 
+      reason: 'Could not parse verification clearly, rejecting for safety' 
     };
   }
 
