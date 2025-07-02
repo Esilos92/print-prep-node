@@ -74,6 +74,9 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           <div>
             <FileArchive className="w-6 h-6 text-blue-400 mb-2" />
             <h3 className="font-cyber text-xl text-glow-blue">MISSION ARCHIVE</h3>
+            <div className="font-cyber text-lg text-blue-300">
+              Completed - {completedCount}
+            </div>
           </div>
         </div>
         <div style={{ width: '65%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
@@ -81,7 +84,6 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
             <FileArchive className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-xl text-glow-blue">SUBJECT LOG</h3>
           </div>
-          <br />
         </div>
       </div>
       
@@ -89,6 +91,11 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         
         {/* LEFT COLUMN - 35% */}
         <div style={{ width: '35%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+          
+          {/* Completed Count underneath */}
+          <div className="font-cyber text-lg text-blue-300 mt-2">
+            Completed - {completedCount}
+          </div>
           
           {/* Completed Count underneath */}
           <div className="font-cyber text-lg text-blue-300 mt-2">
@@ -160,7 +167,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   className="bg-slate-800/30 border border-slate-700 rounded-lg p-4"
                 >
                   {/* Check + Celebrity Name on same line */}
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-2 mb-3">
                     {getStatusIcon(job.status)}
                     <h4 className="font-cyber text-lg text-blue-300">{job.celebrity}</h4>
                   </div>
