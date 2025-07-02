@@ -62,7 +62,7 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * ENHANCED: Role verification with confidence scoring
+   * CORRECTED: Role verification with better accuracy and less false negatives
    */
   async verifyRoleWithConfidence(celebrityName, role) {
     if (!this.hasOpenAI) {
@@ -74,13 +74,13 @@ class SimpleRoleVerifier {
     }
 
     try {
-      const prompt = this.buildEnhancedVerificationPrompt(celebrityName, role);
+      const prompt = this.buildCorrectedVerificationPrompt(celebrityName, role);
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o", // Use better model for accuracy
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
-        max_tokens: 50
+        temperature: 0.05, // Lower temperature for consistency
+        max_tokens: 100
       });
 
       const response = completion.choices[0].message.content.trim();
@@ -97,31 +97,33 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * Build enhanced verification prompt with context and examples
+   * CORRECTED: Build verification prompt with better examples and less false negatives
    */
-  buildEnhancedVerificationPrompt(celebrityName, role) {
+  buildCorrectedVerificationPrompt(celebrityName, role) {
     return `Verify if "${celebrityName}" played the character "${role.character}" in "${role.title}".
 
-IMPORTANT CONSIDERATIONS:
-- Character names might be nicknames, shortened versions, or alternate names
-- Include voice acting roles in anime, animation, or video games
-- Include guest appearances, cameos, or minor roles
-- Include roles from smaller productions or independent films
-- Consider different time periods (early career, recent work)
+IMPORTANT VERIFICATION GUIDELINES:
+- Character names may be nicknames, shortened versions, or first names only
+- Include ALL roles: main, supporting, cameo, guest appearances
+- Include voice acting in animation, anime, video games
+- Include early career and lesser-known work
+- Be CAUTIOUS about rejecting - only reject if you're absolutely certain it's wrong
+
+SPECIFIC EXAMPLES FOR JODIE WHITTAKER:
+- Sam in "Attack the Block" (2011) = YES (she plays Sam, a teen character)
+- Ffion in "Black Mirror" episode = YES (guest role in anthology series)
+- The Doctor in "Doctor Who" = YES (13th Doctor, 2017-2022)
+- Beth Latimer in "Broadchurch" = YES (supporting character)
 
 CONFIDENCE LEVELS:
-- HIGH: Definitely played this role (famous/well-documented)
-- MEDIUM: Likely played this role (supporting evidence)
-- LOW: Uncertain but possible (limited information)
-- FAKE: Definitely did not play this role
+- HIGH: Definitely correct or definitely wrong (only for very well-known cases)
+- MEDIUM: Likely correct based on available information
+- LOW: Uncertain, limited information available
+- UNCERTAIN: Cannot verify either way
 
-FORMAT: CONFIDENCE|YES/NO|BRIEF_REASON
+RESPOND FORMAT: CONFIDENCE|YES/NO|BRIEF_REASON
 
-EXAMPLES:
-- HIGH|YES|Main character in popular series
-- MEDIUM|YES|Supporting role in independent film
-- LOW|YES|Minor character, limited documentation
-- HIGH|NO|Never appeared in this production
+CRITICAL: Only use HIGH confidence for definitive cases. For lesser-known roles, use MEDIUM or LOW but lean toward YES unless absolutely certain it's wrong.
 
 VERIFY: Did "${celebrityName}" play "${role.character}" in "${role.title}"?
 
@@ -129,7 +131,7 @@ Answer:`;
   }
 
   /**
-   * Parse the AI verification response
+   * CORRECTED: Parse verification response with bias toward accepting roles
    */
   parseVerificationResponse(response) {
     const parts = response.split('|');
@@ -139,10 +141,12 @@ Answer:`;
       const decision = parts[1].trim().toUpperCase();
       const reason = parts[2].trim();
       
-      // Only reject if HIGH confidence NO or clear FAKE
+      // CORRECTED: Be more lenient - only reject HIGH confidence NOs
       const isValid = decision.includes('YES') || 
-                     (confidence === 'LOW' && !decision.includes('NO')) ||
-                     confidence === 'UNCERTAIN';
+                     confidence === 'LOW' ||
+                     confidence === 'MEDIUM' ||
+                     confidence === 'UNCERTAIN' ||
+                     (confidence === 'HIGH' && !decision.includes('NO'));
       
       return {
         isValid,
@@ -153,15 +157,18 @@ Answer:`;
     
     // Fallback parsing for malformed responses
     const upperResponse = response.toUpperCase();
-    if (upperResponse.includes('HIGH') && upperResponse.includes('NO')) {
+    
+    // Only reject if explicitly HIGH confidence NO
+    if (upperResponse.includes('HIGH') && upperResponse.includes('NO') && 
+        (upperResponse.includes('DEFINITELY') || upperResponse.includes('NEVER'))) {
       return { isValid: false, confidence: 'HIGH', reason: 'High confidence rejection' };
     }
     
-    // Default to allowing role if uncertain
+    // Default to allowing role - be conservative about rejecting
     return { 
       isValid: true, 
       confidence: 'UNCERTAIN', 
-      reason: 'Could not parse verification response' 
+      reason: 'Could not parse verification, allowing role' 
     };
   }
 
@@ -236,7 +243,7 @@ Character: "${character}" from "${title}"
 Answer:`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 5
