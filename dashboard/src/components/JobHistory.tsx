@@ -81,6 +81,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
             <FileArchive className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-xl text-glow-blue">SUBJECT LOG</h3>
           </div>
+          <br />
         </div>
       </div>
       
@@ -194,6 +195,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   {/* Download Button for individual job */}
                   {job.status === 'completed' && job.downloadLink && (
                     <>
+                      <br />
                       <br />
                       <div className="mt-3 pt-3 border-t border-slate-700">
                         <motion.button
