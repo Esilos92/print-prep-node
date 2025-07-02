@@ -66,9 +66,9 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
   };
 
   return (
-    <div className="cyber-panel p-6 h-[650px] flex flex-col">
+    <div className="cyber-panel">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-blue-500/30">
+      <div className="flex items-center justify-between p-6 pb-4 border-b border-blue-500/30 flex-shrink-0">
         <div className="flex items-center gap-3">
           <Activity className="w-6 h-6 text-blue-400" />
           <h3 className="text-xl font-cyber font-bold text-glow-blue">
@@ -85,24 +85,26 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
       {!currentJob ? (
         /* Idle State */
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex flex-col items-center justify-center h-full text-center"
-        >
-          <div className="w-32 h-32 bg-slate-800/50 rounded-full flex items-center justify-center mb-6">
-            <Search className="w-16 h-16 text-slate-600" />
-          </div>
-          <h4 className="text-xl font-cyber text-slate-400 mb-3">
-            AWAITING MISSION PARAMETERS
-          </h4>
-          <p className="text-sm text-slate-500 font-ui max-w-xs">
-            Enter celebrity name in the terminal to begin image sourcing protocol
-          </p>
-        </motion.div>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center h-full"
+          >
+            <div className="w-32 h-32 bg-slate-800/50 rounded-full flex items-center justify-center mb-6">
+              <Search className="w-16 h-16 text-slate-600" />
+            </div>
+            <h4 className="text-xl font-cyber text-slate-400 mb-3">
+              AWAITING MISSION PARAMETERS
+            </h4>
+            <p className="text-sm text-slate-500 font-ui max-w-xs">
+              Enter celebrity name in the terminal to begin image sourcing protocol
+            </p>
+          </motion.div>
+        </div>
       ) : (
         /* Active Job */
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 p-6 space-y-6 overflow-y-auto">
           {/* Overall Progress */}
           <div>
             <div className="flex justify-between items-center mb-3">
@@ -147,7 +149,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                     isActive ? 'bg-blue-900/30 border border-blue-500/30' : ''
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 flex-shrink-0 ${
                     isComplete 
                       ? 'bg-green-500 border-green-400' 
                       : isActive 
@@ -205,7 +207,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                         transition={{ delay: index * 0.1 }}
                         className="flex items-center gap-3 bg-blue-900/30 text-blue-200 px-3 py-2 rounded-lg border border-blue-500/30"
                       >
-                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
                         <span className="text-sm font-ui">{role}</span>
                       </motion.div>
                     ))}
