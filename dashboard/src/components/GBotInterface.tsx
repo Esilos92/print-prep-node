@@ -28,7 +28,7 @@ export default function GBotInterface({
       id: 1,
       text: "GBot.EXE online! Ready to execute celebrity image sourcing missions.",
       isBot: true,
-      timestamp: new Date()
+      timestamp: new Date().toLocaleTimeString()
     }
   ]);
 
@@ -42,18 +42,18 @@ export default function GBotInterface({
     }
   }, [currentJob?.status]);
 
-  const addBotMessage = (text: string) => {
-    setIsTyping(true);
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        text,
-        isBot: true,
-        timestamp: new Date()
-      }]);
-      setIsTyping(false);
-    }, 1000);
-  };
+const addBotMessage = (text: string) => {
+  setIsTyping(true);
+  setTimeout(() => {
+    setMessages(prev => [...prev, {
+      id: Date.now(),
+      text,
+      isBot: true,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
+    setIsTyping(false);
+  }, 1000);
+};
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,9 +112,9 @@ export default function GBotInterface({
                 : 'bg-pink-900/50 text-pink-100 border border-pink-500/30'
             }`}>
               <p className="text-sm font-ui">{message.text}</p>
-              <p className="text-xs opacity-60 mt-1">
-                {message.timestamp.toLocaleTimeString()}
-              </p>
+             <p className="text-xs opacity-60 mt-1">
+              {message.timestamp}
+            </p>
             </div>
           </motion.div>
         ))}
