@@ -115,15 +115,23 @@ class AIFirstImageFetcher {
    * Generate CLEAN search queries - exactly like your manual searches
    */
   generateCleanSearchQueries(celebrityName, role) {
+    // DEBUG: Log what we're getting
+    logger.info(`🔧 DEBUG role.finalSearchTerms:`, role.finalSearchTerms);
+    logger.info(`🔧 DEBUG role keys:`, Object.keys(role));
+    
     // Use optimized terms if available, otherwise generate clean ones
     if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
+      logger.info(`✅ Using smart search terms: ${role.finalSearchTerms.slice(0, 2).join(', ')}...`);
       // Clean any existing terms of exclusions
       return role.finalSearchTerms.map(term => this.cleanSearchTerm(term));
     }
     
     if (role.searchTerms && role.searchTerms.character_images && role.searchTerms.character_images.length > 0) {
+      logger.info(`✅ Using character_images terms: ${role.searchTerms.character_images.slice(0, 2).join(', ')}...`);
       return role.searchTerms.character_images.map(term => this.cleanSearchTerm(term));
     }
+    
+    logger.warn(`⚠️ No smart search terms found, generating fallback terms`);
     
     // Generate clean, simple queries like your manual approach
     const characterName = role.character || role.characterName;
