@@ -127,10 +127,10 @@ export default function GBotInterface({
                 <button
                   type="submit"
                   disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button text-base whitespace-nowrap ${
+                  className={`cyber-button px-8 py-4 text-base whitespace-nowrap ${
                     currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
-                  style={{ padding: '12px 32px', height: '48px', boxSizing: 'border-box', minHeight: 'unset' }}
+                  style={{ height: '48px', boxSizing: 'border-box', minHeight: 'unset' }}
                 >
                   <Send className="w-5 h-5 mr-2" />
                   Execute
