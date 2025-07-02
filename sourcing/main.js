@@ -1,18 +1,18 @@
 const AIRoleFetcher = require('./ai-services/AIRoleFetcher.js');
 const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
-const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js'); // NEW
+const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js'); // ➕ ADDED
 const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
 
 class CelebrityRoleOrchestrator {
   constructor() {
     this.roleFetcher = new AIRoleFetcher();
     this.searchOptimizer = new SearchOptimizer();
-    this.roleVerifier = new SimpleRoleVerifier(); // NEW
+    this.roleVerifier = new SimpleRoleVerifier(); // ➕ ADDED
     this.cache = new Map();
   }
 
   /**
-   * ENHANCED: CHARACTER-FIRST celebrity role discovery and optimization with ROLE VERIFICATION
+   * ENHANCED: CHARACTER-FIRST celebrity role discovery and optimization
    */
   async getCelebrityRoles(celebrityName) {
     try {
@@ -25,32 +25,28 @@ class CelebrityRoleOrchestrator {
       }
 
       // Step 1: AI fetches the top 5 roles with enhanced voice detection
-      const discoveredRoles = await this.roleFetcher.fetchRoles(celebrityName);
+      const roles = await this.roleFetcher.fetchRoles(celebrityName);
       
-      if (!discoveredRoles || discoveredRoles.length === 0) {
+      if (!roles || roles.length === 0) {
         throw new Error(`No roles found for ${celebrityName}`);
       }
 
-      console.log(`🔍 AI discovered ${discoveredRoles.length} roles:`)
-      discoveredRoles.forEach((role, index) => {
-        console.log(`  ${index + 1}. ${role.character} in ${role.title} [${role.medium}]`);
-      });
-
-      // Step 2: NEW - VERIFY ROLES ARE REAL (saves major costs on fake roles)
-      console.log(`🔍 Verifying discovered roles are real...`);
-      const verifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, discoveredRoles);
+      // ➕ ADDED: Step 1.5: Verify roles are real (eliminates fake roles)
+      console.log(`🔍 Verifying ${roles.length} discovered roles are real...`);
+      const verifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, roles);
       
       if (verifiedRoles.length === 0) {
         throw new Error(`No valid roles found for ${celebrityName} after verification`);
       }
 
-      if (verifiedRoles.length < discoveredRoles.length) {
-        const rejectedCount = discoveredRoles.length - verifiedRoles.length;
+      if (verifiedRoles.length < roles.length) {
+        const rejectedCount = roles.length - verifiedRoles.length;
         console.log(`❌ Rejected ${rejectedCount} fake/invalid roles - saved ~$${(rejectedCount * 0.18).toFixed(2)} in wasted searches`);
       }
+      // ➕ END ADDITION
 
-      // Step 3: Add celebrity name and detect character prominence
-      const rolesWithCelebrity = verifiedRoles.map(role => ({
+      // Step 2: Add celebrity name and detect character prominence
+      const rolesWithCelebrity = verifiedRoles.map(role => ({ // ➕ CHANGED: use verifiedRoles instead of roles
         ...role,
         celebrity: celebrityName,
         actorName: celebrityName,
@@ -59,24 +55,25 @@ class CelebrityRoleOrchestrator {
         searchPriority: this.calculateSearchPriority(role, celebrityName)
       }));
 
-      console.log(`🔍 Optimizing CHARACTER-FIRST search terms for ${rolesWithCelebrity.length} verified roles`);
+      console.log(`🔍 Optimizing CHARACTER-FIRST search terms for ${rolesWithCelebrity.length} roles`);
 
-      // Step 4: Generate CHARACTER-FIRST search terms with SMART MULTI-ACTOR handling
+      // Step 3: Generate CHARACTER-FIRST search terms
       const characterFirstRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithCelebrity);
 
-      // Step 5: Enhanced OpenAI optimization for high-priority roles
+      // Step 4: Enhanced OpenAI optimization for high-priority roles
       const enhancedRoles = await this.enhanceHighPriorityRoles(characterFirstRoles);
 
-      // Step 6: ADD SMART SEARCH STRATEGIES from role verifier
-      const rolesWithSearchStrategies = await this.addSmartSearchStrategies(enhancedRoles, celebrityName);
+      // ➕ ADDED: Step 4.5: Add smart search strategies for multi-actor characters
+      const rolesWithSmartStrategies = await this.addSmartSearchStrategies(enhancedRoles, celebrityName);
+      // ➕ END ADDITION
 
       // Verify optimization success
-      const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithSearchStrategies);
-      
+      const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithSmartStrategies); // ➕ CHANGED: use rolesWithSmartStrategies
+
       console.log(`✅ CHARACTER-FIRST optimization stats:`, optimizationStats);
 
-      // Step 7: Process and format final results with character-first priority
-      const finalResults = this.processCharacterFirstResults(celebrityName, rolesWithSearchStrategies, optimizationStats);
+      // Step 5: Process and format final results with character-first priority
+      const finalResults = this.processCharacterFirstResults(celebrityName, rolesWithSmartStrategies, optimizationStats); // ➕ CHANGED: use rolesWithSmartStrategies
 
       // Cache results
       this.cache.set(celebrityName, finalResults);
@@ -92,9 +89,7 @@ class CelebrityRoleOrchestrator {
     }
   }
 
-  /**
-   * NEW: Add smart search strategies from role verifier (handles multi-actor characters)
-   */
+  // ➕ ADDED: New method for smart search strategies
   async addSmartSearchStrategies(roles, celebrityName) {
     console.log(`🎯 Adding smart search strategies for multi-actor character detection...`);
     
@@ -107,7 +102,7 @@ class CelebrityRoleOrchestrator {
         
         rolesWithStrategies.push({
           ...role,
-          // Merge smart search strategy with existing search terms
+          // Add smart search strategy metadata
           smartSearchStrategy: searchStrategy,
           // Update final search terms to use smart strategy if available
           finalSearchTerms: searchStrategy?.searchTerms || role.finalSearchTerms || this.searchOptimizer.getBestSearchTerms(role, 6),
@@ -130,6 +125,7 @@ class CelebrityRoleOrchestrator {
     
     return rolesWithStrategies;
   }
+  // ➕ END ADDITION
 
   /**
    * NEW: Analyze character prominence for search strategy
@@ -219,13 +215,13 @@ class CelebrityRoleOrchestrator {
       celebrity: celebrityName,
       totalRoles: optimizedRoles.length,
       timestamp: new Date().toISOString(),
-      source: 'character_first_optimized_verified',
-      strategy: 'character_prominence_based_with_verification',
+      source: 'character_first_optimized',
+      strategy: 'character_prominence_based',
       roles: optimizedRoles.map((role, index) => ({
         ...role,
         priority: index + 1,
-        // PRIMARY: SMART search terms (handles multi-actor automatically)
-        finalSearchTerms: role.finalSearchTerms,
+        // PRIMARY: CHARACTER-FIRST search terms
+        finalSearchTerms: this.searchOptimizer.getBestSearchTerms(role, 6),
         imageSearchReady: true,
         // Enhanced metadata for fetchImages.js
         searchMetadata: {
@@ -236,10 +232,11 @@ class CelebrityRoleOrchestrator {
           balancedTerms: role.searchTerms?.balanced?.length || 0,
           expectedImageVolume: this.estimateRoleImageVolume(role),
           optimizedForCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6,
-          // NEW: Multi-actor handling
+          // ➕ ADDED: Multi-actor handling metadata
           isMultiActorCharacter: role.isMultiActorCharacter || false,
           smartSearchApproach: role.searchApproach || 'Standard',
           maxImages: role.maxImages || 20
+          // ➕ END ADDITION
         }
       })),
       summary: this.generateCharacterFirstSummary(optimizedRoles, optimizationStats),
@@ -251,31 +248,29 @@ class CelebrityRoleOrchestrator {
    * NEW: Estimate expected image volume per role
    */
   estimateRoleImageVolume(role) {
-    let baseEstimate = role.maxImages || 20; // Use smart max from role verifier
+    let baseEstimate = 20; // Conservative base
     
     // Character prominence multiplier
-    if (role.characterProminent === 'high') baseEstimate *= 2; // Reduced from 3x
-    else if (role.characterProminent === 'medium') baseEstimate *= 1.5; // Reduced from 2x
+    if (role.characterProminent === 'high') baseEstimate *= 3; // 60 images
+    else if (role.characterProminent === 'medium') baseEstimate *= 2; // 40 images
     
     // Medium multiplier
     const medium = (role.medium || '').toLowerCase();
-    if (medium.includes('anime') || medium.includes('voice')) baseEstimate *= 1.3; // Reduced multiplier
-    if (medium.includes('movie')) baseEstimate *= 1.1;
+    if (medium.includes('anime') || medium.includes('voice')) baseEstimate *= 1.5; // Anime has lots of screenshots
+    if (medium.includes('movie')) baseEstimate *= 1.2;
     
     // Popularity multiplier
-    if (role.popularity === 'high') baseEstimate *= 1.2; // Reduced multiplier
+    if (role.popularity === 'high') baseEstimate *= 1.3;
     
     // Recent content multiplier (better digital availability)
     const year = parseInt(role.year) || 0;
-    if (year >= 2010) baseEstimate *= 1.1; // Reduced multiplier
-    if (year >= 2020) baseEstimate *= 1.05; // Reduced multiplier
+    if (year >= 2010) baseEstimate *= 1.2;
+    if (year >= 2020) baseEstimate *= 1.1;
     
-    // Multi-actor character adjustment (these need higher precision)
-    if (role.isMultiActorCharacter) {
-      baseEstimate *= 0.8; // Slightly fewer images but higher quality expected
-    }
+    // Optimization quality multiplier
+    if ((role.searchTerms?.character_images?.length || 0) === 6) baseEstimate *= 1.3;
     
-    return Math.round(Math.min(baseEstimate, 25)); // Cap at 25 images per role
+    return Math.round(baseEstimate);
   }
 
   /**
@@ -295,7 +290,6 @@ class CelebrityRoleOrchestrator {
     const strategyCounts = {};
     let totalCharacterFirstTerms = 0;
     let highProminenceRoles = 0;
-    let multiActorRoles = 0;
     
     optimizedRoles.forEach(role => {
       mediumCounts[role.medium] = (mediumCounts[role.medium] || 0) + 1;
@@ -306,7 +300,6 @@ class CelebrityRoleOrchestrator {
       totalCharacterFirstTerms += role.searchTerms?.character_images?.length || 0;
       
       if (role.characterProminent === 'high') highProminenceRoles++;
-      if (role.isMultiActorCharacter) multiActorRoles++;
     });
 
     const primaryMedium = Object.keys(mediumCounts).reduce((a, b) => 
@@ -325,14 +318,12 @@ class CelebrityRoleOrchestrator {
       hasVoiceRoles: optimizedRoles.some(r => r.medium.includes('voice')),
       hasLiveActionRoles: optimizedRoles.some(r => r.medium.includes('live_action')),
       highProminenceRoles,
-      multiActorRoles, // NEW
       characterFirstOptimization: {
         totalCharacterFirstTerms: totalCharacterFirstTerms,
         expectedTerms: optimizedRoles.length * 6,
         characterFirstSuccessRate: optimizationStats.characterFirstSuccessRate || 0,
         fullyOptimizedRoles: optimizedRoles.filter(r => (r.searchTerms?.character_images?.length || 0) === 6).length,
-        averageSearchPriority: Math.round(optimizedRoles.reduce((sum, r) => sum + (r.searchPriority || 0), 0) / optimizedRoles.length),
-        multiActorCharactersDetected: multiActorRoles // NEW
+        averageSearchPriority: Math.round(optimizedRoles.reduce((sum, r) => sum + (r.searchPriority || 0), 0) / optimizedRoles.length)
       }
     };
   }
@@ -342,7 +333,7 @@ class CelebrityRoleOrchestrator {
    */
   generateOptimizationReport(optimizedRoles, optimizationStats) {
     const report = {
-      optimizationApproach: 'character_first_prominence_based_with_verification',
+      optimizationApproach: 'character_first_prominence_based',
       totalSearchTermsGenerated: optimizationStats.characterFirstTerms + optimizationStats.balancedTerms + optimizationStats.fallbackTerms,
       characterFirstTerms: optimizationStats.characterFirstTerms,
       balancedTerms: optimizationStats.balancedTerms,
@@ -356,9 +347,7 @@ class CelebrityRoleOrchestrator {
         priority: role.searchPriority,
         strategy: role.searchStrategy,
         termsGenerated: role.searchTerms?.character_images?.length || 0,
-        expectedImages: role.searchMetadata?.expectedImageVolume || 0,
-        isMultiActor: role.isMultiActorCharacter || false, // NEW
-        searchApproach: role.searchApproach || 'Standard' // NEW
+        expectedImages: role.searchMetadata?.expectedImageVolume || 0
       }))
     };
 
@@ -373,32 +362,276 @@ class CelebrityRoleOrchestrator {
     const improvementFactor = characterFirstRoles.length / roles.length;
     
     let expectedMultiplier = 1;
-    if (improvementFactor >= 0.8) expectedMultiplier = 2.5; // More conservative estimates
-    else if (improvementFactor >= 0.6) expectedMultiplier = 2.0;
-    else if (improvementFactor >= 0.4) expectedMultiplier = 1.7;
-    else expectedMultiplier = 1.3;
+    if (improvementFactor >= 0.8) expectedMultiplier = 3.5; // 3.5x more images expected
+    else if (improvementFactor >= 0.6) expectedMultiplier = 2.8;
+    else if (improvementFactor >= 0.4) expectedMultiplier = 2.2;
+    else expectedMultiplier = 1.5;
     
     return {
       estimatedImageIncreaseMultiplier: expectedMultiplier,
       baselineExpectation: '5-15 images per role',
-      optimizedExpectation: `${Math.round(10 * expectedMultiplier)}-${Math.round(20 * expectedMultiplier)} images per role`,
-      confidenceLevel: improvementFactor >= 0.8 ? 'high' : improvementFactor >= 0.5 ? 'medium' : 'low',
-      costOptimization: 'Role verification eliminates fake role costs'
+      optimizedExpectation: `${Math.round(10 * expectedMultiplier)}-${Math.round(30 * expectedMultiplier)} images per role`,
+      confidenceLevel: improvementFactor >= 0.8 ? 'high' : improvementFactor >= 0.5 ? 'medium' : 'low'
     };
   }
 
-  // ... [Keep all other existing methods unchanged] ...
+  /**
+   * ENHANCED: Handle failures with CHARACTER-FIRST fallback strategies
+   */
+  async handleFailure(celebrityName, originalError) {
+    console.log(`🔄 Attempting CHARACTER-FIRST fallback strategies for ${celebrityName}`);
+
+    try {
+      const simplifiedRoles = await this.trySimplifiedFetch(celebrityName);
+      if (simplifiedRoles && simplifiedRoles.length > 0) {
+        console.log(`✅ Fallback successful with ${simplifiedRoles.length} roles`);
+        
+        const rolesWithCelebrity = simplifiedRoles.map(role => ({
+          ...role,
+          celebrity: celebrityName,
+          actorName: celebrityName,
+          characterProminent: this.analyzeCharacterProminence(role, celebrityName),
+          searchPriority: this.calculateSearchPriority(role, celebrityName)
+        }));
+        
+        // Apply CHARACTER-FIRST optimization to fallback roles
+        const optimizedFallbackRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithCelebrity);
+        const optimizationStats = this.searchOptimizer.getOptimizationStats(optimizedFallbackRoles);
+        
+        return this.processCharacterFirstResults(celebrityName, optimizedFallbackRoles, optimizationStats);
+      }
+
+      return this.createErrorResponse(celebrityName, originalError);
+
+    } catch (fallbackError) {
+      console.error(`❌ All CHARACTER-FIRST fallback strategies failed:`, fallbackError.message);
+      return this.createErrorResponse(celebrityName, originalError);
+    }
+  }
 
   /**
-   * ENHANCED: System health check with role verification
+   * Simplified fetch for difficult cases
+   */
+  async trySimplifiedFetch(celebrityName) {
+    const simplifiedPrompt = `List 3-5 most famous roles for "${celebrityName}". Focus on CHARACTER names and show titles. Format: [{"character": "Character Name", "title": "Show/Movie", "medium": "type"}]`;
+
+    try {
+      if (this.roleFetcher.hasOpenAI) {
+        const completion = await this.roleFetcher.openai.chat.completions.create({
+          model: PROMPT_CONFIG.MODELS.FALLBACK || "gpt-3.5-turbo",
+          messages: [{ role: "user", content: simplifiedPrompt }],
+          temperature: 0.5,
+          max_tokens: 500
+        });
+
+        const response = completion.choices[0].message.content;
+        return this.roleFetcher.parseAndValidateResponse(response, celebrityName);
+      }
+      return null;
+    } catch (error) {
+      console.error('Simplified fetch failed:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Create error response structure
+   */
+  createErrorResponse(celebrityName, error) {
+    return {
+      celebrity: celebrityName,
+      totalRoles: 0,
+      timestamp: new Date().toISOString(),
+      source: 'error',
+      strategy: 'character_first_failed',
+      error: {
+        message: error.message,
+        type: 'character_first_fetch_failed'
+      },
+      roles: [],
+      summary: {
+        primaryMedium: 'unknown',
+        dominantStrategy: 'none',
+        mediumBreakdown: {},
+        strategyBreakdown: {},
+        hasVoiceRoles: false,
+        hasLiveActionRoles: false,
+        highProminenceRoles: 0,
+        characterFirstOptimization: {
+          totalCharacterFirstTerms: 0,
+          expectedTerms: 0,
+          characterFirstSuccessRate: 0,
+          fullyOptimizedRoles: 0,
+          averageSearchPriority: 0
+        }
+      },
+      optimizationReport: {
+        optimizationApproach: 'failed',
+        totalSearchTermsGenerated: 0,
+        characterFirstTerms: 0,
+        balancedTerms: 0,
+        fallbackTerms: 0,
+        strategiesUsed: {},
+        expectedPerformanceImprovement: {
+          estimatedImageIncreaseMultiplier: 1,
+          baselineExpectation: 'unknown',
+          optimizedExpectation: 'manual research required',
+          confidenceLevel: 'none'
+        },
+        roleAnalysis: []
+      }
+    };
+  }
+
+  /**
+   * ENHANCED: Get search terms optimized for fetchImages integration
+   */
+  getSearchTermsForImages(results) {
+    if (!results.roles || results.roles.length === 0) {
+      return [];
+    }
+
+    return results.roles.map(role => ({
+      character: role.character,
+      title: role.title,
+      medium: role.medium,
+      celebrity: role.celebrity,
+      name: role.title, // For compatibility with fetchImages
+      
+      // ENHANCED: Priority fields for CHARACTER-FIRST fetchImages.js
+      finalSearchTerms: role.finalSearchTerms || [], // Highest priority - CHARACTER-FIRST terms
+      searchTerms: role.searchTerms, // Contains character_images array and strategy breakdown
+      characterImageTerms: role.searchTerms?.character_images || [], // Pure character terms
+      balancedTerms: role.searchTerms?.balanced || [], // Character+actor terms
+      
+      // Metadata for intelligent processing
+      searchStrategy: role.searchStrategy || 'mixed',
+      characterProminent: role.characterProminent || 'low',
+      searchPriority: role.searchPriority || 1,
+      expectedImageVolume: role.searchMetadata?.expectedImageVolume || 20,
+      
+      // Flags for fetchImages logic
+      focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6,
+      isVoiceRole: role.medium?.includes('voice') || false,
+      isHighPriority: (role.searchPriority || 0) >= 5,
+      useCharacterFirstApproach: role.characterProminent !== 'low',
+      
+      // ➕ ADDED: Multi-actor flags
+      isMultiActorCharacter: role.isMultiActorCharacter || false,
+      maxImages: role.maxImages || 20,
+      smartSearchApproach: role.searchApproach || 'Standard',
+      // ➕ END ADDITION
+      
+      // Legacy compatibility
+      priority: role.priority
+    }));
+  }
+
+  /**
+   * ENHANCED: Get detailed CHARACTER-FIRST analytics
+   */
+  getSearchAnalytics(results) {
+    if (!results.roles) return null;
+
+    const analytics = {
+      // Basic metrics
+      totalRoles: results.roles.length,
+      totalSearchTerms: 0,
+      characterFirstTermsGenerated: 0,
+      balancedTermsGenerated: 0,
+      fallbackTermsUsed: 0,
+      
+      // CHARACTER-FIRST specific metrics
+      characterFirstSuccessRate: 0,
+      fullyOptimizedRoles: 0,
+      highProminenceRoles: 0,
+      averageSearchPriority: 0,
+      expectedTotalImages: 0,
+      
+      // Strategy breakdown
+      strategyDistribution: {},
+      prominenceDistribution: {},
+      mediumDistribution: {},
+      
+      // Performance predictions
+      expectedPerformanceGain: 'unknown',
+      confidenceLevel: 'unknown'
+    };
+
+    let totalPriority = 0;
+    let totalExpectedImages = 0;
+
+    results.roles.forEach(role => {
+      // Count search terms
+      if (role.searchTerms) {
+        analytics.totalSearchTerms += role.searchTerms.all?.length || 0;
+        analytics.characterFirstTermsGenerated += role.searchTerms.character_images?.length || 0;
+        analytics.balancedTermsGenerated += role.searchTerms.balanced?.length || 0;
+        analytics.fallbackTermsUsed += role.searchTerms.basic?.length || 0;
+        
+        if ((role.searchTerms.character_images?.length || 0) === 6) {
+          analytics.fullyOptimizedRoles++;
+        }
+      }
+      
+      // Character prominence analysis
+      if (role.characterProminent === 'high') {
+        analytics.highProminenceRoles++;
+      }
+      
+      // Strategy tracking
+      const strategy = role.searchStrategy || 'unknown';
+      analytics.strategyDistribution[strategy] = (analytics.strategyDistribution[strategy] || 0) + 1;
+      
+      // Prominence tracking
+      const prominence = role.characterProminent || 'unknown';
+      analytics.prominenceDistribution[prominence] = (analytics.prominenceDistribution[prominence] || 0) + 1;
+      
+      // Medium tracking
+      const medium = role.medium || 'unknown';
+      analytics.mediumDistribution[medium] = (analytics.mediumDistribution[medium] || 0) + 1;
+      
+      // Priority and image expectations
+      totalPriority += role.searchPriority || 0;
+      totalExpectedImages += role.searchMetadata?.expectedImageVolume || 20;
+    });
+
+    // Calculate rates and averages
+    analytics.characterFirstSuccessRate = analytics.totalSearchTerms > 0 
+      ? Math.round((analytics.characterFirstTermsGenerated / analytics.totalSearchTerms) * 100) 
+      : 0;
+      
+    analytics.averageSearchPriority = Math.round(totalPriority / results.roles.length);
+    analytics.expectedTotalImages = totalExpectedImages;
+    
+    // Performance predictions
+    if (analytics.characterFirstSuccessRate >= 80) {
+      analytics.expectedPerformanceGain = '3-4x more images';
+      analytics.confidenceLevel = 'high';
+    } else if (analytics.characterFirstSuccessRate >= 60) {
+      analytics.expectedPerformanceGain = '2-3x more images';
+      analytics.confidenceLevel = 'medium';
+    } else if (analytics.characterFirstSuccessRate >= 40) {
+      analytics.expectedPerformanceGain = '1.5-2x more images';
+      analytics.confidenceLevel = 'medium';
+    } else {
+      analytics.expectedPerformanceGain = 'minimal improvement';
+      analytics.confidenceLevel = 'low';
+    }
+
+    return analytics;
+  }
+
+  /**
+   * ENHANCED: System health check with CHARACTER-FIRST focus
    */
   async systemHealthCheck() {
-    console.log('🔍 Running CHARACTER-FIRST system health check with role verification...');
+    console.log('🔍 Running CHARACTER-FIRST system health check...');
     
     const checks = {
       aiConnection: false,
       roleFetcher: false,
-      roleVerifier: false, // NEW
+      roleVerifier: false, // ➕ ADDED
       searchOptimizer: false,
       characterFirstIntegration: false,
       openaiOptimization: false
@@ -411,8 +644,9 @@ class CelebrityRoleOrchestrator {
       // Test role fetcher
       checks.roleFetcher = await this.testRoleFetcher();
       
-      // NEW: Test role verifier
+      // ➕ ADDED: Test role verifier
       checks.roleVerifier = this.roleVerifier.hasOpenAI;
+      // ➕ END ADDITION
       
       // Test CHARACTER-FIRST search optimizer
       checks.searchOptimizer = await this.searchOptimizer.testOptimizer();
@@ -426,14 +660,13 @@ class CelebrityRoleOrchestrator {
       const allPassed = Object.values(checks).every(check => check === true);
       
       console.log('CHARACTER-FIRST Health Check Results:', checks);
-      console.log(allPassed ? '✅ All systems operational for CHARACTER-FIRST searches with role verification' : '⚠️ Some systems have issues');
+      console.log(allPassed ? '✅ All systems operational for CHARACTER-FIRST searches' : '⚠️ Some systems have issues');
       
       const healthReport = { 
         passed: allPassed, 
         details: checks,
         recommendations: this.generateHealthRecommendations(checks),
-        expectedCostReduction: checks.roleVerifier ? '60-80% cost reduction from fake role elimination' : 'No cost optimization',
-        expectedImageVolumeImprovement: allPassed ? '2-3x increase with higher accuracy' : 'limited improvement'
+        expectedImageVolumeImprovement: allPassed ? '3-5x increase' : 'limited improvement'
       };
       
       return healthReport;
@@ -451,7 +684,7 @@ class CelebrityRoleOrchestrator {
   }
 
   /**
-   * ENHANCED: Generate health recommendations
+   * NEW: Generate health recommendations
    */
   generateHealthRecommendations(checks) {
     const recommendations = [];
@@ -460,9 +693,11 @@ class CelebrityRoleOrchestrator {
       recommendations.push('Check OpenAI API key and internet connection');
     }
     
+    // ➕ ADDED: Role verifier recommendation
     if (!checks.roleVerifier) {
       recommendations.push('Enable OpenAI for role verification (major cost savings)');
     }
+    // ➕ END ADDITION
     
     if (!checks.characterFirstIntegration) {
       recommendations.push('CHARACTER-FIRST integration failed - verify search term generation');
@@ -472,18 +707,172 @@ class CelebrityRoleOrchestrator {
       recommendations.push('Enable OpenAI for enhanced CHARACTER-FIRST optimization');
     }
     
-    if (checks.searchOptimizer && checks.characterFirstIntegration && checks.roleVerifier) {
-      recommendations.push('System fully optimized for cost-effective CHARACTER-FIRST image searches');
+    if (checks.searchOptimizer && checks.characterFirstIntegration) {
+      recommendations.push('System ready for high-volume CHARACTER-FIRST image searches');
     }
     
     return recommendations;
   }
 
-  // ... [Keep all other existing methods like handleFailure, trySimplifiedFetch, etc.] ...
+  /**
+   * Test CHARACTER-FIRST integration specifically
+   */
+  async testCharacterFirstIntegration() {
+    try {
+      const testRole = {
+        character: "Test Character",
+        title: "Test Show",
+        medium: "voice_anime",
+        celebrity: "Test Actor",
+        actorName: "Test Actor"
+      };
+      
+      const optimized = await this.searchOptimizer.optimizeRoleForCharacterFirst(testRole);
+      const hasCharacterFirst = optimized.searchTerms?.character_images?.length === 6;
+      const hasCorrectStrategy = optimized.searchStrategy === 'character_pure';
+      
+      if (hasCharacterFirst && hasCorrectStrategy) {
+        console.log('✅ CHARACTER-FIRST integration test passed');
+        return true;
+      } else {
+        console.log('❌ CHARACTER-FIRST integration test failed');
+        console.log(`- Character-first terms: ${optimized.searchTerms?.character_images?.length || 0}/6`);
+        console.log(`- Strategy: ${optimized.searchStrategy || 'none'}`);
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('CHARACTER-FIRST integration test failed:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Test role fetcher
+   */
+  async testRoleFetcher() {
+    try {
+      const testResult = await this.roleFetcher.fetchRoles("Test Celebrity");
+      return testResult && testResult.length > 0;
+    } catch (error) {
+      console.error('Role fetcher test failed:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Clear cache
+   */
+  clearCache() {
+    this.cache.clear();
+    console.log('🗑️ CHARACTER-FIRST cache cleared');
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return {
+      size: this.cache.size,
+      celebrities: Array.from(this.cache.keys()),
+      cacheType: 'character_first_optimized'
+    };
+  }
+
+  /**
+   * NEW: Bulk process multiple celebrities with CHARACTER-FIRST approach
+   */
+  async bulkProcessCelebrities(celebrityNames, options = {}) {
+    const { 
+      maxConcurrent = 3, 
+      prioritizeVoiceActors = true,
+      enhanceHighPriority = true 
+    } = options;
+    
+    console.log(`🚀 Starting bulk CHARACTER-FIRST processing for ${celebrityNames.length} celebrities`);
+    
+    const results = [];
+    const errors = [];
+    
+    // Process in batches to avoid overwhelming APIs
+    for (let i = 0; i < celebrityNames.length; i += maxConcurrent) {
+      const batch = celebrityNames.slice(i, i + maxConcurrent);
+      
+      console.log(`Processing batch ${Math.floor(i/maxConcurrent) + 1}: ${batch.join(', ')}`);
+      
+      const batchPromises = batch.map(async (name) => {
+        try {
+          const result = await this.getCelebrityRoles(name);
+          return { name, result, success: true };
+        } catch (error) {
+          return { name, error: error.message, success: false };
+        }
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      
+      batchResults.forEach(item => {
+        if (item.success) {
+          results.push(item.result);
+        } else {
+          errors.push({ celebrity: item.name, error: item.error });
+        }
+      });
+      
+      // Brief pause between batches
+      if (i + maxConcurrent < celebrityNames.length) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    const summary = this.generateBulkSummary(results, errors);
+    
+    console.log(`✅ Bulk processing complete: ${results.length} successful, ${errors.length} failed`);
+    console.log(`📊 Estimated total images: ${summary.estimatedTotalImages}`);
+    
+    return {
+      results,
+      errors,
+      summary,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * NEW: Generate bulk processing summary
+   */
+  generateBulkSummary(results, errors) {
+    let totalRoles = 0;
+    let totalCharacterFirstTerms = 0;
+    let totalExpectedImages = 0;
+    let voiceActors = 0;
+    let liveActionActors = 0;
+    
+    results.forEach(result => {
+      totalRoles += result.totalRoles;
+      totalCharacterFirstTerms += result.summary?.characterFirstOptimization?.totalCharacterFirstTerms || 0;
+      totalExpectedImages += result.roles?.reduce((sum, role) => sum + (role.searchMetadata?.expectedImageVolume || 20), 0) || 0;
+      
+      if (result.summary?.hasVoiceRoles) voiceActors++;
+      if (result.summary?.hasLiveActionRoles) liveActionActors++;
+    });
+    
+    return {
+      totalCelebrities: results.length,
+      totalRoles,
+      totalCharacterFirstTerms,
+      estimatedTotalImages: totalExpectedImages,
+      voiceActors,
+      liveActionActors,
+      failedProcessing: errors.length,
+      characterFirstSuccessRate: totalRoles > 0 ? Math.round((totalCharacterFirstTerms / (totalRoles * 6)) * 100) : 0,
+      averageImagesPerCelebrity: results.length > 0 ? Math.round(totalExpectedImages / results.length) : 0
+    };
+  }
 }
 
 /**
- * ENHANCED: Main execution function with CHARACTER-FIRST approach and role verification
+ * ENHANCED: Main execution function with CHARACTER-FIRST approach
  */
 async function fetchCelebrityRoles(celebrityName) {
   const orchestrator = new CelebrityRoleOrchestrator();
@@ -491,10 +880,10 @@ async function fetchCelebrityRoles(celebrityName) {
 }
 
 /**
- * ENHANCED: Initialize CHARACTER-FIRST system with role verification
+ * ENHANCED: Initialize CHARACTER-FIRST system
  */
 async function initializeSystem() {
-  console.log('🚀 Initializing CHARACTER-FIRST image search system with role verification...');
+  console.log('🚀 Initializing CHARACTER-FIRST image search system...');
   
   const orchestrator = new CelebrityRoleOrchestrator();
   const healthCheck = await orchestrator.systemHealthCheck();
@@ -503,17 +892,12 @@ async function initializeSystem() {
     console.warn('⚠️ CHARACTER-FIRST system initialization completed with warnings');
     console.warn('Recommendations:', healthCheck.recommendations);
     
-    if (!healthCheck.details.roleVerifier) {
-      console.warn('⚠️ Role verification disabled - fake roles may waste money');
-    }
-    
     if (!healthCheck.details.characterFirstIntegration) {
       console.warn('⚠️ CHARACTER-FIRST integration failed - image volume may be limited');
     }
   } else {
-    console.log('✅ CHARACTER-FIRST image search system with role verification fully operational');
+    console.log('✅ CHARACTER-FIRST image search system fully operational');
     console.log(`📈 Expected performance: ${healthCheck.expectedImageVolumeImprovement}`);
-    console.log(`💰 Expected cost reduction: ${healthCheck.expectedCostReduction}`);
   }
   
   return healthCheck;
