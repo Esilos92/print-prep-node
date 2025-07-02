@@ -12,7 +12,7 @@ class ZipUploader {
    */
   static async zipAndUpload(workDir, celebrityName) {
     try {
-      logger.info('Creating zip file...');
+      logger.info('Creating zip file with organized folders...');
       const zipPath = await this.createZipFile(workDir, celebrityName);
       
       logger.info('Uploading to Google Drive...');
@@ -30,26 +30,76 @@ class ZipUploader {
   }
   
   /**
-   * Create zip file from work directory
+   * FIXED: Create zip file with separate folders for 8x10 and 11x17
    */
   static async createZipFile(workDir, celebrityName) {
     const zip = new AdmZip();
     const zipPath = path.join(workDir, '..', `${celebrityName.replace(/\s+/g, '_')}_images.zip`);
     
-    // Add resized images
+    // Add resized images with folder structure
     const resizedDir = path.join(workDir, 'resized');
+    
     try {
-      const files = await fs.readdir(resizedDir);
+      // Check if we have the new folder structure
+      const format8x10Dir = path.join(resizedDir, '8x10');
+      const format11x17Dir = path.join(resizedDir, '11x17');
       
-      for (const file of files) {
-        const filePath = path.join(resizedDir, file);
-        zip.addLocalFile(filePath);
+      // Add 8x10 images to zip in their own folder
+      try {
+        const files8x10 = await fs.readdir(format8x10Dir);
+        logger.info(`Adding ${files8x10.length} 8x10 images to zip`);
+        
+        for (const file of files8x10) {
+          const filePath = path.join(format8x10Dir, file);
+          // Add to zip with folder structure: 8x10/filename.jpg
+          zip.addLocalFile(filePath, '8x10/');
+        }
+      } catch (error) {
+        logger.warn('No 8x10 directory found');
       }
+      
+      // Add 11x17 images to zip in their own folder
+      try {
+        const files11x17 = await fs.readdir(format11x17Dir);
+        logger.info(`Adding ${files11x17.length} 11x17 images to zip`);
+        
+        for (const file of files11x17) {
+          const filePath = path.join(format11x17Dir, file);
+          // Add to zip with folder structure: 11x17/filename.jpg
+          zip.addLocalFile(filePath, '11x17/');
+        }
+      } catch (error) {
+        logger.warn('No 11x17 directory found');
+      }
+      
+      // Fallback: if no subfolder structure exists, add all files from resized root
+      try {
+        const allFiles = await fs.readdir(resizedDir);
+        const imageFiles = allFiles.filter(file => 
+          file.toLowerCase().endsWith('.jpg') || 
+          file.toLowerCase().endsWith('.jpeg') || 
+          file.toLowerCase().endsWith('.png')
+        );
+        
+        if (imageFiles.length > 0) {
+          logger.info(`Adding ${imageFiles.length} images from resized root (fallback)`);
+          
+          for (const file of imageFiles) {
+            const filePath = path.join(resizedDir, file);
+            // Determine folder based on filename format indicator
+            const folder = this.determineFolderFromFilename(file);
+            zip.addLocalFile(filePath, `${folder}/`);
+          }
+        }
+      } catch (error) {
+        logger.warn('Error reading resized directory for fallback');
+      }
+      
     } catch (error) {
       logger.warn('No resized directory found, skipping image files');
     }
     
-    // Add manifest
+    // Add manifest to root of zip
     const manifestPath = path.join(workDir, 'manifest.json');
     try {
       zip.addLocalFile(manifestPath);
@@ -59,9 +109,24 @@ class ZipUploader {
     
     // Write zip file
     zip.writeZip(zipPath);
-    logger.info(`Zip file created: ${zipPath}`);
+    logger.info(`Zip file created with organized folders: ${zipPath}`);
     
     return zipPath;
+  }
+  
+  /**
+   * NEW: Determine folder from filename when using fallback method
+   */
+  static determineFolderFromFilename(filename) {
+    // Look for format indicators in filename
+    if (filename.includes('8x10') || filename.includes('8X10')) {
+      return '8x10';
+    } else if (filename.includes('11x17') || filename.includes('11X17')) {
+      return '11x17';
+    }
+    
+    // Default to 8x10 if unclear
+    return '8x10';
   }
   
   /**
