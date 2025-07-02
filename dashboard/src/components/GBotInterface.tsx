@@ -120,27 +120,6 @@ export default function GBotInterface({
                   value={celebrityName}
                   onChange={(e) => setCelebrityName(e.target.value)}
                   placeholder="input celebrity subject name..."
-                  className="cyber-input flex-1 text-base"
-                  style={{ padding: '12px 16px', height: '52px' }}
-                  disabled={currentJob?.status === 'running'}
-                />
-                <button
-                  type="submit"
-                  disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button text-base whitespace-nowrap ${
-                    currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                  style={{ padding: '12px 32px', height: '52px' }}
-                >
-                  <Send className="w-5 h-5 mr-2" />
-                  Execute
-                </button>
-              </div>-3 items-stretch">
-                <input
-                  type="text"
-                  value={celebrityName}
-                  onChange={(e) => setCelebrityName(e.target.value)}
-                  placeholder="input celebrity subject name..."
                   className="cyber-input flex-1 text-base py-4 px-4"
                   disabled={currentJob?.status === 'running'}
                 />
@@ -176,10 +155,8 @@ export default function GBotInterface({
           {/* Processing (only when running) */}
           {currentJob?.status === 'running' && (
             <>
-              <div className="mb-2">
-                <div className="flex items-center gap-4">
-                  <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
-                </div>
+              <div>
+                <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
                 <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
               </div>
               
