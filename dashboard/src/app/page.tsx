@@ -109,7 +109,7 @@ export default function Dashboard() {
       
       {/* Centered Container */}
       <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
-        <div className="w-full max-w-[1600px]">
+        <div className="w-full">
           {/* Header */}
           <motion.div 
             initial={{ opacity: 0, y: -30 }}
@@ -125,7 +125,7 @@ export default function Dashboard() {
           </motion.div>
 
           {/* Dashboard Grid */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 max-w-[1400px] mx-auto">
             {/* Left Column - GBot Chat Terminal */}
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
