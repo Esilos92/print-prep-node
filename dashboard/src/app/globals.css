@@ -1,24 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
 
 :root {
   /* Brand Colors */
   --primary-blue: #0066CC;
   --accent-pink: #FF1493;
   --steel-silver: #B0C4DE;
-
+  
   /* Dark Theme */
   --bg-dark: #0a0a0f;
   --bg-panel: #1a1a2e;
   --bg-card: #16213e;
   --border-glow: #2563eb;
-
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-accent: #60a5fa;
+  
   /* Neon Effects */
   --neon-blue: #00bfff;
   --neon-pink: #ff69b4;
-  --neon-green: #39ff14;
+  --shadow-blue: 0 0 20px rgba(0, 191, 255, 0.3);
+  --shadow-pink: 0 0 20px rgba(255, 105, 180, 0.3);
 }
 
 * {
@@ -27,46 +32,41 @@
   margin: 0;
 }
 
-html,
 body {
-  max-width: 100vw;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: 'Rajdhani', sans-serif;
   overflow-x: hidden;
-  font-family: 'Rajdhani', sans-serif;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%);
-  min-height: 100vh;
 }
 
-body {
-  color: #e2e8f0;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%);
+/* Animated background grid */
+.cyber-grid {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(37, 99, 235, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: grid-move 20s linear infinite;
+  z-index: -1;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+@keyframes grid-move {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 50px); }
 }
 
-/* Typography Classes */
-.font-cyber {
-  font-family: 'Orbitron', monospace;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-}
-
-.font-ui {
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 500;
-}
-
-/* Cyber Panel Styling */
+/* Terminal/Panel Styling */
 .cyber-panel {
-  background: linear-gradient(145deg, rgba(26, 26, 46, 0.9), rgba(22, 33, 62, 0.9));
-  border: 1px solid rgba(37, 99, 235, 0.3);
+  background: linear-gradient(145deg, var(--bg-panel), var(--bg-card));
+  border: 2px solid var(--border-glow);
   border-radius: 12px;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-blue);
   position: relative;
   overflow: hidden;
-  transition: all 0.3s ease;
 }
 
 .cyber-panel::before {
@@ -80,101 +80,90 @@ a {
   animation: scan-line 3s infinite;
 }
 
-.cyber-panel:hover {
-  border-color: rgba(37, 99, 235, 0.6);
-  box-shadow: 0 0 20px rgba(37, 99, 235, 0.2);
-}
-
-/* Scan Line Animation */
 @keyframes scan-line {
-  0% {
-    left: -100%;
-  }
-  100% {
-    left: 100%;
-  }
+  0% { left: -100%; }
+  100% { left: 100%; }
 }
 
-/* Cyber Button Styling */
+/* Button Styling */
 .cyber-button {
-  background: linear-gradient(145deg, #1e40af, #3b82f6);
-  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: linear-gradient(145deg, var(--primary-blue), #0052a3);
+  border: 2px solid var(--neon-blue);
   color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
   font-family: 'Orbitron', monospace;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 1px;
+  border-radius: 8px;
+  padding: 12px 24px;
+  cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 
 .cyber-button:hover {
-  background: linear-gradient(145deg, #3b82f6, #60a5fa);
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
-  transform: translateY(-1px);
+  background: linear-gradient(145deg, #0052a3, var(--primary-blue));
+  box-shadow: var(--shadow-blue);
+  transform: translateY(-2px);
 }
 
 .cyber-button:active {
   transform: translateY(0);
 }
 
-.cyber-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
+.cyber-button.pink {
+  background: linear-gradient(145deg, var(--accent-pink), #dc1475);
+  border-color: var(--neon-pink);
 }
 
-.cyber-button:hover::before {
-  left: 100%;
+.cyber-button.pink:hover {
+  background: linear-gradient(145deg, #dc1475, var(--accent-pink));
+  box-shadow: var(--shadow-pink);
 }
 
-/* Cyber Input Styling */
+/* Input Styling */
 .cyber-input {
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(37, 99, 235, 0.3);
-  color: #e2e8f0;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  font-family: 'Rajdhani', sans-serif;
+  background: var(--bg-dark);
+  border: 2px solid var(--border-glow);
+  color: var(--text-primary);
+  font-family: 'Orbitron', monospace;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 16px;
   transition: all 0.3s ease;
 }
 
 .cyber-input:focus {
   outline: none;
   border-color: var(--neon-blue);
-  box-shadow: 0 0 10px rgba(0, 191, 255, 0.3);
-  background: rgba(15, 23, 42, 0.9);
+  box-shadow: var(--shadow-blue);
 }
 
 .cyber-input::placeholder {
-  color: rgba(148, 163, 184, 0.6);
+  color: var(--text-secondary);
+  font-family: 'Rajdhani', sans-serif;
 }
 
-/* Progress Bar Styling */
+/* Progress Bar */
 .progress-bar {
-  background: rgba(15, 23, 42, 0.8);
-  border-radius: 8px;
+  width: 100%;
+  height: 8px;
+  background: var(--bg-dark);
+  border-radius: 4px;
   overflow: hidden;
   position: relative;
-  height: 8px;
 }
 
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--neon-blue), var(--neon-pink));
+  border-radius: 4px;
   transition: width 0.5s ease;
   position: relative;
 }
 
-.progress-fill::before {
+.progress-fill::after {
   content: '';
   position: absolute;
   top: 0;
@@ -182,27 +171,30 @@ a {
   right: 0;
   bottom: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shine 2s infinite;
+  animation: progress-shine 2s infinite;
 }
 
-@keyframes shine {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+@keyframes progress-shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
-/* Status Indicators */
-.status-online {
-  color: var(--neon-green);
-  animation: pulse-green 2s infinite;
-}
-
-.status-processing {
+/* Text Glow Effects */
+.text-glow-blue {
   color: var(--neon-blue);
-  animation: pulse-blue 1.5s infinite;
+  text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
 }
 
-.status-
+.text-glow-pink {
+  color: var(--neon-pink);
+  text-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+}
+
+/* Utility Classes */
+.font-cyber {
+  font-family: 'Orbitron', monospace;
+}
+
+.font-ui {
+  font-family: 'Rajdhani', sans-serif;
+}
