@@ -68,9 +68,7 @@ body {
   position: relative;
   overflow: hidden;
   height: 650px;
-  width: 400px;
   padding: 0;
-  margin: 0 auto;
 }
 
 .cyber-panel::before {
