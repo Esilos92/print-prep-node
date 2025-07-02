@@ -22,7 +22,17 @@ interface JobStatus {
 
 export default function Dashboard() {
   const [celebrityName, setCelebrityName] = useState('');
-  const [currentJob, setCurrentJob] = useState<JobStatus | null>(null);
+  const [currentJob, setCurrentJob] = useState<JobStatus | null>({
+    id: 'mock-1',
+    celebrity: 'Ryan Reynolds',
+    status: 'running',
+    currentPhase: 'Downloading image candidates...',
+    progress: 65,
+    roles: ['Deadpool', 'Green Lantern', 'The Proposal'],
+    imagesProcessed: 28,
+    imagesValidated: 15,
+    startTime: new Date(Date.now() - 120000) // 2 minutes ago
+  });
   const [jobHistory, setJobHistory] = useState<JobStatus[]>([
     // Mock data for now
     {
@@ -124,8 +134,8 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
-        {/* Three Horizontal Panels with Optimal Spacing */}
-        <div className="max-w-7xl mx-auto w-full space-y-8">
+        {/* Three Horizontal Panels with Better Spacing */}
+        <div className="max-w-7xl mx-auto w-full space-y-16">
           
           {/* Panel 1 - GBot Terminal */}
           <motion.div 
