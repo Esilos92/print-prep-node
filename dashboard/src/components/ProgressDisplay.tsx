@@ -166,8 +166,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                 {/* Column 2 - Image Stats */}
                 {currentJob.imagesProcessed && (
                   <div style={{ flex: 1, paddingLeft: '16px' }}>
-                    <h6 className="text-sm font-cyber text-slate-400 mb-4 tracking-wide flex items-center gap-1">
-                      <Image className="w-4 h-4" />
+                    <h6 className="font-cyber text-xl text-glow-blue mb-4 tracking-wide">
                       IMAGES
                     </h6>
                     <div className="text-center">
