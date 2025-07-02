@@ -67,9 +67,6 @@ body {
   box-shadow: var(--shadow-blue);
   position: relative;
   overflow: hidden;
-  margin: 0 auto;
-  max-width: 100%;
-  width: 100%;
 }
 
 .cyber-panel::before {
