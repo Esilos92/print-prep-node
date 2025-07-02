@@ -144,7 +144,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'row', gap: '32px' }}>
               
-              {/* Column 1 - Celebrity Info & Progress */}
+              {/* Column 1 - Celebrity Info */}
               <div style={{ flex: 1 }}>
                 {/* Celebrity Name */}
                 <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
@@ -159,32 +159,6 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                     </span>
                   </div>
                 )}
-
-                {/* Percentage Bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-2xl font-cyber font-bold text-blue-400">
-                      {currentJob.progress}%
-                    </span>
-                    {currentJob.startTime && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <Clock className="w-3 h-3" />
-                        <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="progress-bar h-4">
-                    <motion.div 
-                      className="progress-fill"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${currentJob.progress}%` }}
-                      transition={{ duration: 0.5 }}
-                    />
-                  </div>
-                  <p className="text-xs text-slate-400 font-ui text-center mt-2">
-                    {currentJob.currentPhase}
-                  </p>
-                </div>
               </div>
 
               {/* Column 2 - Image Stats */}
@@ -212,6 +186,32 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Progress Bar Row - Full Width */}
+            <div className="mt-6 mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-2xl font-cyber font-bold text-blue-400">
+                  {currentJob.progress}%
+                </span>
+                {currentJob.startTime && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Clock className="w-3 h-3" />
+                    <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="progress-bar h-4">
+                <motion.div 
+                  className="progress-fill"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${currentJob.progress}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+              <p className="text-xs text-slate-400 font-ui text-center mt-2">
+                {currentJob.currentPhase}
+              </p>
             </div>
           )}
 
