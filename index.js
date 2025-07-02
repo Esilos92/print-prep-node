@@ -37,19 +37,36 @@ async function main() {
       process.exit(1);
     }
     
-    // Convert AI results to format expected by your existing pipeline
+    // 🎯 CRITICAL FIX: Preserve ALL smart search properties from orchestrator
     const roles = aiResults.roles.map(role => ({
+      // Basic role info for compatibility
       name: `${role.character} (${role.title})`,
       character: role.character,
+      characterName: role.characterName || role.character, // Alternative property
       title: role.title,
       medium: role.medium,
       year: role.year,
       isVoiceRole: role.medium.includes('voice'),
       source: 'ai_discovery',
       isKnownFor: role.popularity === 'high',
-      searchTerms: role.finalSearchTerms || [],
       popularity: role.popularity,
-      description: role.description
+      description: role.description,
+      
+      // 🎯 CRITICAL: Preserve ALL smart search properties from orchestrator
+      finalSearchTerms: role.finalSearchTerms || [], // Smart search terms
+      isMultiActorCharacter: role.isMultiActorCharacter || false, // Multi-actor detection
+      smartSearchApproach: role.smartSearchApproach || 'Standard', // Search strategy
+      maxImages: role.maxImages || 20, // Image limits
+      searchTerms: role.searchTerms, // Full search term object
+      searchMetadata: role.searchMetadata, // Search metadata
+      
+      // Additional smart search properties
+      characterProminent: role.characterProminent || 'low',
+      searchPriority: role.searchPriority || 1,
+      smartSearchStrategy: role.smartSearchStrategy,
+      
+      // Preserve any other orchestrator properties
+      ...role // Spread all other properties from orchestrator
     }));
     
     logger.info(`✅ AI discovered ${roles.length} roles:`);
@@ -57,7 +74,20 @@ async function main() {
       const voiceMarker = role.isVoiceRole ? ' (VOICE)' : '';
       const mediumMarker = ` [${role.medium}]`;
       const popularityMarker = role.popularity === 'high' ? ' ⭐' : '';
-      logger.info(`  ${i + 1}. ${role.character} in ${role.title}${voiceMarker}${mediumMarker}${popularityMarker}`);
+      const multiActorMarker = role.isMultiActorCharacter ? ' 🎭' : '';
+      logger.info(`  ${i + 1}. ${role.character} in ${role.title}${voiceMarker}${mediumMarker}${popularityMarker}${multiActorMarker}`);
+    });
+    
+    // 🎯 DEBUG: Verify smart search data is preserved
+    logger.info('🔧 DEBUG: Smart search data verification:');
+    roles.forEach((role, i) => {
+      logger.info(`  Role ${i + 1} - ${role.character}:`);
+      logger.info(`    finalSearchTerms: ${role.finalSearchTerms?.length || 0} terms`);
+      logger.info(`    isMultiActorCharacter: ${role.isMultiActorCharacter}`);
+      logger.info(`    smartSearchApproach: ${role.smartSearchApproach}`);
+      if (role.finalSearchTerms?.length > 0) {
+        logger.info(`    First search term: "${role.finalSearchTerms[0]}"`);
+      }
     });
     
     // Step 2: Fetch images for each role (enhanced with AI search terms)
@@ -65,7 +95,7 @@ async function main() {
     const allImages = [];
     for (const role of roles) {
       try {
-        // Use AI-generated search terms if available, otherwise use traditional method
+        // 🎯 NOW PASSING COMPLETE SMART SEARCH DATA TO fetchImages
         const images = await fetchImages(celebrityName, role, workDir);
         allImages.push(...images);
         logger.info(`📸 ${role.character}: ${images.length} images found`);
@@ -118,9 +148,9 @@ async function main() {
     logger.info('📄 Step 5: Generating AI-enhanced manifest...');
     const manifest = await generateManifest(resizedImages, celebrityName, roles);
     
-    // Add AI system metadata to manifest
+    // Add AI system metadata to manifest with smart search info
     manifest.system = {
-      version: 'AI-POWERED-V1',
+      version: 'AI-POWERED-V2-SMART-SEARCH',
       timestamp: new Date().toISOString(),
       aiProvider: aiResults.source || 'ai_powered',
       primaryMedium: aiResults.summary?.primaryMedium || 'unknown',
@@ -130,13 +160,26 @@ async function main() {
       totalResizedImages: resizedImages.length,
       voiceRolesFound: aiResults.summary?.hasVoiceRoles ? roles.filter(r => r.isVoiceRole).length : 0,
       liveActionRolesFound: aiResults.summary?.hasLiveActionRoles ? roles.filter(r => !r.isVoiceRole).length : 0,
+      // 🎯 ADDED: Smart search statistics
+      multiActorRoles: roles.filter(r => r.isMultiActorCharacter).length,
+      smartSearchTermsGenerated: roles.reduce((sum, r) => sum + (r.finalSearchTerms?.length || 0), 0),
+      averageSearchTermsPerRole: Math.round(roles.reduce((sum, r) => sum + (r.finalSearchTerms?.length || 0), 0) / roles.length),
       aiFeatures: [
         'ai_role_discovery',
         'popularity_ranking',
         'autograph_optimization',
-        'search_term_generation'
+        'search_term_generation',
+        'multi_actor_detection', // 🎯 NEW
+        'smart_search_integration', // 🎯 NEW
+        'actor_specific_precision' // 🎯 NEW
       ],
-      roleBreakdown: aiResults.summary?.mediumBreakdown || {}
+      roleBreakdown: aiResults.summary?.mediumBreakdown || {},
+      // 🎯 ADDED: Smart search breakdown
+      smartSearchBreakdown: {
+        multiActorCharacters: roles.filter(r => r.isMultiActorCharacter).map(r => `${r.character} (${r.title})`),
+        singleActorCharacters: roles.filter(r => !r.isMultiActorCharacter).map(r => `${r.character} (${r.title})`),
+        totalSmartSearchTerms: roles.reduce((sum, r) => sum + (r.finalSearchTerms?.length || 0), 0)
+      }
     };
     
     await fs.writeFile(
@@ -154,6 +197,8 @@ async function main() {
     logger.info(`Celebrity: ${celebrityName}`);
     logger.info(`AI Primary Medium: ${aiResults.summary?.primaryMedium || 'mixed'}`);
     logger.info(`Roles Discovered: ${roles.length}`);
+    logger.info(`Multi-Actor Roles: ${manifest.system.multiActorRoles}`); // 🎯 NEW
+    logger.info(`Smart Search Terms: ${manifest.system.smartSearchTermsGenerated}`); // 🎯 NEW
     logger.info(`Images Downloaded: ${allImages.length}`);
     logger.info(`Images Validated: ${validImages.length}`);
     logger.info(`Images Resized: ${resizedImages.length}`);
@@ -162,11 +207,25 @@ async function main() {
     logger.info(`AI Features: ${manifest.system.aiFeatures.join(', ')}`);
     logger.info(`Google Drive Link: ${uploadResult.webViewLink}`);
     
-    // Show top roles discovered by AI
-    logger.info('\n🎯 TOP AI-DISCOVERED ROLES:');
+    // Show top roles discovered by AI with smart search info
+    logger.info('\n🎯 TOP AI-DISCOVERED ROLES WITH SMART SEARCH:');
     roles.slice(0, 3).forEach((role, i) => {
-      logger.info(`  ${i + 1}. ${role.character} in ${role.title} (${role.popularity} popularity)`);
+      const multiActorInfo = role.isMultiActorCharacter ? ' [MULTI-ACTOR]' : '';
+      const searchTermsInfo = ` (${role.finalSearchTerms?.length || 0} search terms)`;
+      logger.info(`  ${i + 1}. ${role.character} in ${role.title}${multiActorInfo}${searchTermsInfo}`);
+      if (role.finalSearchTerms?.length > 0) {
+        logger.info(`     First search: "${role.finalSearchTerms[0]}"`);
+      }
     });
+    
+    // 🎯 NEW: Show multi-actor detection results
+    const multiActorRoles = roles.filter(r => r.isMultiActorCharacter);
+    if (multiActorRoles.length > 0) {
+      logger.info('\n🎭 MULTI-ACTOR CHARACTER PRECISION:');
+      multiActorRoles.forEach(role => {
+        logger.info(`  • ${role.character} (${role.title}) - Actor-specific search enabled`);
+      });
+    }
     
     // Cleanup temporary files
     await fs.rm(workDir, { recursive: true, force: true });
@@ -180,6 +239,8 @@ async function main() {
       logger.error('🤖 AI system error - check your API keys and internet connection');
     } else if (error.message.includes('API')) {
       logger.error('🔑 API error - verify your Claude/OpenAI API keys in .env file');
+    } else if (error.message.includes('smart search')) {
+      logger.error('🎯 Smart search error - check multi-actor detection system');
     }
     
     logger.error('Stack trace:', error.stack);
