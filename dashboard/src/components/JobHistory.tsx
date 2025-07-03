@@ -230,6 +230,10 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                     
                     <br />
                     
+                    <br />
+                    
+                    <br />
+                    
                     {/* Download Button */}
                     {job.status === 'completed' && job.downloadLink && (
                       <motion.button
