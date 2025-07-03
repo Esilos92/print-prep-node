@@ -1,115 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import GBotInterface from '@/components/GBotInterface';
 import ProgressDisplay from '@/components/ProgressDisplay';
 import JobHistory from '@/components/JobHistory';
-
-interface JobStatus {
-  id: string;
-  celebrity: string;
-  status: 'idle' | 'running' | 'completed' | 'error';
-  currentPhase: string;
-  progress: number;
-  roles?: string[];
-  imagesProcessed?: number;
-  imagesValidated?: number;
-  downloadLink?: string;
-  startTime?: Date;
-  endTime?: Date;
-}
+import { celebrityAPI, JobStatus } from '@/services/api';
 
 export default function Dashboard() {
   const [celebrityName, setCelebrityName] = useState('');
-  const [currentJob, setCurrentJob] = useState<JobStatus | null>({
-    id: 'mock-1',
-    celebrity: 'Ryan Reynolds',
-    status: 'running',
-    currentPhase: 'Downloading image candidates...',
-    progress: 65,
-    roles: ['Deadpool', 'Green Lantern', 'The Proposal'],
-    imagesProcessed: 28,
-    imagesValidated: 15,
-    startTime: new Date(Date.now() - 120000) // 2 minutes ago
-  });
-  const [jobHistory, setJobHistory] = useState<JobStatus[]>([
-    // Mock data for now
-    {
-      id: '1',
-      celebrity: 'Ryan Gosling',
-      status: 'completed',
-      currentPhase: 'Complete',
-      progress: 100,
-      roles: ['Blade Runner 2049', 'La La Land', 'Drive'],
-      imagesProcessed: 47,
-      imagesValidated: 23,
-      downloadLink: '#',
-      startTime: new Date(Date.now() - 300000),
-      endTime: new Date(Date.now() - 60000)
-    }
-  ]);
+  const [currentJob, setCurrentJob] = useState<JobStatus | null>(null);
+  const [jobHistory, setJobHistory] = useState<JobStatus[]>([]);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
+  // Load job history on component mount
+  useEffect(() => {
+    loadJobHistory();
+    return () => {
+      // Cleanup polling on unmount
+      celebrityAPI.cleanup();
+    };
+  }, []);
+
+  // Load job history from API
+  const loadJobHistory = async () => {
+    try {
+      const jobs = await celebrityAPI.getAllJobs();
+      setJobHistory(jobs);
+    } catch (error) {
+      console.error('Failed to load job history:', error);
+    }
+  };
+
+  // Start new celebrity job
   const handleStartJob = async () => {
     if (!celebrityName.trim()) return;
 
-    const newJob: JobStatus = {
-      id: Date.now().toString(),
-      celebrity: celebrityName,
-      status: 'running',
-      currentPhase: 'Initializing AI systems...',
-      progress: 0,
-      startTime: new Date()
-    };
+    try {
+      // Start job via API
+      const jobId = await celebrityAPI.startJob(celebrityName.trim());
+      setCurrentJobId(jobId);
+      setCelebrityName('');
 
-    setCurrentJob(newJob);
-    setCelebrityName('');
+      // Start polling for updates
+      celebrityAPI.startPolling(jobId, (job) => {
+        if (job) {
+          setCurrentJob(job);
+          
+          // When job completes, move to history and clear current
+          if (job.status === 'completed') {
+            setTimeout(() => {
+              setCurrentJob(null);
+              setCurrentJobId(null);
+              loadJobHistory(); // Refresh history
+            }, 3000); // Show completed state for 3 seconds
+          }
+        }
+      });
 
-    // Mock progress simulation (will be replaced with real backend calls)
-    simulateProgress(newJob);
+    } catch (error) {
+      console.error('Failed to start job:', error);
+      alert(`Failed to start job: ${error.message}`);
+    }
   };
 
-  const simulateProgress = async (job: JobStatus) => {
-    const phases = [
-      { phase: 'Scanning filmography database...', progress: 10, delay: 1000 },
-      { phase: 'Analyzing most recognizable performances...', progress: 25, delay: 2000 },
-      { phase: 'Generating precision search protocols...', progress: 40, delay: 1500 },
-      { phase: 'Downloading image candidates...', progress: 70, delay: 3000 },
-      { phase: 'AI validation in progress...', progress: 90, delay: 2000 },
-      { phase: 'Compiling print-ready files...', progress: 100, delay: 1000 }
-    ];
-
-    for (const { phase, progress, delay } of phases) {
-      await new Promise(resolve => setTimeout(resolve, delay));
-      
-      setCurrentJob(prev => prev ? {
-        ...prev,
-        currentPhase: phase,
-        progress,
-        roles: progress > 25 ? ['Blade Runner 2049', 'La La Land', 'Drive'] : undefined,
-        imagesProcessed: progress > 70 ? Math.floor((progress - 70) * 2) : undefined,
-        imagesValidated: progress > 90 ? Math.floor((progress - 90) * 2) : undefined
-      } : null);
+  // Cancel current job
+  const handleCancelJob = async () => {
+    if (currentJobId) {
+      try {
+        await celebrityAPI.cancelJob(currentJobId);
+        celebrityAPI.stopPolling(currentJobId);
+        setCurrentJob(null);
+        setCurrentJobId(null);
+        loadJobHistory();
+      } catch (error) {
+        console.error('Failed to cancel job:', error);
+      }
     }
-
-    // Complete the job
-    setTimeout(() => {
-      setCurrentJob(prev => prev ? {
-        ...prev,
-        status: 'completed',
-        currentPhase: 'Mission Complete!',
-        downloadLink: '#',
-        endTime: new Date()
-      } : null);
-
-      // Add to history after 2 seconds
-      setTimeout(() => {
-        if (currentJob) {
-          setJobHistory(prev => [{ ...currentJob, status: 'completed', endTime: new Date() }, ...prev]);
-          setCurrentJob(null);
-        }
-      }, 2000);
-    }, 1000);
   };
 
   return (
