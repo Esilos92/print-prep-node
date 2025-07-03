@@ -390,33 +390,22 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT SIDE - Exactly 50% with FIXED HEIGHT CONTAINER */}
+        {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ 
           width: '50%', 
-          paddingLeft: '16px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column'
+          paddingLeft: '16px'
         }}>
           
           {/* Communication Header */}
-          <div style={{ padding: '12px 0', flexShrink: 0 }}>
+          <div style={{ padding: '12px 0' }}>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
-          {/* Chat Container - FIXED: Responsive height constraint with embedded styling */}
-          <div 
-            className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col"
-            style={{ 
-              height: 'calc(100% - 80px)', // Use available space minus header
-              maxHeight: '500px',
-              minHeight: '300px',
-              overflow: 'hidden'
-            }}
-          >
+          {/* Chat Container - ONLY fix internal scrolling, keep original size */}
+          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 60px)' }}>
             
-            {/* Chat Header with embedded window styling */}
+            {/* Chat Header */}
             <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -427,7 +416,7 @@ export default function GBotInterface({
             {/* Embedded chat separator line */}
             <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '2px', flexShrink: 0 }}></div>
             
-            {/* Chat Messages Area - FIXED: Constrained scrolling area */}
+            {/* Chat Messages Area - ONLY fix scrolling behavior */}
             <div 
               className="flex-1 p-4 overflow-y-auto space-y-4"
               style={{ 
