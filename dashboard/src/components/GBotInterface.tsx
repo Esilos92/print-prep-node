@@ -254,22 +254,10 @@ export default function GBotInterface({
 
           {/* Communication Log - Push to bottom to match Subject Input */}
           <div className="mt-auto">
-            {/* 🎯 Invisible emoji for proper alignment - matches Mission Archive approach */}
-            <div className="flex items-center gap-4 mb-2">
-              <Bot className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
+            <div>
+              <FileArchive className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
+              <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             </div>
-            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4> left side */}
-          <br />
-
-          {/* LINE BREAK - match left side */}
-          <br />
-
-          {/* LINE BREAK - match left side */}
-          <br />
-
-          {/* Communication Log - Takes remaining space */}
-          <div className="mt-auto flex-1">
-            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
             {/* GBot texts with darker background - embedded chat box */}
             <div className="bg-slate-900/80 rounded-lg border border-slate-600 h-full flex flex-col overflow-hidden">
