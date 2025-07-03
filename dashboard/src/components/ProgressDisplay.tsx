@@ -217,12 +217,14 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               {/* FIXED: Progress Bar Row with time and percentage on same line */}
               <div className="mt-4 mb-2">
-                {/* FIXED: Time | Percentage on same line */}
-                <div className="flex items-center gap-3 mb-2">
+                {/* FIXED: Time | Percentage on same line with proper spacing */}
+                <div className="flex items-center gap-4 mb-2">
                   {currentJob.startTime && (
                     <>
-                      <Clock className="w-4 h-4 text-slate-400" />
-                      <span className="font-cyber text-base text-slate-400">{formatDuration(currentJob.startTime)}</span>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-slate-400" />
+                        <span className="font-cyber text-base text-slate-400">{formatDuration(currentJob.startTime)}</span>
+                      </div>
                       <span className="text-slate-500">|</span>
                     </>
                   )}
