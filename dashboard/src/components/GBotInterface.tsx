@@ -198,9 +198,10 @@ export default function GBotInterface({
                     minHeight: 'unset',
                     padding: '12px 32px',  // Match input's vertical padding
                     lineHeight: '1.5',     // Match input's line height
-                    display: 'flex',
+                    display: 'inline-flex', // Changed from 'flex' to 'inline-flex'
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    flexShrink: 0          // Prevent button from shrinking
                   }}
                 >
                   <Send className="w-5 h-5 mr-2" />
