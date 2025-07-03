@@ -200,8 +200,21 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT SIDE - Exactly 50% */}
-        <div style={{ width: '50%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
+        {/* RIGHT SIDE - Exactly 50% with properly spaced divider */}
+        <div style={{ 
+          width: '50%', 
+          paddingLeft: '16px',
+          position: 'relative'
+        }}>
+          {/* Divider that respects padding boundaries */}
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            top: '12px',
+            bottom: '12px', 
+            width: '1px',
+            backgroundColor: 'rgba(37, 99, 235, 0.3)'
+          }}></div>
           
           {/* Communication Header */}
           <div style={{ padding: '12px 0' }}>
