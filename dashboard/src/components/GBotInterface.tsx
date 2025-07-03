@@ -107,11 +107,11 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
-      {/* FIX: Move padding inside cyber-panel, matching other components */}
+      {/* Matching ProgressDisplay padding pattern: consistent 12px all around */}
       <div style={{ padding: '12px', display: 'flex', flexDirection: 'row', height: '100%' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
-        <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
+        <div style={{ width: '50%', paddingRight: '16px' }} className="flex flex-col">
           
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
           <div className="flex items-center gap-3 mb-4" style={{ padding: '12px 0' }}>
@@ -201,7 +201,7 @@ export default function GBotInterface({
         </div>
 
         {/* RIGHT SIDE - Exactly 50% */}
-        <div style={{ width: '50%', paddingLeft: '16px' }}>
+        <div style={{ width: '50%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
           
           {/* Communication Header */}
           <div style={{ padding: '12px 0' }}>
