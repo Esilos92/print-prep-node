@@ -405,13 +405,13 @@ export default function GBotInterface({
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
-          {/* Chat Container - FIXED: Absolute height constraint with embedded styling */}
+          {/* Chat Container - FIXED: Responsive height constraint with embedded styling */}
           <div 
             className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col"
             style={{ 
-              height: '400px', // Fixed height - will not grow
-              maxHeight: '400px',
-              minHeight: '400px',
+              height: 'calc(100% - 80px)', // Use available space minus header
+              maxHeight: '500px',
+              minHeight: '300px',
               overflow: 'hidden'
             }}
           >
