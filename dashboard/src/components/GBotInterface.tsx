@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+eimport { motion } from 'framer-motion';
 import { Bot, Send, Zap } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
@@ -202,7 +202,7 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Exactly 50% - 🎯 FIXED ALIGNMENT USING PROVEN PATTERN */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           {/* 🎯 CRITICAL FIX: Added invisible icon to match Mission Archive pattern */}
-          <div style={{ padding: '12px 0' }}>
+          <div style={{ padding: '8px 0' }}>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
