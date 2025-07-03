@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Bot, Send, Zap } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import * as Tone from 'tone';
 
 interface JobStatus {
   id: string;
@@ -31,6 +32,43 @@ export default function GBotInterface({
   const [awaitingNewMission, setAwaitingNewMission] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Cyber sound effects using Tone.js
+  const playCyberBeep = async (type: 'start' | 'phase' | 'complete' | 'error') => {
+    try {
+      await Tone.start(); // Required for web audio
+      const synth = new Tone.Synth({
+        oscillator: { type: 'square' }, // Retro square wave
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+      }).toDestination();
+
+      switch (type) {
+        case 'start':
+          // Quick ascending beep for mission start
+          synth.triggerAttackRelease('C4', '0.1');
+          setTimeout(() => synth.triggerAttackRelease('E4', '0.1'), 100);
+          break;
+        case 'phase':
+          // Single mid-tone beep for phase changes
+          synth.triggerAttackRelease('G4', '0.15');
+          break;
+        case 'complete':
+          // Triumphant ascending sequence for completion
+          synth.triggerAttackRelease('C4', '0.2');
+          setTimeout(() => synth.triggerAttackRelease('E4', '0.2'), 200);
+          setTimeout(() => synth.triggerAttackRelease('G4', '0.2'), 400);
+          setTimeout(() => synth.triggerAttackRelease('C5', '0.4'), 600);
+          break;
+        case 'error':
+          // Low descending beep for errors
+          synth.triggerAttackRelease('C4', '0.3');
+          setTimeout(() => synth.triggerAttackRelease('G3', '0.3'), 300);
+          break;
+      }
+    } catch (error) {
+      console.log('Audio playback failed:', error);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -42,6 +80,7 @@ export default function GBotInterface({
   useEffect(() => {
     if (currentJob?.status === 'running') {
       if (!lastAnnouncedPhase) {
+        playCyberBeep('start');
         addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
         setLastAnnouncedPhase('started');
       }
@@ -58,12 +97,14 @@ export default function GBotInterface({
         
         const message = phaseMessages[currentJob.gBotPhaseChange as keyof typeof phaseMessages];
         if (message) {
+          playCyberBeep('phase');
           addBotMessage(message);
           setLastAnnouncedPhase(currentJob.gBotPhaseChange);
         }
       }
     } else if (currentJob?.status === 'completed') {
       if (lastAnnouncedPhase !== 'completed') {
+        playCyberBeep('complete');
         addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
         setLastAnnouncedPhase('completed');
         
@@ -80,6 +121,7 @@ export default function GBotInterface({
       }
     } else if (currentJob?.status === 'error') {
       if (lastAnnouncedPhase !== 'error') {
+        playCyberBeep('error');
         addBotMessage(`Mission encountered an error. Systems standing by for new orders.`);
         setLastAnnouncedPhase('error');
       }
