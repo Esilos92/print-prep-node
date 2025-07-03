@@ -414,7 +414,7 @@ export default function GBotInterface({
             </div>
             
             {/* Permanent dark separator line for chat box appearance */}
-            <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)', flexShrink: 0 }}></div>
+            <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '1px', flexShrink: 0 }}></div>
             
             {/* FIXED: Chat Messages Area - Proper containment with flex-1 and overflow */}
             <div 
