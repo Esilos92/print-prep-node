@@ -205,7 +205,7 @@ export default function GBotInterface({
           {/* Communication Header */}
           <div style={{ padding: '12px 0' }}>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
-            <h3 className="font-cyber text-2xl font-bold text-glow-blue" style={{ marginTop: '-1px' }}>COMMUNICATION LOG</h3>
+            <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
           {/* Chat Container */}
