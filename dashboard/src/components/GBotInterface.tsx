@@ -296,7 +296,7 @@ export default function GBotInterface({
               <div ref={messagesEndRef} />
             </div>
           </div>
-        </div>
+        </div> 
       </div> 
     </div>
   );
