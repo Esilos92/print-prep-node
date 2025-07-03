@@ -50,8 +50,8 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     if (!roles || !celebrityName) return [];
     return roles
       .map(role => {
-        const cleanRole = role.replace(new RegExp(`${celebrityName}\\s*\\(([^)]+)\\)`, 'gi'), '$1').trim();
-        return cleanRole.replace(new RegExp(`\\(${celebrityName}\\)`, 'gi'), '').trim();
+        const cleanRole = role.replace(new RegExp(`${celebrityName}\\s*\$begin:math:text$([^)]+)\\$end:math:text$`, 'gi'), '$1').trim();
+        return cleanRole.replace(new RegExp(`\$begin:math:text$${celebrityName}\\$end:math:text$`, 'gi'), '').trim();
       })
       .filter(role => role.length > 0)
       .slice(0, 5);
@@ -181,15 +181,15 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                   )}
                 </div>
 
-                {(currentJob.imagesProcessed || currentJob.imagesValidated) && (
+                {(currentJob.imagesProcessed !== undefined || currentJob.imagesValidated !== undefined) && (
                   <div style={{ flex: 1, paddingLeft: '16px' }}>
                     <h6 className="font-cyber text-xl text-glow-blue mb-4 tracking-wide">
                       IMAGES
                     </h6>
                     <div className="text-center">
                       <div className="text-2xl font-cyber font-bold text-blue-300">
-                        {currentJob.imagesProcessed || 0} Downloaded
-                        {currentJob.imagesValidated && (
+                        {currentJob.imagesProcessed ?? 0} Downloaded
+                        {typeof currentJob.imagesValidated === 'number' && (
                           <> / {currentJob.imagesValidated} Validated</>
                         )}
                       </div>
