@@ -142,7 +142,6 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           </div>
           
           <br />
-          <br />
           
           {/* Enhanced Download Button with Google Drive support */}
           {lastJob && lastJob.status === 'completed' && lastJob.downloadLink && (
