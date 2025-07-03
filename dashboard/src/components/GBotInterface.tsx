@@ -113,7 +113,7 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
           {/* 🎯 FIX: EXTRA TOP SPACING - PUSH EVERYTHING DOWN */}
-          <div style={{ height: '24px' }}></div>
+          <div style={{ height: '48px' }}></div>
           
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
           <div className="flex items-center gap-3 mb-4" style={{ padding: '12px 0' }}>
@@ -206,7 +206,7 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
           {/* 🎯 FIX: EXTRA TOP SPACING TO MATCH LEFT SIDE */}
-          <div style={{ height: '24px' }}></div>
+          <div style={{ height: '48px' }}></div>
           
           {/* Communication Header */}
           <div style={{ padding: '12px 0' }}>
