@@ -205,11 +205,11 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Communication Log with Fixed Header */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
-          {/* 🎯 FIX: EXTRA TOP SPACING - PUSH EVERYTHING DOWN */}
+          {/* 🎯 FIX: EXTRA TOP SPACING - PUSH EVERYTHING DOWN TO MATCH LEFT PANEL */}
           <div style={{ height: '24px' }}></div>
           
           {/* Communication Header */}
-          <div style={{ padding: '12px 0' }}>>>
+          <div style={{ padding: '12px 0' }}>>>>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
