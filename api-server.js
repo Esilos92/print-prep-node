@@ -1,4 +1,4 @@
-// api-server.js - NEW FILE to add to ~/print-prep-node/
+// api-server.js - ENHANCED VERSION with 5 critical fixes
 // This runs alongside your existing CLI system
 
 const express = require('express');
@@ -23,19 +23,29 @@ class JobTracker {
     this.status = 'running';
     this.progress = 0;
     this.currentPhase = 'Initializing AI systems...';
-    this.roles = null;
+    this.roles = []; // 🎯 FIX #2: Real roles array instead of null
     this.imagesProcessed = 0;
     this.imagesValidated = 0;
+    this.totalImagesAcrossRoles = 0; // 🎯 FIX #4: Cumulative tracking
     this.startTime = new Date();
     this.endTime = null;
     this.downloadLink = null;
     this.process = null;
     this.logs = [];
+    this.currentPhaseForGBot = null; // 🎯 FIX #1: Track phase changes for GBot
+    this.lastPhaseAnnounced = null; // 🎯 FIX #1: Prevent duplicate announcements
   }
 
   updateProgress(progress, phase) {
     this.progress = progress;
     this.currentPhase = phase;
+    
+    // 🎯 FIX #1: Detect phase changes for GBot announcements
+    if (this.currentPhaseForGBot !== phase) {
+      this.currentPhaseForGBot = phase;
+      this.lastPhaseAnnounced = phase;
+    }
+    
     this.addLog(`Progress: ${progress}% - ${phase}`);
   }
 
@@ -214,93 +224,240 @@ function monitorJobProgress(job, process) {
   });
 }
 
-// Parse YOUR EXACT backend output patterns for progress
+// 🎯 ENHANCED: Parse YOUR EXACT backend output patterns for progress
 function parseProgressFromOutput(job, output) {
   job.addLog(`Output: ${output.trim()}`);
 
-  // EXACT patterns from your backend files
-  const progressPatterns = [
-    { pattern: /🎬 Starting CHARACTER-FIRST image search for:/i, progress: 5, phase: 'Initializing CHARACTER-FIRST search...' },
-    { pattern: /🔍 Verifying.*roles for/i, progress: 15, phase: 'Verifying discovered roles...' },
-    { pattern: /✅.*roles verified as real/i, progress: 25, phase: 'Role verification complete' },
-    { pattern: /🔍 Generating CHARACTER-FIRST search terms/i, progress: 35, phase: 'Optimizing search strategies...' },
-    { pattern: /✅ CHARACTER-FIRST optimization/i, progress: 45, phase: 'Search optimization complete' },
-    { pattern: /🖼️ AI-FIRST fetching for.*in/i, progress: 55, phase: 'Starting image search...' },
-    { pattern: /🔍 SMART Search:/i, progress: 65, phase: 'Executing smart searches...' },
-    { pattern: /📸 Found.*images for AI to evaluate/i, progress: 75, phase: 'Images found, preparing for AI...' },
-    { pattern: /📥 Downloaded.*images for AI evaluation/i, progress: 85, phase: 'Images downloaded, AI analyzing...' },
-    { pattern: /🤖 AI taking over/i, progress: 90, phase: 'AI validation in progress...' },
-    { pattern: /✅ AI SELECTED:.*high-quality images/i, progress: 95, phase: 'AI validation complete' },
-    { pattern: /✅.*processing complete.*optimized roles/i, progress: 98, phase: 'Finalizing package...' }
+  // 🎯 FIX #2: Extract REAL role names from backend output
+  const roleExtractionPatterns = [
+    // Pattern: "🖼️ AI-FIRST fetching for Ryan Reynolds in Deadpool..."
+    /🖼️\s*AI-FIRST fetching for\s*(.+?)\s*in\s*(.+?)\.\.\./i,
+    // Pattern: "✅ AI SELECTED: 15 high-quality images" (after a role context)
+    /✅\s*AI SELECTED.*for\s*(.+?)\s*in\s*(.+)/i,
+    // Pattern: "🔍 SMART Search: "Wade Wilson" "Deadpool""
+    /🔍\s*SMART Search:.*["'](.+?)["'].*["'](.+?)["']/i
   ];
 
-  // Extract role discoveries from YOUR exact format
-  const roleDiscoveryMatch = output.match(/✅.*processing complete.*(\d+)\s*optimized roles/i);
-  if (roleDiscoveryMatch) {
-    const roleCount = parseInt(roleDiscoveryMatch[1]);
-    // Create placeholder roles array
-    job.roles = Array.from({length: Math.min(roleCount, 5)}, (_, i) => `Role ${i + 1}`);
-    job.addLog(`Discovered ${roleCount} optimized roles`);
+  for (const pattern of roleExtractionPatterns) {
+    const match = output.match(pattern);
+    if (match) {
+      const character = match[1]?.trim();
+      const title = match[2]?.trim();
+      if (character && title) {
+        const roleName = `${character} (${title})`;
+        if (!job.roles.includes(roleName)) {
+          job.roles.push(roleName);
+          job.addLog(`Discovered role: ${roleName}`);
+        }
+      }
+    }
   }
 
-  // Extract image counts from YOUR exact patterns
+  // 🎯 FIX #4: Track CUMULATIVE image counts across all roles
   const imagesFoundMatch = output.match(/📸 Found (\d+) images for AI to evaluate/i);
   if (imagesFoundMatch) {
-    job.imagesProcessed = parseInt(imagesFoundMatch[1]);
-    job.addLog(`Found ${job.imagesProcessed} images for evaluation`);
+    const newImages = parseInt(imagesFoundMatch[1]);
+    job.imagesProcessed += newImages; // Cumulative addition
+    job.addLog(`Found ${newImages} more images (total: ${job.imagesProcessed})`);
   }
 
   const imagesDownloadedMatch = output.match(/📥 Downloaded (\d+) images for AI evaluation/i);
   if (imagesDownloadedMatch) {
-    job.imagesProcessed = parseInt(imagesDownloadedMatch[1]);
-    job.addLog(`Downloaded ${job.imagesProcessed} images`);
+    const downloadedImages = parseInt(imagesDownloadedMatch[1]);
+    job.imagesProcessed = Math.max(job.imagesProcessed, downloadedImages); // Use max to avoid regression
+    job.addLog(`Downloaded ${downloadedImages} images`);
   }
 
   const aiSelectedMatch = output.match(/✅ AI SELECTED: (\d+) high-quality images/i);
   if (aiSelectedMatch) {
-    job.imagesValidated = parseInt(aiSelectedMatch[1]);
-    job.addLog(`AI validated ${job.imagesValidated} high-quality images`);
+    const validatedImages = parseInt(aiSelectedMatch[1]);
+    job.totalImagesAcrossRoles += validatedImages; // 🎯 FIX #4: Cumulative validation
+    job.imagesValidated = job.totalImagesAcrossRoles;
+    job.addLog(`AI validated ${validatedImages} more images (total validated: ${job.imagesValidated})`);
   }
 
+  // 🎯 ENHANCED: Better progress patterns with phase detection for GBot
+  const progressPatterns = [
+    { 
+      pattern: /🎬 Starting CHARACTER-FIRST image search for:/i, 
+      progress: 5, 
+      phase: 'Initializing CHARACTER-FIRST search...',
+      gBotPhase: 'filmography_scan'
+    },
+    { 
+      pattern: /🔍 Verifying.*roles for/i, 
+      progress: 15, 
+      phase: 'Verifying discovered roles...',
+      gBotPhase: 'performance_analysis'
+    },
+    { 
+      pattern: /✅.*roles verified as real/i, 
+      progress: 25, 
+      phase: 'Role verification complete',
+      gBotPhase: 'performance_analysis'
+    },
+    { 
+      pattern: /🔍 Generating CHARACTER-FIRST search terms/i, 
+      progress: 35, 
+      phase: 'Optimizing search strategies...',
+      gBotPhase: 'search_protocol'
+    },
+    { 
+      pattern: /✅ CHARACTER-FIRST optimization/i, 
+      progress: 45, 
+      phase: 'Search optimization complete',
+      gBotPhase: 'search_protocol'
+    },
+    { 
+      pattern: /🖼️ AI-FIRST fetching for.*in/i, 
+      progress: 55, 
+      phase: 'Starting image search...',
+      gBotPhase: 'image_download'
+    },
+    { 
+      pattern: /🔍 SMART Search:/i, 
+      progress: 65, 
+      phase: 'Executing smart searches...',
+      gBotPhase: 'image_download'
+    },
+    { 
+      pattern: /📸 Found.*images for AI to evaluate/i, 
+      progress: 75, 
+      phase: 'Images found, preparing for AI...',
+      gBotPhase: 'image_download'
+    },
+    { 
+      pattern: /📥 Downloaded.*images for AI evaluation/i, 
+      progress: 85, 
+      phase: 'Images downloaded, AI analyzing...',
+      gBotPhase: 'ai_validation'
+    },
+    { 
+      pattern: /🤖 AI taking over/i, 
+      progress: 90, 
+      phase: 'AI validation in progress...',
+      gBotPhase: 'ai_validation'
+    },
+    { 
+      pattern: /✅ AI SELECTED:.*high-quality images/i, 
+      progress: 95, 
+      phase: 'AI validation complete',
+      gBotPhase: 'ai_validation'
+    },
+    { 
+      pattern: /✅.*processing complete.*optimized roles/i, 
+      progress: 98, 
+      phase: 'Finalizing package...',
+      gBotPhase: 'file_compilation'
+    }
+  ];
+
   // Update progress based on YOUR exact patterns
-  for (const { pattern, progress, phase } of progressPatterns) {
+  for (const { pattern, progress, phase, gBotPhase } of progressPatterns) {
     if (pattern.test(output)) {
       job.updateProgress(progress, phase);
+      
+      // 🎯 FIX #1: Mark phase changes for GBot announcements
+      if (gBotPhase && job.currentPhaseForGBot !== gBotPhase) {
+        job.currentPhaseForGBot = gBotPhase;
+        job.gBotPhaseChange = gBotPhase; // Flag for frontend to detect
+      }
       break;
     }
   }
 }
 
-// Handle job completion - look for YOUR exact output file pattern
+// 🎯 FIX #5: Enhanced job completion with better file detection
 async function handleJobCompletion(job) {
   try {
-    // YOUR EXACT file naming pattern: Celebrity_Name_2025-07-02.zip
-    const expectedFileName = `${job.celebrity.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.zip`;
-    const outputPath = path.join(__dirname, expectedFileName);
+    // 🎯 ENHANCED: Multiple file name patterns to check
+    const today = new Date().toISOString().split('T')[0];
+    const possibleFileNames = [
+      `${job.celebrity.replace(/\s+/g, '_')}_${today}.zip`,
+      `${job.celebrity.replace(/\s+/g, '_')}.zip`,
+      `${job.celebrity.replace(/[^a-zA-Z0-9]/g, '_')}_${today}.zip`,
+      `${job.celebrity.replace(/[^a-zA-Z0-9]/g, '_')}.zip`
+    ];
     
-    job.addLog(`Looking for output file: ${expectedFileName}`);
+    job.addLog(`Looking for output files: ${possibleFileNames.join(', ')}`);
     
-    // Check if file exists (with retries for file system delays)
-    let fileExists = false;
-    for (let i = 0; i < 15; i++) { // Increased retries for large zip files
-      try {
-        await fs.access(outputPath);
-        const stats = await fs.stat(outputPath);
-        if (stats.size > 1000) { // Ensure file is not empty
-          fileExists = true;
-          job.addLog(`Found output file: ${expectedFileName} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-          break;
+    // 🎯 ENHANCED: Check multiple locations and file patterns
+    let foundFile = null;
+    let foundPath = null;
+    
+    for (const fileName of possibleFileNames) {
+      const possiblePaths = [
+        path.join(__dirname, fileName),
+        path.join(__dirname, 'output', fileName),
+        path.join(__dirname, 'downloads', fileName),
+        path.join(__dirname, '..', fileName) // Parent directory
+      ];
+      
+      for (const filePath of possiblePaths) {
+        try {
+          const stats = await fs.stat(filePath);
+          if (stats.size > 1000) { // Ensure file is not empty
+            foundFile = fileName;
+            foundPath = filePath;
+            job.addLog(`Found output file: ${fileName} at ${filePath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+            break;
+          }
+        } catch {
+          // File doesn't exist at this path, continue
         }
-      } catch {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second intervals
+      }
+      
+      if (foundFile) break;
+    }
+    
+    // 🎯 ENHANCED: Retry logic with longer timeout for large files
+    if (!foundFile) {
+      job.addLog('File not found immediately, waiting for completion...');
+      for (let i = 0; i < 20; i++) { // 40 seconds total (20 × 2s)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        for (const fileName of possibleFileNames) {
+          const possiblePaths = [
+            path.join(__dirname, fileName),
+            path.join(__dirname, 'output', fileName),
+            path.join(__dirname, 'downloads', fileName)
+          ];
+          
+          for (const filePath of possiblePaths) {
+            try {
+              const stats = await fs.stat(filePath);
+              if (stats.size > 1000) {
+                foundFile = fileName;
+                foundPath = filePath;
+                job.addLog(`Found delayed output file: ${fileName} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+                break;
+              }
+            } catch {
+              // Continue searching
+            }
+          }
+          
+          if (foundFile) break;
+        }
+        
+        if (foundFile) break;
       }
     }
 
-    if (fileExists) {
-      // File created successfully
-      job.complete(`http://159.223.131.137:4000/download/${expectedFileName}`);
+    if (foundFile) {
+      // 🎯 ENHANCED: Copy file to download directory for serving
+      const downloadDir = path.join(__dirname, 'downloads');
+      await fs.mkdir(downloadDir, { recursive: true });
+      const downloadPath = path.join(downloadDir, foundFile);
+      
+      if (foundPath !== downloadPath) {
+        await fs.copyFile(foundPath, downloadPath);
+        job.addLog(`Copied file to download directory: ${foundFile}`);
+      }
+      
+      job.complete(`http://159.223.131.137:4000/download/${foundFile}`);
     } else {
-      job.addLog(`Output file not found after 30 seconds: ${expectedFileName}`);
+      job.addLog(`Output file not found after extended search`);
       throw new Error('Output file not found - process may have failed');
     }
   } catch (error) {
@@ -308,16 +465,24 @@ async function handleJobCompletion(job) {
   }
 }
 
-// Serve download files
+// Serve download files from downloads directory
 app.get('/download/:filename', async (req, res) => {
   const filename = req.params.filename;
-  const filePath = path.join(__dirname, filename);
+  const downloadDir = path.join(__dirname, 'downloads');
+  const filePath = path.join(downloadDir, filename);
   
   try {
     await fs.access(filePath);
     res.download(filePath);
   } catch {
-    res.status(404).json({ error: 'File not found' });
+    // Fallback to root directory
+    const rootPath = path.join(__dirname, filename);
+    try {
+      await fs.access(rootPath);
+      res.download(rootPath);
+    } catch {
+      res.status(404).json({ error: 'File not found' });
+    }
   }
 });
 
