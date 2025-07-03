@@ -78,7 +78,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
   };
 
-  // FIXED: PhaseItem with proper pulsing logic
+  // ANTI-FLICKER: PhaseItem with stable keys and conditional rendering
   const PhaseItem = ({ phase, index }: { phase: any; index: number }) => {
     const Icon = phase.icon;
     const isActive = isPhaseActive(index);
@@ -86,45 +86,50 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     const currentPhaseIndex = getCurrentPhaseIndex();
     const isCurrent = currentPhaseIndex === index;
 
-    if (!isActive) return null; // Only show phases that are active
-
+    // ANTI-FLICKER: Always render the container, just control visibility
     return (
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.2 }}
-        style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}
+        key={`phase-${index}`} // Stable key prevents re-mounting
+        initial={false} // ANTI-FLICKER: Don't re-animate on every render
+        animate={{ 
+          opacity: isActive ? 1 : 0,
+          height: isActive ? 'auto' : 0,
+          marginBottom: isActive ? '16px' : '0px'
+        }}
+        transition={{ 
+          duration: 0.3, 
+          ease: 'easeInOut',
+          opacity: { duration: 0.2 } // Faster opacity transition
+        }}
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          overflow: 'hidden' // Prevent layout shift during height animation
+        }}
       >
-        {/* FIXED: Proper pulsing animation - only current phase pulses white to blue */}
-        {isComplete ? (
-          // Completed phases: static white checkmark
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.5, type: "spring" }}
-            style={{ marginRight: '8px' }}
-          >
+        {/* ANTI-FLICKER: Stable icon rendering with layout preservation */}
+        <span style={{ marginRight: '8px', minWidth: '20px', display: 'flex', justifyContent: 'center' }}>
+          {isComplete ? (
             <CheckCircle2 className="w-4 h-4 text-white" />
-          </motion.span>
-        ) : isCurrent ? (
-          // Current phase: pulsing white to blue animation
-          <motion.span
-            animate={{ 
-              color: ['#ffffff', '#60a5fa', '#ffffff'] // white -> blue -> white
-            }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            style={{ marginRight: '8px' }}
-          >
-            <Icon className="w-4 h-4" />
-          </motion.span>
-        ) : (
-          // Future phases: static gray icon
-          <span style={{ marginRight: '8px' }}>
+          ) : isCurrent ? (
+            <motion.div
+              animate={{ 
+                color: ['#ffffff', '#60a5fa', '#ffffff'] // white -> blue -> white
+              }}
+              transition={{ 
+                repeat: Infinity, 
+                duration: 2, 
+                ease: 'easeInOut'
+              }}
+            >
+              <Icon className="w-4 h-4" />
+            </motion.div>
+          ) : (
             <Icon className="w-4 h-4 text-slate-600" />
-          </span>
-        )}
+          )}
+        </span>
         
-        <span className={`text-sm font-ui ${
+        <span className={`text-sm font-ui transition-colors duration-200 ${
           isComplete ? 'text-white' : isCurrent ? 'text-blue-300' : 'text-slate-400'
         }`}>
           {phase.name}
@@ -210,25 +215,27 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               {/* Line Break between Mission Status row and Progress row */}
               <br />
 
-              {/* RESTORED: Progress Bar Row - Full Width */}
+              {/* FIXED: Progress Bar Row with side-by-side layout */}
               <div className="mt-4 mb-2">
+                {/* FIXED: Percentage and Time side by side */}
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-2xl font-cyber font-bold text-blue-400">
-                    {currentJob.progress}%
-                  </span>
-                  {currentJob.startTime && (
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <Clock className="w-3 h-3" />
-                      <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-6">
+                    <span className="text-2xl font-cyber font-bold text-blue-400">
+                      {currentJob.progress}%
+                    </span>
+                    {currentJob.startTime && (
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Clock className="w-3 h-3" />
+                        <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
-                {/* RESTORED: Progress bar with smooth transitions */}
+                {/* Progress bar */}
                 <div className="progress-bar h-4">
                   <motion.div 
                     className="progress-fill"
-                    initial={{ width: 0 }}
                     animate={{ width: `${currentJob.progress}%` }}
                     transition={{ duration: 0.8, ease: "easeInOut" }}
                   />
@@ -245,7 +252,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           {currentJob && <br />}
         </div>
 
-        {/* RESTORED: Mission Phases in 3 Columns */}
+        {/* ANTI-FLICKER: Mission Phases with stable rendering */}
         {currentJob && (
           <div className="border-t border-slate-700 pt-4">
             <h5 className="font-cyber text-sm text-slate-300 mb-4 tracking-wide">
@@ -255,21 +262,36 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
             <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
               
               {/* Column 1 - 33.33% */}
-              <div style={{ width: '33.33%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+              <div style={{ 
+                width: '33.33%', 
+                paddingRight: '16px', 
+                borderRight: '1px solid rgba(37, 99, 235, 0.3)',
+                minHeight: '120px' // ANTI-FLICKER: Reserve space to prevent layout shift
+              }}>
                 <br />
                 <PhaseItem phase={phases[0]} index={0} />
                 <PhaseItem phase={phases[1]} index={1} />
               </div>
 
               {/* Column 2 - 33.33% */}
-              <div style={{ width: '33.33%', paddingLeft: '16px', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+              <div style={{ 
+                width: '33.33%', 
+                paddingLeft: '16px', 
+                paddingRight: '16px', 
+                borderRight: '1px solid rgba(37, 99, 235, 0.3)',
+                minHeight: '120px' // ANTI-FLICKER: Reserve space
+              }}>
                 <br />
                 <PhaseItem phase={phases[2]} index={2} />
                 <PhaseItem phase={phases[3]} index={3} />
               </div>
 
               {/* Column 3 - 33.33% */}
-              <div style={{ width: '33.33%', paddingLeft: '16px' }}>
+              <div style={{ 
+                width: '33.33%', 
+                paddingLeft: '16px',
+                minHeight: '120px' // ANTI-FLICKER: Reserve space
+              }}>
                 <br />
                 <PhaseItem phase={phases[4]} index={4} />
                 <PhaseItem phase={phases[5]} index={5} />
