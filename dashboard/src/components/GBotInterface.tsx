@@ -177,17 +177,31 @@ export default function GBotInterface({
                   onChange={(e) => setCelebrityName(e.target.value)}
                   placeholder="input celebrity subject name..."
                   className="cyber-input flex-1 text-base"
-                  style={{ padding: '12px 16px', height: '48px', boxSizing: 'border-box' }}
+                  style={{ 
+                    padding: '12px 16px', 
+                    height: '48px', 
+                    boxSizing: 'border-box',
+                    lineHeight: '1.5'
+                  }}
                   disabled={currentJob?.status === 'running'}
                 />
                 <button
                   type="submit"
                   onClick={handleSubmit}
                   disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button px-8 py-4 text-base whitespace-nowrap ${
+                  className={`cyber-button text-base whitespace-nowrap ${
                     currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
-                  style={{ height: '48px', boxSizing: 'border-box', minHeight: 'unset' }}
+                  style={{ 
+                    height: '48px', 
+                    boxSizing: 'border-box', 
+                    minHeight: 'unset',
+                    padding: '12px 32px',  // Match input's vertical padding
+                    lineHeight: '1.5',     // Match input's line height
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                 >
                   <Send className="w-5 h-5 mr-2" />
                   Execute
