@@ -15,6 +15,87 @@ app.use(express.json());
 const activeJobs = new Map();
 const completedJobs = new Map();
 
+// 🎯 NEW: Persistent storage for download links and job data
+const JOBS_DATA_FILE = path.join(__dirname, 'jobs_data.json');
+const DOWNLOAD_LINKS_FILE = path.join(__dirname, 'download_links.json');
+
+// 🎯 NEW: Load persistent data on startup
+async function loadPersistedData() {
+  try {
+    // Load download links
+    try {
+      const linksData = await fs.readFile(DOWNLOAD_LINKS_FILE, 'utf8');
+      const downloadLinks = JSON.parse(linksData);
+      console.log(`📁 Loaded ${Object.keys(downloadLinks).length} download links from disk`);
+    } catch (error) {
+      console.log('📁 No existing download links file found (creating new)');
+    }
+
+    // Load completed jobs
+    try {
+      const jobsData = await fs.readFile(JOBS_DATA_FILE, 'utf8');
+      const savedJobs = JSON.parse(jobsData);
+      
+      for (const jobData of savedJobs) {
+        // Convert date strings back to Date objects
+        if (jobData.startTime) jobData.startTime = new Date(jobData.startTime);
+        if (jobData.endTime) jobData.endTime = new Date(jobData.endTime);
+        
+        completedJobs.set(jobData.id, jobData);
+      }
+      console.log(`📁 Loaded ${savedJobs.length} completed jobs from disk`);
+    } catch (error) {
+      console.log('📁 No existing jobs data file found (creating new)');
+    }
+  } catch (error) {
+    console.error('📁 Error loading persisted data:', error);
+  }
+}
+
+// 🎯 NEW: Save download link to persistent storage
+async function saveDownloadLink(jobId, celebrity, downloadLink) {
+  try {
+    let downloadLinks = {};
+    
+    // Load existing links
+    try {
+      const data = await fs.readFile(DOWNLOAD_LINKS_FILE, 'utf8');
+      downloadLinks = JSON.parse(data);
+    } catch {
+      // File doesn't exist yet, start with empty object
+    }
+    
+    // Add new link
+    downloadLinks[jobId] = {
+      celebrity,
+      downloadLink,
+      timestamp: new Date().toISOString(),
+      savedAt: Date.now()
+    };
+    
+    // Save back to file
+    await fs.writeFile(DOWNLOAD_LINKS_FILE, JSON.stringify(downloadLinks, null, 2));
+    console.log(`💾 Saved download link for ${celebrity} (${jobId})`);
+  } catch (error) {
+    console.error('💾 Error saving download link:', error);
+  }
+}
+
+// 🎯 NEW: Save completed job to persistent storage
+async function saveCompletedJob(job) {
+  try {
+    // Get all completed jobs
+    const allCompleted = Array.from(completedJobs.values());
+    
+    // Save to file (exclude process object)
+    const jobsToSave = allCompleted.map(({ process, ...jobData }) => jobData);
+    await fs.writeFile(JOBS_DATA_FILE, JSON.stringify(jobsToSave, null, 2));
+    console.log(`💾 Saved ${jobsToSave.length} completed jobs to disk`);
+  } catch (error) {
+    console.error('💾 Error saving completed jobs:', error);
+  }
+}
+
 // Job status interface
 class JobTracker {
   constructor(id, celebrity) {
@@ -65,9 +146,17 @@ class JobTracker {
     this.downloadLink = downloadLink;
     this.addLog('Job completed successfully');
     
+    // 🎯 NEW: Save download link to persistent storage if available
+    if (downloadLink) {
+      saveDownloadLink(this.id, this.celebrity, downloadLink);
+    }
+    
     // Move to completed jobs
     completedJobs.set(this.id, this);
     activeJobs.delete(this.id);
+    
+    // 🎯 NEW: Save completed job to persistent storage
+    saveCompletedJob(this);
   }
 
   error(errorMessage) {
@@ -79,6 +168,9 @@ class JobTracker {
     // Move to completed jobs (even if failed)
     completedJobs.set(this.id, this);
     activeJobs.delete(this.id);
+    
+    // 🎯 NEW: Save failed job to persistent storage
+    saveCompletedJob(this);
   }
 }
 
@@ -158,7 +250,7 @@ app.get('/api/jobs', (req, res) => {
   res.json(cleanJobs);
 });
 
-// 4. Get download link for completed job
+// 4. Get download link for completed job with failsafe lookup
 app.get('/api/jobs/:jobId/download', async (req, res) => {
   const { jobId } = req.params;
   const job = completedJobs.get(jobId) || activeJobs.get(jobId);
@@ -171,11 +263,25 @@ app.get('/api/jobs/:jobId/download', async (req, res) => {
     return res.status(400).json({ error: 'Job not completed yet' });
   }
 
+  // First check job's download link
   if (job.downloadLink) {
-    res.json({ downloadUrl: job.downloadLink });
-  } else {
-    res.status(404).json({ error: 'Download link not available' });
+    return res.json({ downloadUrl: job.downloadLink });
   }
+
+  // 🎯 NEW: Failsafe - check persistent storage for download link
+  try {
+    const linksData = await fs.readFile(DOWNLOAD_LINKS_FILE, 'utf8');
+    const downloadLinks = JSON.parse(linksData);
+    
+    if (downloadLinks[jobId] && downloadLinks[jobId].downloadLink) {
+      console.log(`🔄 Found download link in persistent storage for job ${jobId}`);
+      return res.json({ downloadUrl: downloadLinks[jobId].downloadLink });
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not read download links file:', error.message);
+  }
+
+  return res.status(404).json({ error: 'Download link not available' });
 });
 
 // 5. Cancel running job
@@ -434,22 +540,86 @@ app.get('/download/:filename', async (req, res) => {
   });
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
+// 🎯 NEW: Admin endpoint to view all saved download links
+app.get('/api/admin/download-links', async (req, res) => {
+  try {
+    const linksData = await fs.readFile(DOWNLOAD_LINKS_FILE, 'utf8');
+    const downloadLinks = JSON.parse(linksData);
+    res.json(downloadLinks);
+  } catch (error) {
+    res.json({});
+  }
+});
+
+// 🎯 NEW: Admin endpoint to manually save a download link
+app.post('/api/admin/download-links', async (req, res) => {
+  const { jobId, celebrity, downloadLink } = req.body;
+  
+  if (!jobId || !celebrity || !downloadLink) {
+    return res.status(400).json({ error: 'jobId, celebrity, and downloadLink are required' });
+  }
+  
+  try {
+    await saveDownloadLink(jobId, celebrity, downloadLink);
+    res.json({ success: true, message: 'Download link saved successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save download link' });
+  }
+});
+
+// Health check with storage info
+app.get('/api/health', async (req, res) => {
+  // Check storage status
+  let storageInfo = {
+    downloadLinksFile: false,
+    jobsDataFile: false,
+    downloadLinksCount: 0,
+    completedJobsCount: 0
+  };
+
+  try {
+    await fs.access(DOWNLOAD_LINKS_FILE);
+    storageInfo.downloadLinksFile = true;
+    const linksData = await fs.readFile(DOWNLOAD_LINKS_FILE, 'utf8');
+    const downloadLinks = JSON.parse(linksData);
+    storageInfo.downloadLinksCount = Object.keys(downloadLinks).length;
+  } catch {
+    // File doesn't exist
+  }
+
+  try {
+    await fs.access(JOBS_DATA_FILE);
+    storageInfo.jobsDataFile = true;
+    const jobsData = await fs.readFile(JOBS_DATA_FILE, 'utf8');
+    const jobs = JSON.parse(jobsData);
+    storageInfo.completedJobsCount = jobs.length;
+  } catch {
+    // File doesn't exist
+  }
+
   res.json({ 
     status: 'healthy', 
     timestamp: new Date(),
     activeJobs: activeJobs.size,
-    completedJobs: completedJobs.size
+    completedJobs: completedJobs.size,
+    storage: storageInfo
   });
 });
 
 // Start the API server
 const PORT = process.env.API_PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
-  console.log(`📊 Dashboard should connect to: http://159.223.131.137:${PORT}`);
-  console.log(`🔧 Health check: http://159.223.131.137:${PORT}/api/health`);
+
+// 🎯 NEW: Load persisted data before starting server
+loadPersistedData().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
+    console.log(`📊 Dashboard should connect to: http://159.223.131.137:${PORT}`);
+    console.log(`🔧 Health check: http://159.223.131.137:${PORT}/api/health`);
+    console.log(`💾 Persistent storage: ${JOBS_DATA_FILE}, ${DOWNLOAD_LINKS_FILE}`);
+  });
+}).catch(error => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
 });
 
 module.exports = { app, activeJobs, completedJobs };
