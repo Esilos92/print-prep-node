@@ -202,38 +202,54 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingLeft: '16px' }} className="flex flex-col">
           
-          {/* Processing Header (always present for alignment) */}
-          <div>
-            <div className="flex items-center gap-4 mb-2">
-              {/* 🎯 FIX: Always show invisible Zap icon for perfect alignment */}
-              <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
+          {/* Header section to match left side Robot + GBot.EXE structure */}
+          <div className="flex items-center gap-3">
+            {/* Invisible placeholder to match the robot icon space */}
+            <div className="relative" style={{ opacity: 0 }}>
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                <Bot className="w-8 h-8 text-white" />
+              </div>
             </div>
-            {currentJob?.status === 'running' ? (
-              <>
+            <div style={{ opacity: 0 }}>
+              <h3 className="font-cyber text-2xl font-bold text-glow-blue">Placeholder</h3>
+              <p className="text-base text-slate-400">Invisible Text</p>
+            </div>
+          </div>
+
+          {/* LINE BREAK - match left side */}
+          <br />
+
+          {/* Processing section - show when running, invisible when idle */}
+          <div>
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">
+              {currentJob?.status === 'running' ? 'PROCESSING STATUS' : ''}
+            </h4>
+            {currentJob?.status === 'running' && (
+              <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
                 <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
                 <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
-              </>
-            ) : (
-              <>
-                {/* Invisible placeholder to maintain spacing when not processing */}
-                <span className="font-cyber text-xl" style={{ opacity: 0 }}>PROCESSING</span>
-                <div className="font-cyber text-2xl" style={{ opacity: 0 }}>Placeholder</div>
-              </>
+              </div>
             )}
           </div>
-          
-          {/* LINE BREAK */}
+
+          {/* LINE BREAK - match left side */}
+          <br />
+
+          {/* LINE BREAK - match left side */}
+          <br />
+
+          {/* LINE BREAK - match left side */}
           <br />
 
           {/* Communication Log - Takes remaining space */}
-          <div className="flex-1">
+          <div className="mt-auto flex-1">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
             {/* GBot texts with darker background - embedded chat box */}
             <div className="bg-slate-900/80 rounded-lg border border-slate-600 h-full flex flex-col overflow-hidden">
               
               {/* Chat Header */}
-              <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
+              <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
@@ -241,12 +257,15 @@ export default function GBotInterface({
               </div>
               
               {/* 🎯 FIX: Line break after header */}
-              <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
+              <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }} className="flex-shrink-0"></div>
               
-              {/* Chat Messages Area - 🎯 FIX: Scrollable with max height */}
+              {/* 🎯 GUARANTEED SCROLL: Chat Messages Area - Takes all remaining space and scrolls */}
               <div 
-                className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
-                style={{ maxHeight: '400px' }}
+                className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90 min-h-0"
+                style={{ 
+                  scrollBehavior: 'smooth',
+                  overscrollBehavior: 'contain'
+                }}
               >
                 {messages.map((message) => (
                   <motion.div
