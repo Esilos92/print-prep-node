@@ -191,21 +191,21 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               <br />
 
-              {/* FIXED: Progress Bar Row with time and percentage on same line */}
+              {/* Progress Line - Timer + % on single horizontal line */}
               <div className="mt-4 mb-2">
-                <div className="flex items-center justify-center gap-2 mb-2">
+                <div className="flex items-center justify-center gap-2 mb-2 whitespace-nowrap text-sm font-cyber text-slate-400">
                   {currentJob.startTime && (
                     <>
-                      <div className="flex items-center gap-1 text-slate-400 font-cyber text-sm">
-                        <Clock className="w-3 h-3" />
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
                         <span>{formatDuration(currentJob.startTime)}</span>
                       </div>
-                      <span className="text-slate-500">|</span>
+                      <span className="mx-1 text-slate-600">|</span>
                     </>
                   )}
-                  <div className="text-blue-400 font-cyber text-sm">
+                  <span className="text-blue-400 font-bold">
                     {currentJob.progress}%
-                  </div>
+                  </span>
                 </div>
 
                 <div className="progress-bar h-4">
