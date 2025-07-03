@@ -202,6 +202,9 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
+          {/* LINE BREAK at the top to push everything down */}
+          <br />
+          
           {/* Static positioned Communication Log - matching Subject Input height */}
           <div style={{ 
             position: 'relative',
@@ -215,8 +218,6 @@ export default function GBotInterface({
             
             {/* Communication Log positioned at bottom */}
             <div style={{ marginTop: 'auto' }}>
-              {/* Simple spacer to move text down */}
-              <div style={{ height: '32px' }}></div>
               <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
               
               {/* GBot texts with darker background - embedded chat box */}
