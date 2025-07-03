@@ -228,6 +228,13 @@ function monitorJobProgress(job, process) {
 function parseProgressFromOutput(job, output) {
   job.addLog(`Output: ${output.trim()}`);
 
+  // 🎯 FIX #5: Extract Google Drive download link from output
+  const googleDriveLinkMatch = output.match(/✅ Upload complete: (https:\/\/drive\.google\.com\/[^\s]+)/i);
+  if (googleDriveLinkMatch) {
+    job.downloadLink = googleDriveLinkMatch[1];
+    job.addLog(`Google Drive link captured: ${job.downloadLink}`);
+  }
+
   // 🎯 FIX #2: Extract REAL role names from backend output
   const roleExtractionPatterns = [
     // Pattern: "🖼️ AI-FIRST fetching for Ryan Reynolds in Deadpool..."
@@ -367,123 +374,64 @@ function parseProgressFromOutput(job, output) {
   }
 }
 
-// 🎯 FIX #5: Enhanced job completion with better file detection
+// 🎯 FIX #5: Enhanced job completion using Google Drive link detection
 async function handleJobCompletion(job) {
   try {
-    // 🎯 ENHANCED: Multiple file name patterns to check
-    const today = new Date().toISOString().split('T')[0];
-    const possibleFileNames = [
-      `${job.celebrity.replace(/\s+/g, '_')}_${today}.zip`,
-      `${job.celebrity.replace(/\s+/g, '_')}.zip`,
-      `${job.celebrity.replace(/[^a-zA-Z0-9]/g, '_')}_${today}.zip`,
-      `${job.celebrity.replace(/[^a-zA-Z0-9]/g, '_')}.zip`
-    ];
-    
-    job.addLog(`Looking for output files: ${possibleFileNames.join(', ')}`);
-    
-    // 🎯 ENHANCED: Check multiple locations and file patterns
-    let foundFile = null;
-    let foundPath = null;
-    
-    for (const fileName of possibleFileNames) {
-      const possiblePaths = [
-        path.join(__dirname, fileName),
-        path.join(__dirname, 'output', fileName),
-        path.join(__dirname, 'downloads', fileName),
-        path.join(__dirname, '..', fileName) // Parent directory
-      ];
-      
-      for (const filePath of possiblePaths) {
-        try {
-          const stats = await fs.stat(filePath);
-          if (stats.size > 1000) { // Ensure file is not empty
-            foundFile = fileName;
-            foundPath = filePath;
-            job.addLog(`Found output file: ${fileName} at ${filePath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-            break;
-          }
-        } catch {
-          // File doesn't exist at this path, continue
-        }
-      }
-      
-      if (foundFile) break;
+    // 🎯 NEW APPROACH: Check if we already captured Google Drive link during parsing
+    if (job.downloadLink) {
+      job.addLog(`Using captured Google Drive link: ${job.downloadLink}`);
+      job.complete(job.downloadLink);
+      return;
     }
     
-    // 🎯 ENHANCED: Retry logic with longer timeout for large files
-    if (!foundFile) {
-      job.addLog('File not found immediately, waiting for completion...');
-      for (let i = 0; i < 20; i++) { // 40 seconds total (20 × 2s)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        for (const fileName of possibleFileNames) {
-          const possiblePaths = [
-            path.join(__dirname, fileName),
-            path.join(__dirname, 'output', fileName),
-            path.join(__dirname, 'downloads', fileName)
-          ];
-          
-          for (const filePath of possiblePaths) {
-            try {
-              const stats = await fs.stat(filePath);
-              if (stats.size > 1000) {
-                foundFile = fileName;
-                foundPath = filePath;
-                job.addLog(`Found delayed output file: ${fileName} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-                break;
-              }
-            } catch {
-              // Continue searching
-            }
-          }
-          
-          if (foundFile) break;
-        }
-        
-        if (foundFile) break;
+    // 🎯 FALLBACK: Wait a bit more for Google Drive upload completion message
+    job.addLog('Waiting for Google Drive upload completion...');
+    
+    // Wait up to 30 seconds for the Google Drive link to appear in logs
+    for (let i = 0; i < 15; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Check if link was captured during this wait period
+      if (job.downloadLink) {
+        job.addLog(`Google Drive link found after ${i * 2} seconds`);
+        job.complete(job.downloadLink);
+        return;
       }
     }
-
-    if (foundFile) {
-      // 🎯 ENHANCED: Copy file to download directory for serving
-      const downloadDir = path.join(__dirname, 'downloads');
-      await fs.mkdir(downloadDir, { recursive: true });
-      const downloadPath = path.join(downloadDir, foundFile);
-      
-      if (foundPath !== downloadPath) {
-        await fs.copyFile(foundPath, downloadPath);
-        job.addLog(`Copied file to download directory: ${foundFile}`);
+    
+    // 🎯 FINAL FALLBACK: Check recent logs for any Google Drive links
+    const recentLogs = job.logs.slice(-10); // Last 10 log messages
+    for (const log of recentLogs) {
+      const linkMatch = log.message.match(/https:\/\/drive\.google\.com\/[^\s]+/);
+      if (linkMatch) {
+        const foundLink = linkMatch[0];
+        job.addLog(`Found Google Drive link in recent logs: ${foundLink}`);
+        job.complete(foundLink);
+        return;
       }
-      
-      job.complete(`http://159.223.131.137:4000/download/${foundFile}`);
-    } else {
-      job.addLog(`Output file not found after extended search`);
-      throw new Error('Output file not found - process may have failed');
     }
+    
+    // If no Google Drive link found, complete without download link
+    job.addLog('No Google Drive link found, but process completed successfully');
+    job.complete(null); // Complete but without download link
+    
   } catch (error) {
     job.error(`Completion error: ${error.message}`);
   }
 }
 
-// Serve download files from downloads directory
+// Serve download files - redirect to Google Drive
 app.get('/download/:filename', async (req, res) => {
   const filename = req.params.filename;
-  const downloadDir = path.join(__dirname, 'downloads');
-  const filePath = path.join(downloadDir, filename);
   
-  try {
-    await fs.access(filePath);
-    res.download(filePath);
-  } catch {
-    // Fallback to root directory
-    const rootPath = path.join(__dirname, filename);
-    try {
-      await fs.access(rootPath);
-      res.download(rootPath);
-    } catch {
-      res.status(404).json({ error: 'File not found' });
-    }
-  }
+  // Since we're using Google Drive, we don't serve local files
+  // Instead, we should redirect to the Google Drive link
+  // This endpoint is mainly for backward compatibility
+  
+  res.status(404).json({ 
+    error: 'Direct download not available. Files are stored on Google Drive.',
+    message: 'Use the download link provided in the job status.'
+  });
 });
 
 // Health check
