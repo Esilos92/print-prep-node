@@ -110,9 +110,10 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
               {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
             </div>
             
-            {/* UPDATED: Simplified roles and image counts */}
+            {/* UPDATED: Simplified roles and image counts with line breaks */}
             {lastJob && (
               <div className="mt-3 space-y-2">
+                <br />
                 {/* Simplified roles display - just movie/TV show names */}
                 {lastJob.roles && lastJob.roles.length > 0 && (
                   <div className="text-sm font-ui text-slate-300">
@@ -129,6 +130,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                     }
                   </div>
                 )}
+                <br />
                 {/* Images: # Validated format */}
                 {lastJob.imagesValidated && (
                   <div className="text-sm font-ui text-slate-300">
@@ -139,7 +141,6 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
             )}
           </div>
           
-          <br />
           <br />
           <br />
           
