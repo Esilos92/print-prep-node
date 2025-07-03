@@ -403,7 +403,7 @@ export default function GBotInterface({
           </div>
               
           {/* Chat Container - FIXED: Proper containment and scrolling */}
-          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
+          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 60px)' }}>
             
             {/* Chat Header */}
             <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
