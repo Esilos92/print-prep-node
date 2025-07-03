@@ -102,6 +102,13 @@ body {
   100% { left: 100%; }
 }
 
+/* GBot Interface Override - Fixes layout issues for GBot component only */
+.cyber-panel.gbot-override {
+  padding: 12px !important;
+  display: block !important;
+  flex-direction: unset !important;
+}
+
 /* Refined button spacing */
 .cyber-button {
   background: linear-gradient(145deg, var(--primary-blue), #0052a3);
