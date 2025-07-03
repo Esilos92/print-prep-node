@@ -239,10 +239,10 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        className="cyber-button text-sm px-3 py-2 w-full flex items-center justify-center gap-2"
+                        className="cyber-button w-full flex items-center justify-center gap-2"
                         onClick={() => handleDownload(job.downloadLink!)}
                       >
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-4 h-4" />
                         <span>Download</span>
                       </motion.button>
                     )}
