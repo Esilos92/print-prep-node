@@ -108,7 +108,18 @@ export default function GBotInterface({
   return (
     <div className="cyber-panel">
       {/* Matching ProgressDisplay padding pattern: consistent 12px all around */}
-      <div style={{ padding: '12px', display: 'flex', flexDirection: 'row', height: '100%' }}>
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'row', height: '100%', position: 'relative' }}>
+        
+        {/* Vertical divider positioned relative to the padded container */}
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: 0,
+          bottom: 0,
+          width: '1px',
+          backgroundColor: 'rgba(37, 99, 235, 0.3)',
+          transform: 'translateX(-8px)' // Offset to account for padding between columns
+        }}></div>
         
         {/* LEFT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingRight: '16px' }} className="flex flex-col">
@@ -200,21 +211,11 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT SIDE - Exactly 50% with properly spaced divider */}
+        {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ 
           width: '50%', 
-          paddingLeft: '16px',
-          position: 'relative'
+          paddingLeft: '16px'
         }}>
-          {/* Divider that respects padding boundaries */}
-          <div style={{
-            position: 'absolute',
-            left: 0,
-            top: '12px',
-            bottom: '12px', 
-            width: '1px',
-            backgroundColor: 'rgba(37, 99, 235, 0.3)'
-          }}></div>
           
           {/* Communication Header */}
           <div style={{ padding: '12px 0' }}>
