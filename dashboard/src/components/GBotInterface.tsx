@@ -38,10 +38,11 @@ export default function GBotInterface({
   useEffect(() => {
     const initAudio = async () => {
       try {
-        // Create synth instance
+        // Create synth instance with reduced volume (65% quieter)
         synthRef.current = new Tone.Synth({
           oscillator: { type: 'square' }, // Retro square wave
-          envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+          envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
+          volume: -12 // Reduce volume by ~65% (from 0dB to -12dB)
         }).toDestination();
         
         console.log('🎵 Tone.js synth initialized successfully');
@@ -60,7 +61,7 @@ export default function GBotInterface({
     };
   }, []);
 
-  // Enhanced cyber sound effects with better error handling
+  // Enhanced cyber sound effects with better error handling and reduced volume
   const playCyberBeep = async (type: 'start' | 'phase' | 'complete' | 'error') => {
     try {
       // Ensure Tone.js context is started (required for web audio)
@@ -70,10 +71,11 @@ export default function GBotInterface({
         console.log('🎵 Audio context started');
       }
 
-      // Use existing synth or create new one if needed
+      // Use existing synth or create new one if needed with reduced volume
       const synth = synthRef.current || new Tone.Synth({
         oscillator: { type: 'square' },
-        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
+        volume: -12 // 65% quieter
       }).toDestination();
 
       switch (type) {
@@ -400,27 +402,28 @@ export default function GBotInterface({
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
-          {/* Chat Container - FIX: Proper height calculation within padded area */}
-          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(300px - 24px)' }}>
+          {/* Chat Container - FIXED: Proper containment and scrolling */}
+          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 80px)' }}>
             
             {/* Chat Header */}
-            <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
+            <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
               <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
             </div>
             
-            {/* Line break after header */}
-            <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
+            {/* FIXED: Dark separator line positioned correctly */}
+            <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '1px', flexShrink: 0 }}></div>
             
-            {/* Chat Messages Area - Fixed height with scroll and proper min-height */}
+            {/* FIXED: Chat Messages Area - Proper containment with flex-1 and overflow */}
             <div 
               className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
               style={{ 
                 scrollBehavior: 'smooth',
                 overscrollBehavior: 'contain',
-                minHeight: 0  // KEY FIX: Prevents flexbox overflow
+                minHeight: 0,  // Critical: Prevents flex overflow
+                maxHeight: '100%' // Ensures containment
               }}
             >
               {messages.map((message) => (
