@@ -106,7 +106,20 @@ export default function GBotInterface({
   };
 
   return (
-    <div className="cyber-panel gbot-override">
+    <div style={{
+      background: 'linear-gradient(145deg, var(--bg-panel), var(--bg-card))',
+      border: '2px solid var(--border-glow)',
+      borderRadius: '12px',
+      boxShadow: 'var(--shadow-blue)',
+      position: 'relative',
+      overflow: 'hidden',
+      height: '350px',
+      width: '100%',
+      maxWidth: '1200px',
+      margin: '0 auto',
+      padding: '12px',
+      display: 'block'
+    }}>
       <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 24px)', marginTop: '12px' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
