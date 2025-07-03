@@ -215,21 +215,21 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               {/* Line Break between Mission Status row and Progress row */}
               <br />
 
-              {/* FIXED: Progress Bar Row with side-by-side layout */}
+              {/* FIXED: Progress Bar Row with percentage on top right */}
               <div className="mt-4 mb-2">
-                {/* FIXED: Percentage and Time side by side */}
+                {/* FIXED: Time on left, Percentage on right */}
                 <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center gap-6">
-                    <span className="text-2xl font-cyber font-bold text-blue-400">
-                      {currentJob.progress}%
-                    </span>
+                  <div className="flex items-center gap-2">
                     {currentJob.startTime && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <Clock className="w-3 h-3" />
-                        <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
-                      </div>
+                      <>
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        <span className="font-cyber text-xs text-slate-400">{formatDuration(currentJob.startTime)}</span>
+                      </>
                     )}
                   </div>
+                  <span className="text-2xl font-cyber font-bold text-blue-400">
+                    {currentJob.progress}%
+                  </span>
                 </div>
                 
                 {/* Progress bar */}
