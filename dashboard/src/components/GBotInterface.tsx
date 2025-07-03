@@ -107,7 +107,7 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel" style={{ padding: '12px' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 24px)' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
