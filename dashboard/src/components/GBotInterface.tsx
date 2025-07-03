@@ -293,11 +293,6 @@ export default function GBotInterface({
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
               <p className="text-base font-ui leading-relaxed">
                 GBot.EXE online! Ready to execute celebrity image sourcing missions.
-                {audioEnabled && (
-                  <span className="block mt-2 text-sm text-green-300">
-                    🎵 Cyber audio systems: ACTIVE
-                  </span>
-                )}
               </p>
             </div>
           </div>
@@ -414,9 +409,6 @@ export default function GBotInterface({
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
               <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
-              {audioEnabled && (
-                <span className="text-xs font-mono text-green-400 ml-auto">♪ AUDIO</span>
-              )}
             </div>
             
             {/* Line break after header */}
