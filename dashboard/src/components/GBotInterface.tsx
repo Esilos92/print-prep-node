@@ -114,8 +114,8 @@ export default function GBotInterface({
         <div style={{
           position: 'absolute',
           left: '50%',
-          top: '36px',    // Increased top spacing
-          bottom: '8px',  // Decreased bottom spacing to 8px
+          top: '32px',    // Decreased top spacing to 32px
+          bottom: '6px',  // Decreased bottom spacing to 6px
           width: '1px',
           backgroundColor: 'rgba(37, 99, 235, 0.3)',
           transform: 'translateX(-8px)' // Offset to account for padding between columns
