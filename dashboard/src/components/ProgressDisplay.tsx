@@ -19,7 +19,7 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  roles?: string[];
+  roles?: string[]; // 🎯 FIX #2: Now contains real role names
   imagesProcessed?: number;
   imagesValidated?: number;
   startTime?: Date;
@@ -77,6 +77,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
   };
 
+  // 🎯 FIX #3: Smart phase item with selective animation
   const PhaseItem = ({ phase, index }: { phase: any; index: number }) => {
     const Icon = phase.icon;
     const isActive = isPhaseActive(index);
@@ -93,8 +94,9 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
         transition={{ delay: index * 0.2 }}
         style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}
       >
-        {/* Checkmark to the left of phase name */}
-        {isComplete && (
+        {/* 🎯 FIX #3: Conditional animation - only current phase pulses */}
+        {isComplete ? (
+          // Completed phases: static checkmark, no animation
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -103,6 +105,20 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           >
             <CheckCircle2 className="w-4 h-4 text-green-400" />
           </motion.span>
+        ) : isCurrent ? (
+          // Current phase: pulsing animation
+          <motion.span
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            style={{ marginRight: '8px' }}
+          >
+            <Icon className="w-4 h-4 text-blue-400" />
+          </motion.span>
+        ) : (
+          // Future phases: static icon
+          <span style={{ marginRight: '8px' }}>
+            <Icon className="w-4 h-4 text-slate-600" />
+          </span>
         )}
         
         <span className={`text-sm font-ui ${
@@ -153,25 +169,30 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                     {currentJob.celebrity}
                   </h4>
 
-                  {/* Roles beneath celebrity name */}
-                  {currentJob.roles && (
+                  {/* 🎯 FIX #2: Real roles beneath celebrity name */}
+                  {currentJob.roles && currentJob.roles.length > 0 && (
                     <div className="text-center mb-4">
                       <span className="text-sm text-blue-200 font-ui">
                         {currentJob.roles.slice(0, 3).join(', ')}
                       </span>
+                      {currentJob.roles.length > 3 && (
+                        <span className="text-xs text-slate-400 font-ui block mt-1">
+                          +{currentJob.roles.length - 3} more roles
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* Column 2 - Image Stats */}
-                {currentJob.imagesProcessed && (
+                {(currentJob.imagesProcessed || currentJob.imagesValidated) && (
                   <div style={{ flex: 1, paddingLeft: '16px' }}>
                     <h6 className="font-cyber text-xl text-glow-blue mb-4 tracking-wide">
                       IMAGES
                     </h6>
                     <div className="text-center">
                       <div className="text-2xl font-cyber font-bold text-blue-300">
-                        {currentJob.imagesProcessed} Downloaded
+                        {currentJob.imagesProcessed || 0} Downloaded
                         {currentJob.imagesValidated && (
                           <> / {currentJob.imagesValidated} Validated</>
                         )}
@@ -197,14 +218,17 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                     </div>
                   )}
                 </div>
+                
+                {/* 🎯 FIX #4: Enhanced progress bar with smoother transitions */}
                 <div className="progress-bar h-4">
                   <motion.div 
                     className="progress-fill"
                     initial={{ width: 0 }}
                     animate={{ width: `${currentJob.progress}%` }}
-                    transition={{ duration: 0.5 }}
+                    transition={{ duration: 0.8, ease: "easeInOut" }} // Smoother animation
                   />
                 </div>
+                
                 <p className="text-xs text-slate-400 font-ui text-center mt-2">
                   {currentJob.currentPhase}
                 </p>
