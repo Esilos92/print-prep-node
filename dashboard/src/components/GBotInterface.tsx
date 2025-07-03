@@ -209,30 +209,56 @@ export default function GBotInterface({
               <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                 <Bot className="w-8 h-8 text-white" />
               </div>
+              <motion.div 
+                className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              />
             </div>
             <div style={{ opacity: 0 }}>
               <h3 className="font-cyber text-2xl font-bold text-glow-blue">Placeholder</h3>
-              <p className="text-base text-slate-400">Invisible Text</p>
+              <p className="text-base text-slate-400">Invisible Text Here</p>
             </div>
           </div>
 
-          {/* LINE BREAK - match left side */}
+          {/* LINE BREAK */}
           <br />
 
-          {/* Processing section - show when running, invisible when idle */}
+          {/* System Status equivalent section */}
           <div>
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">
-              {currentJob?.status === 'running' ? 'PROCESSING STATUS' : ''}
+              {currentJob?.status === 'running' ? 'PROCESSING STATUS' : 'SYSTEM READY'}
             </h4>
-            {currentJob?.status === 'running' && (
-              <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
-                <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
-                <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
-              </div>
-            )}
+            <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
+              {currentJob?.status === 'running' ? (
+                <div>
+                  <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
+                  <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
+                </div>
+              ) : (
+                <p className="text-base font-ui leading-relaxed">
+                  Communication systems online. Ready for mission updates.
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* LINE BREAK - match left side */}
+          {/* LINE BREAK */}
+          <br />
+
+          {/* LINE BREAK */}
+          <br />
+
+          {/* LINE BREAK */}
+          <br />
+
+          {/* Communication Log - Push to bottom to match Subject Input */}
+          <div className="mt-auto">
+            {/* 🎯 Invisible emoji for proper alignment - matches Mission Archive approach */}
+            <div className="flex items-center gap-4 mb-2">
+              <Bot className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
+            </div>
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4> left side */}
           <br />
 
           {/* LINE BREAK - match left side */}
