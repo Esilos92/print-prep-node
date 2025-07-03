@@ -170,7 +170,7 @@ export default function GBotInterface({
             
             {/* Reserved Space Container - Always same height */}
             <div style={{ minHeight: '96px' }}>
-              <div className="flex gap-3 items-center">
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'stretch' }}>
                 <input
                   type="text"
                   value={celebrityName}
@@ -178,10 +178,12 @@ export default function GBotInterface({
                   placeholder="input celebrity subject name..."
                   className="cyber-input flex-1 text-base"
                   style={{ 
-                    padding: '12px 16px', 
+                    padding: '14px 16px', 
                     height: '48px', 
                     boxSizing: 'border-box',
-                    lineHeight: '1.5'
+                    margin: 0,
+                    border: '2px solid #2563eb',
+                    borderRadius: '8px'
                   }}
                   disabled={currentJob?.status === 'running'}
                 />
@@ -189,19 +191,26 @@ export default function GBotInterface({
                   type="submit"
                   onClick={handleSubmit}
                   disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button text-base whitespace-nowrap ${
+                  className={`text-base whitespace-nowrap ${
                     currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                   style={{ 
                     height: '48px', 
-                    boxSizing: 'border-box', 
-                    minHeight: 'unset',
-                    padding: '12px 32px',  // Match input's vertical padding
-                    lineHeight: '1.5',     // Match input's line height
-                    display: 'inline-flex', // Changed from 'flex' to 'inline-flex'
+                    boxSizing: 'border-box',
+                    padding: '14px 32px',
+                    margin: 0,
+                    background: 'linear-gradient(145deg, #0066CC, #0052a3)',
+                    border: '2px solid #00bfff',
+                    borderRadius: '8px',
+                    color: 'white',
+                    fontFamily: "'Orbitron', monospace",
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    flexShrink: 0          // Prevent button from shrinking
+                    cursor: (!celebrityName.trim() || currentJob?.status === 'running') ? 'not-allowed' : 'pointer'
                   }}
                 >
                   <Send className="w-5 h-5 mr-2" />
