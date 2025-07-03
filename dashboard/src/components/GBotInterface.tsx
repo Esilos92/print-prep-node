@@ -106,8 +106,9 @@ export default function GBotInterface({
   };
 
   return (
-    <div className="cyber-panel" style={{ padding: '12px' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+    <div className="cyber-panel">
+      {/* FIX: Move padding inside cyber-panel, matching other components */}
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'row', height: '100%' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
@@ -208,8 +209,8 @@ export default function GBotInterface({
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
-          {/* Chat Container */}
-          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: '300px' }}>
+          {/* Chat Container - FIX: Proper height calculation within padded area */}
+          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(300px - 24px)' }}>
             
             {/* Chat Header */}
             <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
@@ -222,12 +223,13 @@ export default function GBotInterface({
             {/* Line break after header */}
             <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
             
-            {/* Chat Messages Area - Fixed height with scroll */}
+            {/* Chat Messages Area - Fixed height with scroll and proper min-height */}
             <div 
               className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
               style={{ 
                 scrollBehavior: 'smooth',
-                overscrollBehavior: 'contain'
+                overscrollBehavior: 'contain',
+                minHeight: 0  // KEY FIX: Prevents flexbox overflow
               }}
             >
               {messages.map((message) => (
