@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Bot, Send, Zap } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface JobStatus {
   id: string;
@@ -8,6 +8,8 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
+  gBotPhaseChange?: string; // 🎯 FIX #1: Detect phase changes
+  currentPhaseForGBot?: string;
 }
 
 interface GBotInterfaceProps {
@@ -24,16 +26,62 @@ export default function GBotInterface({
   setCelebrityName 
 }: GBotInterfaceProps) {
   const [messages, setMessages] = useState<any[]>([]);
-
   const [isTyping, setIsTyping] = useState(false);
+  const [lastAnnouncedPhase, setLastAnnouncedPhase] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // 🎯 FIX #1: Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
+
+  // 🎯 FIX #1: Enhanced phase detection and announcements
+  useEffect(() => {
     if (currentJob?.status === 'running') {
-      addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
+      // Initial start message
+      if (!lastAnnouncedPhase) {
+        addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
+        setLastAnnouncedPhase('started');
+      }
+      
+      // 🎯 FIX #1: Detect phase changes and announce them
+      if (currentJob.gBotPhaseChange && currentJob.gBotPhaseChange !== lastAnnouncedPhase) {
+        const phaseMessages = {
+          'filmography_scan': `Beginning filmography analysis for ${currentJob.celebrity}. Scanning career database...`,
+          'performance_analysis': `Now analyzing performance history. Cross-referencing roles and characters...`,
+          'search_protocol': `Activating smart search protocols. Optimizing image discovery strategies...`,
+          'image_download': `Commencing image acquisition sequence. Deploying AI-powered search algorithms...`,
+          'ai_validation': `Engaging AI validation systems. Intelligence algorithms analyzing image quality...`,
+          'file_compilation': `Initiating final compilation sequence. Preparing mission package for delivery...`
+        };
+        
+        const message = phaseMessages[currentJob.gBotPhaseChange as keyof typeof phaseMessages];
+        if (message) {
+          addBotMessage(message);
+          setLastAnnouncedPhase(currentJob.gBotPhaseChange);
+        }
+      }
     } else if (currentJob?.status === 'completed') {
-      addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
+      if (lastAnnouncedPhase !== 'completed') {
+        addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
+        setLastAnnouncedPhase('completed');
+      }
+    } else if (currentJob?.status === 'error') {
+      if (lastAnnouncedPhase !== 'error') {
+        addBotMessage(`Mission encountered an error. Systems standing by for new orders.`);
+        setLastAnnouncedPhase('error');
+      }
     }
-  }, [currentJob?.status]);
+    
+    // Reset when no job is running
+    if (!currentJob) {
+      setLastAnnouncedPhase(null);
+    }
+  }, [currentJob?.status, currentJob?.gBotPhaseChange, currentJob?.celebrity, lastAnnouncedPhase]);
 
   const addBotMessage = (text: string) => {
     setIsTyping(true);
@@ -172,6 +220,10 @@ export default function GBotInterface({
 
           {/* Communication Log - Takes remaining space */}
           <div className="flex-1">
+            {/* 🎯 FIX: Invisible emoji for proper formatting */}
+            <div className="flex items-center gap-4 mb-2">
+              <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
+            </div>
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
             {/* GBot texts with darker background - embedded chat box */}
@@ -185,8 +237,14 @@ export default function GBotInterface({
                 <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
               </div>
               
-              {/* Chat Messages Area - Scrollable with darker background */}
-              <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90">
+              {/* 🎯 FIX: Line break after header */}
+              <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
+              
+              {/* Chat Messages Area - 🎯 FIX: Scrollable with max height */}
+              <div 
+                className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
+                style={{ maxHeight: '400px' }}
+              >
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
@@ -248,6 +306,9 @@ export default function GBotInterface({
                     </div>
                   </motion.div>
                 )}
+                
+                {/* 🎯 FIX: Auto-scroll anchor */}
+                <div ref={messagesEndRef} />
               </div>
             </div>
           </div>
