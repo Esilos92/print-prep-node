@@ -202,28 +202,31 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingLeft: '16px' }} className="flex flex-col">
           
-          {/* Processing (only when running) */}
-          {currentJob?.status === 'running' && (
-            <>
-              <div>
-                <div className="flex items-center gap-4 mb-2">
-                  <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
-                </div>
+          {/* Processing Header (always present for alignment) */}
+          <div>
+            <div className="flex items-center gap-4 mb-2">
+              {/* 🎯 FIX: Always show invisible Zap icon for perfect alignment */}
+              <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
+            </div>
+            {currentJob?.status === 'running' ? (
+              <>
                 <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
                 <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
-              </div>
-              
-              {/* LINE BREAK */}
-              <br />
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                {/* Invisible placeholder to maintain spacing when not processing */}
+                <span className="font-cyber text-xl" style={{ opacity: 0 }}>PROCESSING</span>
+                <div className="font-cyber text-2xl" style={{ opacity: 0 }}>Placeholder</div>
+              </>
+            )}
+          </div>
+          
+          {/* LINE BREAK */}
+          <br />
 
           {/* Communication Log - Takes remaining space */}
           <div className="flex-1">
-            {/* 🎯 FIX: Invisible emoji for proper formatting */}
-            <div className="flex items-center gap-4 mb-2">
-              <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
-            </div>
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
             {/* GBot texts with darker background - embedded chat box */}
