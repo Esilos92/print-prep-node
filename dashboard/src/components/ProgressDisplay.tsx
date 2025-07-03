@@ -80,7 +80,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     const duration = Math.floor((Date.now() - startTime.getTime()) / 1000);
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;
-    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    return `${minutes}m ${seconds}s`;
   };
 
   const PhaseItem = ({ phase, index }: { phase: any; index: number }) => {
@@ -200,12 +200,12 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               <br />
 
-              {/* Timer + % on same line with perfect spacing */}
+              {/* ✅ Timer and Percent — Fixed Width, No Jumps */}
               <div className="mt-4 mb-2 text-sm font-cyber text-slate-400">
                 <div className="flex items-center gap-3 whitespace-nowrap">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 min-w-[90px]">
                     <Clock className="w-3 h-3 text-slate-400" />
-                    <span>{formatDuration(currentJob.startTime)}</span>
+                    <span className="tabular-nums">{formatDuration(currentJob.startTime)}</span>
                   </div>
                   <span className="text-slate-600">|</span>
                   <div className="text-blue-400 font-bold tabular-nums min-w-[40px] text-right">
