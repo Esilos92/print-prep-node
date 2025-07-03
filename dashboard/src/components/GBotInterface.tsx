@@ -1,4 +1,4 @@
-eimport { motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Bot, Send, Zap } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
