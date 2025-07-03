@@ -106,27 +106,14 @@ export default function GBotInterface({
   };
 
   return (
-    <div style={{
-      background: 'linear-gradient(145deg, var(--bg-panel), var(--bg-card))',
-      border: '2px solid var(--border-glow)',
-      borderRadius: '12px',
-      boxShadow: 'var(--shadow-blue)',
-      position: 'relative',
-      overflow: 'hidden',
-      height: '350px',
-      width: '100%',
-      maxWidth: '1200px',
-      margin: '0 auto',
-      padding: '12px',
-      display: 'block'
-    }}>
-      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 24px)', marginTop: '12px' }}>
+    <div className="cyber-panel" style={{ padding: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-4" style={{ padding: '12px 0' }}>
             <div className="relative">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                 <Bot className="w-8 h-8 text-white" />
@@ -216,9 +203,9 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
           {/* Communication Header */}
-          <div>
+          <div style={{ padding: '12px 0' }}>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
-            <h3 className="font-cyber text-2xl font-bold text-glow-blue" style={{ marginTop: '-1px' }}>COMMUNICATION LOG</h3>
+            <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
           {/* Chat Container */}
