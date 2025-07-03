@@ -112,6 +112,9 @@ export default function GBotInterface({
         {/* LEFT SIDE - Fixed Structure with Hard Boundaries */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
+          {/* 🎯 FIX: EXTRA TOP SPACING - PUSH EVERYTHING DOWN */}
+          <div style={{ height: '24px' }}></div>
+          
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
           <div className="flex items-center gap-3 mb-4" style={{ padding: '12px 0' }}>>
             <div className="relative">
@@ -202,8 +205,11 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Communication Log with Fixed Header */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
+          {/* 🎯 FIX: EXTRA TOP SPACING - PUSH EVERYTHING DOWN */}
+          <div style={{ height: '24px' }}></div>
+          
           {/* Communication Header */}
-          <div style={{ padding: '12px 0' }}>>
+          <div style={{ padding: '12px 0' }}>>>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
