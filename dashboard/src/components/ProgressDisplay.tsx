@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Search,
@@ -37,6 +38,14 @@ const phases = [
 ];
 
 export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!currentJob || currentJob.status === 'completed' || currentJob.status === 'error') return;
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [currentJob?.status]);
+
   const getCleanRoles = (roles?: string[], celebrityName?: string) => {
     if (!roles || !celebrityName) return [];
     return roles
@@ -191,24 +200,26 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               <br />
 
-              {/* Progress Line - Timer + % on single horizontal line */}
-              <div className="mt-4 mb-2">
-                <div className="flex items-center justify-center gap-2 mb-2 whitespace-nowrap text-sm font-cyber text-slate-400">
+              {/* Timer and Progress Line */}
+              <div className="mt-4 mb-2 text-sm font-cyber text-slate-400">
+                <div className="inline-flex items-center gap-2 whitespace-nowrap">
                   {currentJob.startTime && (
                     <>
-                      <div className="flex items-center gap-1">
+                      <motion.span
+                        className="inline-flex items-center gap-1"
+                        animate={{ opacity: [1, 0.7, 1] }}
+                        transition={{ duration: 1.5, ease: 'easeInOut', repeat: Infinity }}
+                      >
                         <Clock className="w-3 h-3 text-slate-400" />
                         <span>{formatDuration(currentJob.startTime)}</span>
-                      </div>
-                      <span className="mx-1 text-slate-600">|</span>
+                      </motion.span>
+                      <span className="text-slate-600">|</span>
                     </>
                   )}
-                  <span className="text-blue-400 font-bold">
-                    {currentJob.progress}%
-                  </span>
+                  <span className="text-blue-400 font-bold">{currentJob.progress}%</span>
                 </div>
 
-                <div className="progress-bar h-4">
+                <div className="progress-bar h-4 mt-2">
                   <motion.div
                     className="progress-fill"
                     animate={{ width: `${currentJob.progress}%` }}
