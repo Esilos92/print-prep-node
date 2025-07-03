@@ -18,10 +18,10 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  roles?: string[]; // 🎯 Real role names from backend
+  roles?: string[]; // Real role names from backend (REMOVED from display)
   imagesProcessed?: number;
   imagesValidated?: number;
-  downloadLink?: string; // 🎯 Google Drive link
+  downloadLink?: string; // Google Drive link
   startTime?: Date;
   endTime?: Date;
 }
@@ -57,19 +57,13 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
     }
   };
 
-  const formatDuration = (start?: Date, end?: Date) => {
-    if (!start || !end) return 'Unknown';
-    const duration = Math.floor((end.getTime() - start.getTime()) / 1000);
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-  };
+  // REMOVED: formatDuration function - no longer needed
 
-  // 🎯 FIX: Better job filtering - only show completed jobs in count
+  // Better job filtering - only show completed jobs in count
   const completedCount = jobs.filter(j => j.status === 'completed').length;
   const lastJob = jobs.length > 0 ? jobs[0] : null;
 
-  // 🎯 NEW: Handle Google Drive download
+  // Handle Google Drive download
   const handleDownload = (downloadLink: string) => {
     if (downloadLink?.includes('drive.google.com')) {
       // Open Google Drive link in new tab
@@ -116,15 +110,9 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
               {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
             </div>
             
-            {/* 🎯 Real roles and images for last subject */}
+            {/* UPDATED: Only show image counts - NO ROLES */}
             {lastJob && (
               <div className="mt-3 space-y-2">
-                {lastJob.roles && lastJob.roles.length > 0 && (
-                  <div className="text-sm font-ui text-slate-300">
-                    <span className="text-slate-400">Roles:</span> {lastJob.roles.slice(0, 2).join(', ')}
-                    {lastJob.roles.length > 2 && <span className="text-slate-500"> +{lastJob.roles.length - 2} more</span>}
-                  </div>
-                )}
                 {(lastJob.imagesProcessed || lastJob.imagesValidated) && (
                   <div className="text-sm font-ui text-slate-300">
                     <span className="text-slate-400">Images:</span> {lastJob.imagesProcessed || 0} Downloaded / {lastJob.imagesValidated || 0} Validated
@@ -137,7 +125,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           <br />
           <br />
           
-          {/* 🎯 Enhanced Download Button with Google Drive support */}
+          {/* Enhanced Download Button with Google Drive support */}
           {lastJob && lastJob.status === 'completed' && lastJob.downloadLink && (
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -162,7 +150,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         {/* RIGHT COLUMN - 65% with HORIZONTAL SCROLL */}
         <div style={{ width: '65%', paddingLeft: '16px' }}>
           
-          {/* 🎯 NEW: Horizontal scrolling job cards */}
+          {/* Horizontal scrolling job cards */}
           <div style={{ height: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
             {jobs.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-slate-500 font-ui">
@@ -198,50 +186,22 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                       <h4 className="font-cyber text-lg text-blue-300 truncate">{job.celebrity}</h4>
                     </div>
                     
-                    {/* Job Details */}
+                    {/* Job Details - CLEANED UP */}
                     <div className="space-y-2">
-                      {/* 🎯 Real roles display - truncated for horizontal cards */}
-                      {job.roles && job.roles.length > 0 && (
-                        <div className="text-sm font-ui text-slate-300">
-                          <span className="text-slate-400">Roles:</span> 
-                          <div className="mt-1">
-                            {job.roles.slice(0, 2).map((role, i) => (
-                              <div key={i} className="truncate" title={role}>
-                                {role}
-                              </div>
-                            ))}
-                            {job.roles.length > 2 && (
-                              <div className="text-xs text-slate-500">
-                                +{job.roles.length - 2} more roles
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
                       
-                      {/* 🎯 Accurate image counts */}
+                      {/* UPDATED: Images format - Downloaded / Validated */}
                       {(job.imagesProcessed || job.imagesValidated) && (
                         <div className="text-sm font-ui text-slate-300">
                           <span className="text-slate-400">Images:</span>
                           <div className="text-blue-300 font-cyber">
-                            {job.imagesProcessed || 0} / {job.imagesValidated || 0}
+                            {job.imagesProcessed || 0} Downloaded / {job.imagesValidated || 0} Validated
                           </div>
-                          <div className="text-xs text-slate-500">Downloaded / Validated</div>
                         </div>
                       )}
                       
-                      {job.startTime && job.endTime && (
-                        <div className="text-sm font-ui text-slate-300">
-                          <span className="text-slate-400">Duration:</span> {formatDuration(job.startTime, job.endTime)}
-                        </div>
-                      )}
+                      {/* REMOVED: Duration display */}
                       
-                      {job.startTime && (
-                        <div className="text-sm font-ui text-slate-300">
-                          <span className="text-slate-400">Date:</span> 
-                          <div className="text-xs">{job.startTime.toLocaleDateString()}</div>
-                        </div>
-                      )}
+                      {/* REMOVED: Date display */}
                       
                       {/* Show error details for failed jobs */}
                       {job.status === 'error' && (
@@ -252,7 +212,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                       )}
                     </div>
                     
-                    {/* 🎯 Enhanced Download Button for individual jobs */}
+                    {/* Enhanced Download Button for individual jobs */}
                     {job.status === 'completed' && job.downloadLink && (
                       <div className="mt-4 pt-3 border-t border-slate-700">
                         <motion.button
