@@ -7,7 +7,9 @@ import {
   User,
   Calendar,
   FileArchive,
-  Star
+  Star,
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 
 interface JobStatus {
@@ -16,10 +18,10 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  roles?: string[];
+  roles?: string[]; // 🎯 Real role names from backend
   imagesProcessed?: number;
   imagesValidated?: number;
-  downloadLink?: string;
+  downloadLink?: string; // 🎯 Google Drive link
   startTime?: Date;
   endTime?: Date;
 }
@@ -36,7 +38,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
       case 'error':
         return <AlertCircle className="w-4 h-4 text-red-400" />;
       case 'running':
-        return <Clock className="w-4 h-4 text-blue-400 animate-spin" />;
+        return <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />;
       default:
         return <Clock className="w-4 h-4 text-slate-400" />;
     }
@@ -63,8 +65,20 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
     return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
   };
 
+  // 🎯 FIX: Better job filtering - only show completed jobs in count
   const completedCount = jobs.filter(j => j.status === 'completed').length;
   const lastJob = jobs.length > 0 ? jobs[0] : null;
+
+  // 🎯 NEW: Handle Google Drive download
+  const handleDownload = (downloadLink: string) => {
+    if (downloadLink?.includes('drive.google.com')) {
+      // Open Google Drive link in new tab
+      window.open(downloadLink, '_blank');
+    } else {
+      // Fallback for other links
+      window.open(downloadLink, '_blank');
+    }
+  };
 
   return (
     <div className="cyber-panel">
@@ -102,12 +116,13 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
               {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
             </div>
             
-            {/* Roles and Images for last subject */}
+            {/* 🎯 Real roles and images for last subject */}
             {lastJob && (
               <div className="mt-3 space-y-2">
-                {lastJob.roles && (
+                {lastJob.roles && lastJob.roles.length > 0 && (
                   <div className="text-sm font-ui text-slate-300">
-                    <span className="text-slate-400">Roles:</span> {lastJob.roles.join(', ')}
+                    <span className="text-slate-400">Roles:</span> {lastJob.roles.slice(0, 2).join(', ')}
+                    {lastJob.roles.length > 2 && <span className="text-slate-500"> +{lastJob.roles.length - 2} more</span>}
                   </div>
                 )}
                 {(lastJob.imagesProcessed || lastJob.imagesValidated) && (
@@ -122,17 +137,25 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
           <br />
           <br />
           
-          {/* Download Button */}
+          {/* 🎯 Enhanced Download Button with Google Drive support */}
           {lastJob && lastJob.status === 'completed' && lastJob.downloadLink && (
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               className="cyber-button w-full flex items-center justify-center gap-2"
-              onClick={() => window.open(lastJob.downloadLink, '_blank')}
+              onClick={() => handleDownload(lastJob.downloadLink!)}
             >
-              <Download className="w-4 h-4" />
-              <span>Download Latest</span>
+              <ExternalLink className="w-4 h-4" />
+              <span>Open in Google Drive</span>
             </motion.button>
+          )}
+          
+          {/* Show status if job completed but no download link */}
+          {lastJob && lastJob.status === 'completed' && !lastJob.downloadLink && (
+            <div className="w-full p-3 rounded-lg border border-yellow-500/30 bg-yellow-900/20 text-yellow-300 text-center text-sm">
+              <AlertCircle className="w-4 h-4 mx-auto mb-1" />
+              <span>Completed - Download link unavailable</span>
+            </div>
           )}
         </div>
 
@@ -162,12 +185,15 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   
                   {/* Job Details */}
                   <div className="space-y-2">
-                    {job.roles && (
+                    {/* 🎯 Real roles display */}
+                    {job.roles && job.roles.length > 0 && (
                       <div className="text-sm font-ui text-slate-300">
-                        <span className="text-slate-400">Roles:</span> {job.roles.join(', ')}
+                        <span className="text-slate-400">Roles:</span> {job.roles.slice(0, 3).join(', ')}
+                        {job.roles.length > 3 && <span className="text-slate-500"> +{job.roles.length - 3} more</span>}
                       </div>
                     )}
                     
+                    {/* 🎯 Accurate image counts */}
                     {(job.imagesProcessed || job.imagesValidated) && (
                       <div className="text-sm font-ui text-slate-300">
                         <span className="text-slate-400">Images:</span> {job.imagesProcessed || 0} Downloaded / {job.imagesValidated || 0} Validated
@@ -185,9 +211,16 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                         <span className="text-slate-400">Completed:</span> {job.startTime.toLocaleString()}
                       </div>
                     )}
+                    
+                    {/* Show error details for failed jobs */}
+                    {job.status === 'error' && (
+                      <div className="text-sm font-ui text-red-400">
+                        <span className="text-red-300">Error:</span> {job.currentPhase}
+                      </div>
+                    )}
                   </div>
                   
-                  {/* Download Button for individual job */}
+                  {/* 🎯 Enhanced Download Button for individual jobs */}
                   {job.status === 'completed' && job.downloadLink && (
                     <>
                       <br />
@@ -197,11 +230,24 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           className="cyber-button text-sm px-4 py-2 flex items-center gap-2"
-                          onClick={() => window.open(job.downloadLink, '_blank')}
+                          onClick={() => handleDownload(job.downloadLink!)}
                         >
-                          <Download className="w-3 h-3" />
-                          <span>Download</span>
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Open in Google Drive</span>
                         </motion.button>
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Show completed but no download link available */}
+                  {job.status === 'completed' && !job.downloadLink && (
+                    <>
+                      <br />
+                      <div className="mt-3 pt-3 border-t border-slate-700">
+                        <div className="text-xs text-yellow-400 flex items-center gap-2">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>Download link unavailable</span>
+                        </div>
                       </div>
                     </>
                   )}
