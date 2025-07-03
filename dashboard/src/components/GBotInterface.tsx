@@ -38,11 +38,11 @@ export default function GBotInterface({
   useEffect(() => {
     const initAudio = async () => {
       try {
-        // Create synth instance with reduced volume (70% quieter)
+        // Create synth instance with ultra-quiet volume (-35dB = very faint)
         synthRef.current = new Tone.Synth({
           oscillator: { type: 'square' }, // Retro square wave
           envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
-          volume: -18 // Reduce volume by 70% (much quieter)
+          volume: -35 // Ultra quiet - barely audible whisper
         }).toDestination();
         
         console.log('🎵 Tone.js synth initialized successfully');
@@ -61,7 +61,7 @@ export default function GBotInterface({
     };
   }, []);
 
-  // Enhanced cyber sound effects with better error handling and reduced volume
+  // Enhanced cyber sound effects with ultra-quiet volume
   const playCyberBeep = async (type: 'start' | 'phase' | 'complete' | 'error') => {
     try {
       // Ensure Tone.js context is started (required for web audio)
@@ -71,41 +71,41 @@ export default function GBotInterface({
         console.log('🎵 Audio context started');
       }
 
-      // Use existing synth or create new one if needed with reduced volume (70% quieter)
+      // Use existing synth or create new one if needed with ultra-quiet volume
       const synth = synthRef.current || new Tone.Synth({
         oscillator: { type: 'square' },
         envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
-        volume: -18 // 70% quieter than original
+        volume: -35 // Ultra quiet - barely audible whisper
       }).toDestination();
 
       switch (type) {
         case 'start':
-          // Quick ascending beep for mission start: C4 → E4
-          synth.triggerAttackRelease('C4', '0.1');
-          setTimeout(() => synth.triggerAttackRelease('E4', '0.1'), 100);
-          console.log('🔊 Mission start beep played');
+          // Quick ascending beep for mission start: C4 → E4 (very short and quiet)
+          synth.triggerAttackRelease('C4', '0.05');
+          setTimeout(() => synth.triggerAttackRelease('E4', '0.05'), 60);
+          console.log('🔊 Mission start beep played (ultra quiet)');
           break;
           
         case 'phase':
-          // Single mid-tone beep for phase changes
-          synth.triggerAttackRelease('G4', '0.15');
-          console.log('🔊 Phase change beep played');
+          // Single mid-tone beep for phase changes (very brief)
+          synth.triggerAttackRelease('G4', '0.08');
+          console.log('🔊 Phase change beep played (ultra quiet)');
           break;
           
         case 'complete':
-          // Triumphant ascending sequence: C4→E4→G4→C5
-          synth.triggerAttackRelease('C4', '0.2');
-          setTimeout(() => synth.triggerAttackRelease('E4', '0.2'), 200);
-          setTimeout(() => synth.triggerAttackRelease('G4', '0.2'), 400);
-          setTimeout(() => synth.triggerAttackRelease('C5', '0.4'), 600);
-          console.log('🔊 Mission complete sequence played');
+          // Triumphant ascending sequence: C4→E4→G4→C5 (shorter and quieter)
+          synth.triggerAttackRelease('C4', '0.1');
+          setTimeout(() => synth.triggerAttackRelease('E4', '0.1'), 120);
+          setTimeout(() => synth.triggerAttackRelease('G4', '0.1'), 240);
+          setTimeout(() => synth.triggerAttackRelease('C5', '0.15'), 360);
+          console.log('🔊 Mission complete sequence played (ultra quiet)');
           break;
           
         case 'error':
-          // Low descending beep for errors: C4→G3
-          synth.triggerAttackRelease('C4', '0.3');
-          setTimeout(() => synth.triggerAttackRelease('G3', '0.3'), 300);
-          console.log('🔊 Error beep played');
+          // Low descending beep for errors: C4→G3 (shorter duration)
+          synth.triggerAttackRelease('C4', '0.15');
+          setTimeout(() => synth.triggerAttackRelease('G3', '0.15'), 180);
+          console.log('🔊 Error beep played (ultra quiet)');
           break;
       }
     } catch (error) {
