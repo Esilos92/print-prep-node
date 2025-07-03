@@ -38,11 +38,11 @@ export default function GBotInterface({
   useEffect(() => {
     const initAudio = async () => {
       try {
-        // Create synth instance with reduced volume (50% quieter)
+        // Create synth instance with reduced volume (70% quieter)
         synthRef.current = new Tone.Synth({
           oscillator: { type: 'square' }, // Retro square wave
           envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
-          volume: -6 // Reduce volume by 50% more (from -6dB to -12dB total)
+          volume: -18 // Reduce volume by 70% (much quieter)
         }).toDestination();
         
         console.log('🎵 Tone.js synth initialized successfully');
@@ -71,11 +71,11 @@ export default function GBotInterface({
         console.log('🎵 Audio context started');
       }
 
-      // Use existing synth or create new one if needed with reduced volume
+      // Use existing synth or create new one if needed with reduced volume (70% quieter)
       const synth = synthRef.current || new Tone.Synth({
         oscillator: { type: 'square' },
         envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
-        volume: -12 // 50% quieter than before
+        volume: -18 // 70% quieter than original
       }).toDestination();
 
       switch (type) {
