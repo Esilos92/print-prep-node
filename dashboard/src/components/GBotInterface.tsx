@@ -413,8 +413,8 @@ export default function GBotInterface({
               <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
             </div>
             
-            {/* FIXED: Dark separator line positioned correctly */}
-            <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '1px', flexShrink: 0 }}></div>
+            {/* Permanent dark separator line for chat box appearance */}
+            <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)', flexShrink: 0 }}></div>
             
             {/* FIXED: Chat Messages Area - Proper containment with flex-1 and overflow */}
             <div 
