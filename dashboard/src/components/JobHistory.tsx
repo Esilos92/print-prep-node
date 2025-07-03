@@ -110,12 +110,25 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
               {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
             </div>
             
-            {/* UPDATED: Only show image counts - NO ROLES */}
+            {/* UPDATED: Only show image counts and cleaned roles */}
             {lastJob && (
               <div className="mt-3 space-y-2">
-                {(lastJob.imagesProcessed || lastJob.imagesValidated) && (
+                {/* Cleaned roles display */}
+                {lastJob.roles && lastJob.roles.length > 0 && (
                   <div className="text-sm font-ui text-slate-300">
-                    <span className="text-slate-400">Images:</span> {lastJob.imagesProcessed || 0} Downloaded / {lastJob.imagesValidated || 0} Validated
+                    <span className="text-slate-400">Roles:</span> {
+                      lastJob.roles
+                        .map(role => role.replace(new RegExp(`${lastJob.celebrity}\\s*\\(([^)]+)\\)`, 'gi'), '$1').trim())
+                        .filter(role => role.length > 0)
+                        .slice(0, 5)
+                        .join(', ')
+                    }
+                  </div>
+                )}
+                {/* Images: # Validated format */}
+                {lastJob.imagesValidated && (
+                  <div className="text-sm font-ui text-slate-300">
+                    <span className="text-slate-400">Images:</span> {lastJob.imagesValidated} Validated
                   </div>
                 )}
               </div>
