@@ -204,7 +204,7 @@ export default function GBotInterface({
           
           {/* Communication Header */}
           <div>
-            <Zap className="w-6 h-6 text-blue-400" style={{ opacity: 0 }} />
+            <Zap className="w-16 h-16 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
