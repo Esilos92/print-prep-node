@@ -131,7 +131,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
         {/* Mission Progress - Only show when there's an active job */}
         {currentJob && (
           <div className="mb-6">
-            <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION PROGRESS</h4>
+            <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION STATUS</h4>
             
             {/* Progress Bar */}
             <div className="mb-4">
