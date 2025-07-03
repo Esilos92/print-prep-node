@@ -29,17 +29,16 @@ interface ProgressDisplayProps {
   currentJob: JobStatus | null;
 }
 
-export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
-  // Mission phases in order
-  const phases = [
-    { id: 'filmography_scan', name: 'Filmography Scan', icon: Target },
-    { id: 'performance_analysis', name: 'Performance Analysis', icon: Brain },
-    { id: 'search_protocol', name: 'Search Protocol', icon: Search },
-    { id: 'image_download', name: 'Image Download', icon: Download },
-    { id: 'ai_validation', name: 'AI Validation', icon: Zap },
-    { id: 'file_compilation', name: 'File Compilation', icon: Archive }
-  ];
+const phases = [
+  { icon: Search, name: 'Filmography Scan', color: 'text-blue-400' },
+  { icon: Brain, name: 'Performance Analysis', color: 'text-purple-400' },
+  { icon: Target, name: 'Search Protocol', color: 'text-green-400' },
+  { icon: Download, name: 'Image Download', color: 'text-yellow-400' },
+  { icon: Zap, name: 'AI Validation', color: 'text-orange-400' },
+  { icon: Archive, name: 'File Compilation', color: 'text-pink-400' }
+];
 
+export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
   // Clean roles - remove celebrity name from role descriptions
   const getCleanRoles = (roles?: string[], celebrityName?: string) => {
     if (!roles || !celebrityName) return [];
@@ -55,47 +54,96 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
       .slice(0, 5); // Limit to maximum 5 roles
   };
 
-  // Get phases that should be visible (completed + current)
-  const getVisiblePhases = () => {
-    if (!currentJob || currentJob.status === 'idle') return [];
+  const getPhaseProgress = (phaseIndex: number) => {
+    if (!currentJob) return 0;
+    const phaseThresholds = [10, 25, 40, 70, 90, 100];
+    const currentThreshold = phaseThresholds[phaseIndex];
+    const prevThreshold = phaseIndex > 0 ? phaseThresholds[phaseIndex - 1] : 0;
     
-    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
-    if (currentPhaseIndex === -1) return [];
+    if (currentJob.progress < prevThreshold) return 0;
+    if (currentJob.progress >= currentThreshold) return 100;
     
-    // Show all phases up to and including current
-    return phases.slice(0, currentPhaseIndex + 1);
+    return ((currentJob.progress - prevThreshold) / (currentThreshold - prevThreshold)) * 100;
   };
 
-  const getPhaseStatus = (phaseId: string) => {
-    if (!currentJob) return 'pending';
-    
-    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
-    const thisPhaseIndex = phases.findIndex(p => p.id === phaseId);
-    
-    if (currentJob.status === 'completed') return 'completed';
-    if (currentJob.status === 'error') {
-      return thisPhaseIndex <= currentPhaseIndex ? 'error' : 'pending';
-    }
-    if (thisPhaseIndex < currentPhaseIndex) return 'completed';
-    if (thisPhaseIndex === currentPhaseIndex) return 'active';
-    return 'pending';
+  const getCurrentPhaseIndex = () => {
+    if (!currentJob) return -1;
+    const thresholds = [10, 25, 40, 70, 90, 100];
+    return thresholds.findIndex(threshold => currentJob.progress <= threshold);
   };
 
-  // Calculate cumulative validation progress (doesn't reset)
-  const getValidationProgress = () => {
-    if (!currentJob || !currentJob.imagesValidated) return 0;
-    
-    // If we have a target number of images, calculate percentage
-    if (currentJob.imagesProcessed && currentJob.imagesProcessed > 0) {
-      return Math.min((currentJob.imagesValidated / currentJob.imagesProcessed) * 100, 100);
-    }
-    
-    // Otherwise, show progress based on validation count
-    return Math.min(currentJob.imagesValidated * 10, 100); // Assume 10 images = 100%
+  const isPhaseActive = (phaseIndex: number) => {
+    if (!currentJob) return false;
+    const currentPhaseIndex = getCurrentPhaseIndex();
+    return phaseIndex <= currentPhaseIndex;
   };
 
-  const cleanRoles = getCleanRoles(currentJob?.roles, currentJob?.celebrity);
-  const visiblePhases = getVisiblePhases();
+  const isPhaseComplete = (phaseIndex: number) => {
+    if (!currentJob) return false;
+    const thresholds = [10, 25, 40, 70, 90, 100];
+    return currentJob.progress > thresholds[phaseIndex];
+  };
+
+  const formatDuration = (startTime?: Date) => {
+    if (!startTime) return '0s';
+    const duration = Math.floor((Date.now() - startTime.getTime()) / 1000);
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  };
+
+  // Smart phase item with selective animation
+  const PhaseItem = ({ phase, index }: { phase: any; index: number }) => {
+    const Icon = phase.icon;
+    const isActive = isPhaseActive(index);
+    const isComplete = isPhaseComplete(index);
+    const currentPhaseIndex = getCurrentPhaseIndex();
+    const isCurrent = currentPhaseIndex === index;
+
+    if (!isActive) return null; // Only show phases that are active
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.2 }}
+        style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}
+      >
+        {/* Conditional animation - only current phase pulses */}
+        {isComplete ? (
+          // Completed phases: static checkmark, no animation
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5, type: "spring" }}
+            style={{ marginRight: '8px' }}
+          >
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+          </motion.span>
+        ) : isCurrent ? (
+          // Current phase: pulsing animation
+          <motion.span
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            style={{ marginRight: '8px' }}
+          >
+            <Icon className="w-4 h-4 text-blue-400" />
+          </motion.span>
+        ) : (
+          // Future phases: static icon
+          <span style={{ marginRight: '8px' }}>
+            <Icon className="w-4 h-4 text-slate-600" />
+          </span>
+        )}
+        
+        <span className={`text-sm font-ui ${
+          isComplete ? 'text-green-300' : isCurrent ? 'text-blue-300' : 'text-slate-400'
+        }`}>
+          {phase.name}
+        </span>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="cyber-panel">
