@@ -145,6 +145,8 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     );
   };
 
+  const cleanRoles = getCleanRoles(currentJob?.roles, currentJob?.celebrity);
+
   return (
     <div className="cyber-panel">
       {/* Matching GBotInterface padding pattern: consistent 12px all around */}
