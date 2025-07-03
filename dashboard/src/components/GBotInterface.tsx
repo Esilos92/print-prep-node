@@ -113,7 +113,7 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
-          <div className="flex items-center gap-3 mb-4" style={{ padding: '12px 0' }}>
+          <div className="flex items-center gap-3 mb-4">
             <div className="relative">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                 <Bot className="w-8 h-8 text-white" />
@@ -203,7 +203,7 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
           {/* Communication Header */}
-          <div style={{ padding: '12px 0' }}>
+          <div>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
