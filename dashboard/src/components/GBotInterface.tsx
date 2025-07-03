@@ -106,7 +106,7 @@ export default function GBotInterface({
   };
 
   return (
-    <div className="cyber-panel" style={{ padding: '12px !important' }}>
+    <div className="cyber-panel gbot-override">
       <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 24px)', marginTop: '12px' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
@@ -205,7 +205,7 @@ export default function GBotInterface({
           {/* Communication Header */}
           <div>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
-            <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
+            <h3 className="font-cyber text-2xl font-bold text-glow-blue" style={{ marginTop: '-1px' }}>COMMUNICATION LOG</h3>
           </div>
               
           {/* Chat Container */}
