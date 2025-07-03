@@ -73,7 +73,7 @@ export default function GBotInterface({
           
           // Ask for new mission after another delay
           setTimeout(() => {
-            addBotMessage(`Ready for another mission, Commander?\n\nEnter a new celebrity name to begin next operation, or enjoy your downloads! 🎯`);
+            addBotMessage(`Ready for another mission?\n\nEnter a new celebrity name to begin next operation, or enjoy your downloads! 🎯`);
             setAwaitingNewMission(true);
           }, 3000);
         }, 2000);
@@ -244,7 +244,7 @@ export default function GBotInterface({
                     className="flex items-center gap-2 text-base text-yellow-400 font-ui"
                   >
                     <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                    <span>Battle routine executing... Stand by for mission updates</span>
+                    <span>Jack in! Sourcing routine executing... Stand by for mission updates</span>
                   </motion.div>
                 )}
                 {awaitingNewMission && !currentJob && (
