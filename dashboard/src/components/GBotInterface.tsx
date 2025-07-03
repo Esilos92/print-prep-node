@@ -107,7 +107,7 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel" style={{ padding: '12px !important' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 24px)' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 24px)', marginTop: '12px' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
@@ -296,7 +296,7 @@ export default function GBotInterface({
               <div ref={messagesEndRef} />
             </div>
           </div>
-        </div> 
+        </div>
       </div> 
     </div>
   );
