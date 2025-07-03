@@ -215,6 +215,8 @@ export default function GBotInterface({
             
             {/* Communication Log positioned at bottom */}
             <div style={{ marginTop: 'auto' }}>
+              {/* Simple spacer to move text down */}
+              <div style={{ height: '32px' }}></div>
               <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
               
               {/* GBot texts with darker background - embedded chat box */}
