@@ -119,7 +119,7 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
-          <div className="flex items-center gap-3" style={{ marginTop: '-4px' }}>
+          <div className="flex items-center gap-3 mb-4" style={{ padding: '8px 0' }}>
             <div className="relative">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                 <Bot className="w-6 h-6 text-white" />
@@ -203,10 +203,10 @@ export default function GBotInterface({
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           {/* 🎯 CRITICAL FIX: Invisible emoji ABOVE the text to create proper spacing */}
           <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
-          <h3 className="font-cyber text-2xl font-bold text-glow-blue" style={{ paddingTop: '2px' }}>COMMUNICATION LOG</h3>
+          <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
               
           {/* GBot texts with darker background - embedded chat box */}
-          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: '300px', marginTop: '16px' }}>
+          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: '300px' }}>
             
             {/* Chat Header */}
             <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
