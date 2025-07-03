@@ -8,7 +8,7 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  gBotPhaseChange?: string; // 🎯 FIX #1: Detect phase changes
+  gBotPhaseChange?: string;
   currentPhaseForGBot?: string;
 }
 
@@ -30,7 +30,6 @@ export default function GBotInterface({
   const [lastAnnouncedPhase, setLastAnnouncedPhase] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 🎯 FIX #1: Auto-scroll to bottom when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -39,16 +38,13 @@ export default function GBotInterface({
     scrollToBottom();
   }, [messages, isTyping]);
 
-  // 🎯 FIX #1: Enhanced phase detection and announcements
   useEffect(() => {
     if (currentJob?.status === 'running') {
-      // Initial start message
       if (!lastAnnouncedPhase) {
         addBotMessage(`Roger! Initiating mission for ${currentJob.celebrity}. All systems operational!`);
         setLastAnnouncedPhase('started');
       }
       
-      // 🎯 FIX #1: Detect phase changes and announce them
       if (currentJob.gBotPhaseChange && currentJob.gBotPhaseChange !== lastAnnouncedPhase) {
         const phaseMessages = {
           'filmography_scan': `Beginning filmography analysis for ${currentJob.celebrity}. Scanning career database...`,
@@ -77,7 +73,6 @@ export default function GBotInterface({
       }
     }
     
-    // Reset when no job is running
     if (!currentJob) {
       setLastAnnouncedPhase(null);
     }
@@ -100,7 +95,6 @@ export default function GBotInterface({
     e.preventDefault();
     if (!celebrityName.trim() || currentJob?.status === 'running') return;
 
-    // Add user message
     setMessages(prev => [...prev, {
       id: Date.now(),
       text: `Process images for: ${celebrityName}`,
@@ -136,10 +130,8 @@ export default function GBotInterface({
             </div>
           </div>
 
-          {/* LINE BREAK */}
           <br />
 
-          {/* System Status */}
           <div>
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SYSTEM STATUS</h4>
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
@@ -149,16 +141,10 @@ export default function GBotInterface({
             </div>
           </div>
 
-          {/* LINE BREAK */}
+          <br />
+          <br />
           <br />
 
-          {/* LINE BREAK */}
-          <br />
-
-          {/* LINE BREAK */}
-          <br />
-
-          {/* Subject Input - Push to bottom */}
           <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -202,112 +188,89 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
           
-          {/* LINE BREAK at the top to push everything down */}
-          <br />
+          {/* HUGE SPACER TO FORCE COMMUNICATION LOG DOWN */}
+          <div style={{ height: '200px' }}></div>
           
-          {/* Static positioned Communication Log - matching Subject Input height */}
-          <div style={{ 
-            position: 'relative',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
+          <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
+          
+          <div className="bg-slate-900/80 rounded-lg border border-slate-600" style={{ height: '300px', display: 'flex', flexDirection: 'column' }}>
             
-            {/* Push Communication Log to same level as Subject Input */}
-            <div style={{ flex: 1 }}></div>
+            <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
+            </div>
             
-            {/* Communication Log positioned at bottom */}
-            <div style={{ marginTop: 'auto' }}>
-              <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
-              
-              {/* GBot texts with darker background - embedded chat box */}
-              <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: '300px' }}>
-                
-                {/* Chat Header */}
-                <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
-                </div>
-                
-                {/* Line break after header */}
-                <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
-                
-                {/* Chat Messages Area - Fixed height with scroll */}
-                <div 
-                  className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
-                  style={{ 
-                    scrollBehavior: 'smooth',
-                    overscrollBehavior: 'contain'
-                  }}
+            <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
+            
+            <div 
+              className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
+              style={{ scrollBehavior: 'smooth' }}
+            >
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-2"
                 >
-                  {messages.map((message) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`font-mono px-3 py-1 rounded text-sm ${
-                          message.isBot 
-                            ? 'bg-blue-800/60 text-blue-200' 
-                            : 'bg-pink-800/60 text-pink-200'
-                        }`}>
-                          [{message.timestamp}]
-                        </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-mono px-3 py-1 rounded text-sm ${
+                      message.isBot 
+                        ? 'bg-blue-800/60 text-blue-200' 
+                        : 'bg-pink-800/60 text-pink-200'
+                    }`}>
+                      [{message.timestamp}]
+                    </span>
+                  </div>
+                  <div className={`p-4 rounded border-l-4 text-base ${
+                    message.isBot 
+                      ? 'bg-slate-800/80 text-green-300 border-blue-500 font-mono' 
+                      : 'bg-slate-800/80 text-cyan-300 border-pink-500 font-mono'
+                  }`}>
+                    <p className="leading-relaxed">{message.text}</p>
+                  </div>
+                </motion.div>
+              ))}
+              
+              {isTyping && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono px-3 py-1 rounded text-sm bg-blue-800/60 text-blue-200">
+                      [GBot.EXE]
+                    </span>
+                  </div>
+                  <div className="bg-slate-800/80 text-green-300 border-l-4 border-blue-500 p-4 rounded font-mono">
+                    <div className="flex items-center gap-3">
+                      <span className="text-base">Typing</span>
+                      <div className="flex space-x-1">
+                        <motion.div 
+                          className="w-2 h-2 bg-green-400 rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
+                        />
+                        <motion.div 
+                          className="w-2 h-2 bg-green-400 rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                        />
+                        <motion.div 
+                          className="w-2 h-2 bg-green-400 rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                        />
                       </div>
-                      <div className={`p-4 rounded border-l-4 text-base ${
-                        message.isBot 
-                          ? 'bg-slate-800/80 text-green-300 border-blue-500 font-mono' 
-                          : 'bg-slate-800/80 text-cyan-300 border-pink-500 font-mono'
-                      }`}>
-                        <p className="leading-relaxed">{message.text}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                  
-                  {isTyping && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono px-3 py-1 rounded text-sm bg-blue-800/60 text-blue-200">
-                          [GBot.EXE]
-                        </span>
-                      </div>
-                      <div className="bg-slate-800/80 text-green-300 border-l-4 border-blue-500 p-4 rounded font-mono">
-                        <div className="flex items-center gap-3">
-                          <span className="text-base">Typing</span>
-                          <div className="flex space-x-1">
-                            <motion.div 
-                              className="w-2 h-2 bg-green-400 rounded-full"
-                              animate={{ scale: [1, 1.5, 1] }}
-                              transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
-                            />
-                            <motion.div 
-                              className="w-2 h-2 bg-green-400 rounded-full"
-                              animate={{ scale: [1, 1.5, 1] }}
-                              transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
-                            />
-                            <motion.div 
-                              className="w-2 h-2 bg-green-400 rounded-full"
-                              animate={{ scale: [1, 1.5, 1] }}
-                              transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                  
-                  {/* Auto-scroll anchor */}
-                  <div ref={messagesEndRef} />
-                </div>
-              </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
+              <div ref={messagesEndRef} />
             </div>
           </div>
         </div>
