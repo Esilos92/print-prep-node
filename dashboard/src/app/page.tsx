@@ -29,10 +29,11 @@ export default function Dashboard() {
       setJobHistory(jobs);
     } catch (error) {
       console.error('Failed to load job history:', error);
+      // Don't show alert for history loading failures - just log them
     }
   };
 
-  // Start new celebrity job
+  // Start new celebrity job - FIXED TYPESCRIPT ERROR
   const handleStartJob = async () => {
     if (!celebrityName.trim()) return;
 
@@ -60,11 +61,13 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error('Failed to start job:', error);
-      alert(`Failed to start job: ${error.message}`);
+      // FIXED: Proper TypeScript error handling
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to start job: ${errorMessage}`);
     }
   };
 
-  // Cancel current job
+  // Cancel current job - FIXED TYPESCRIPT ERROR
   const handleCancelJob = async () => {
     if (currentJobId) {
       try {
@@ -75,6 +78,9 @@ export default function Dashboard() {
         loadJobHistory();
       } catch (error) {
         console.error('Failed to cancel job:', error);
+        // FIXED: Proper TypeScript error handling
+        const errorMessage = error instanceof Error ? error.message : 'Failed to cancel job';
+        alert(errorMessage);
       }
     }
   };
