@@ -200,28 +200,26 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               <br />
 
-              {/* Timer and Progress Line (clean + stable layout) */}
+              {/* Final fixed timer + percentage row */}
               <div className="mt-4 mb-2 text-sm font-cyber text-slate-400">
-                <div className="inline-flex items-center gap-2 whitespace-nowrap">
+                <div className="flex items-center mb-2">
                   {currentJob.startTime && (
-                    <>
-                      <span className="inline-flex items-center gap-1 min-w-[70px] justify-end">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        <span>{formatDuration(currentJob.startTime)}</span>
-                      </span>
-                      <span className="text-slate-600">|</span>
-                    </>
+                    <div className="flex items-center min-w-[100px] gap-1">
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      <span>{formatDuration(currentJob.startTime)}</span>
+                    </div>
                   )}
-                  <span className="text-blue-400 font-bold tabular-nums min-w-[38px] text-right">
+                  <span className="text-slate-600 px-2">|</span>
+                  <div className="text-blue-400 font-bold tabular-nums min-w-[40px] text-right">
                     {currentJob.progress}%
-                  </span>
+                  </div>
                 </div>
 
-                <div className="progress-bar h-4 mt-2">
+                <div className="progress-bar h-4">
                   <motion.div
                     className="progress-fill"
                     animate={{ width: `${currentJob.progress}%` }}
-                    transition={{ duration: 0.8, ease: "easeInOut" }}
+                    transition={{ duration: 0.8, ease: 'easeInOut' }}
                   />
                 </div>
 
