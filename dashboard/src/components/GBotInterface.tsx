@@ -31,6 +31,7 @@ export default function GBotInterface({
   const [lastAnnouncedPhase, setLastAnnouncedPhase] = useState<string | null>(null);
   const [awaitingNewMission, setAwaitingNewMission] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioMuted, setAudioMuted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const synthRef = useRef<Tone.Synth | null>(null);
 
@@ -63,6 +64,12 @@ export default function GBotInterface({
 
   // Enhanced cyber sound effects with ultra-quiet volume
   const playCyberBeep = async (type: 'start' | 'phase' | 'complete' | 'error') => {
+    // Skip audio if muted
+    if (audioMuted) {
+      console.log(`🔇 Audio muted - ${type} beep skipped`);
+      return;
+    }
+
     try {
       // Ensure Tone.js context is started (required for web audio)
       if (Tone.context.state !== 'running') {
@@ -232,14 +239,27 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
-      {/* Audio Status Indicator */}
-      {!audioEnabled && (
-        <div className="absolute top-2 right-2 z-10">
+      {/* Audio Controls */}
+      <div className="absolute top-2 right-2 z-10 flex gap-2">
+        {!audioEnabled && (
           <div className="bg-yellow-900/80 text-yellow-200 px-3 py-1 rounded text-sm font-mono">
             🔇 Click Execute to enable audio
           </div>
-        </div>
-      )}
+        )}
+        {audioEnabled && (
+          <button
+            onClick={() => setAudioMuted(!audioMuted)}
+            className={`px-3 py-1 rounded text-sm font-mono transition-colors ${
+              audioMuted 
+                ? 'bg-red-900/80 text-red-200 hover:bg-red-800/80' 
+                : 'bg-green-900/80 text-green-200 hover:bg-green-800/80'
+            }`}
+            title={audioMuted ? 'Unmute audio' : 'Mute audio'}
+          >
+            {audioMuted ? '🔇 Muted' : '🔊 Audio'}
+          </button>
+        )}
+      </div>
       
       {/* Matching ProgressDisplay padding pattern: consistent 12px all around */}
       <div style={{ padding: '12px', display: 'flex', flexDirection: 'row', height: '100%', position: 'relative' }}>
@@ -270,7 +290,7 @@ export default function GBotInterface({
                 transition={{ repeat: Infinity, duration: 2 }}
               />
               {/* Audio status indicator */}
-              {audioEnabled && (
+              {audioEnabled && !audioMuted && (
                 <motion.div 
                   className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-slate-900 flex items-center justify-center"
                   animate={{ scale: [1, 1.1, 1] }}
@@ -278,6 +298,11 @@ export default function GBotInterface({
                 >
                   <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
                 </motion.div>
+              )}
+              {audioMuted && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-400 rounded-full border-2 border-slate-900 flex items-center justify-center">
+                  <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+                </div>
               )}
             </div>
             <div>
