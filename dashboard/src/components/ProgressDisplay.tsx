@@ -40,41 +40,6 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     { id: 'file_compilation', name: 'File Compilation', icon: Archive }
   ];
 
-  const getPhaseStatus = (phaseId: string) => {
-    if (!currentJob) return 'pending';
-    
-    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
-    const thisPhaseIndex = phases.findIndex(p => p.id === phaseId);
-    
-    if (currentJob.status === 'completed') return 'completed';
-    if (currentJob.status === 'error') {
-      return thisPhaseIndex <= currentPhaseIndex ? 'error' : 'pending';
-    }
-    if (thisPhaseIndex < currentPhaseIndex) return 'completed';
-    if (thisPhaseIndex === currentPhaseIndex) return 'active';
-    return 'pending';
-  };
-
-  const getPhaseIcon = (phase: any, status: string) => {
-    const IconComponent = phase.icon;
-    if (status === 'completed') return <CheckCircle2 className="w-5 h-5" />;
-    if (status === 'error') return <AlertCircle className="w-5 h-5" />;
-    return <IconComponent className="w-5 h-5" />;
-  };
-
-  const getPhaseStyle = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'text-green-300 border-green-500/50 bg-green-900/20';
-      case 'active':
-        return 'text-blue-300 border-blue-500/50 bg-blue-900/20';
-      case 'error':
-        return 'text-red-300 border-red-500/50 bg-red-900/20';
-      default:
-        return 'text-slate-400 border-slate-600/50 bg-slate-800/20';
-    }
-  };
-
   // Clean roles - remove celebrity name from role descriptions
   const getCleanRoles = (roles?: string[], celebrityName?: string) => {
     if (!roles || !celebrityName) return [];
@@ -88,6 +53,32 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
       })
       .filter(role => role.length > 0)
       .slice(0, 5); // Limit to maximum 5 roles
+  };
+
+  // Get phases that should be visible (completed + current)
+  const getVisiblePhases = () => {
+    if (!currentJob || currentJob.status === 'idle') return [];
+    
+    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
+    if (currentPhaseIndex === -1) return [];
+    
+    // Show all phases up to and including current
+    return phases.slice(0, currentPhaseIndex + 1);
+  };
+
+  const getPhaseStatus = (phaseId: string) => {
+    if (!currentJob) return 'pending';
+    
+    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
+    const thisPhaseIndex = phases.findIndex(p => p.id === phaseId);
+    
+    if (currentJob.status === 'completed') return 'completed';
+    if (currentJob.status === 'error') {
+      return thisPhaseIndex <= currentPhaseIndex ? 'error' : 'pending';
+    }
+    if (thisPhaseIndex < currentPhaseIndex) return 'completed';
+    if (thisPhaseIndex === currentPhaseIndex) return 'active';
+    return 'pending';
   };
 
   // Calculate cumulative validation progress (doesn't reset)
@@ -104,10 +95,12 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
   };
 
   const cleanRoles = getCleanRoles(currentJob?.roles, currentJob?.celebrity);
+  const visiblePhases = getVisiblePhases();
 
   return (
     <div className="cyber-panel">
-      <div style={{ padding: '12px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Matching GBotInterface padding pattern: consistent 12px all around */}
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', height: '100%' }}>
         
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
@@ -182,66 +175,87 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           )}
         </div>
 
-        {/* Mission Phases - FIXED: Contained within box */}
-        <div className="flex-1 overflow-hidden">
-          <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION PHASES</h4>
-          
-          {/* FIXED: Scrollable container for phases */}
-          <div className="space-y-3 overflow-y-auto h-full max-h-full pr-2">
-            {phases.map((phase, index) => {
-              const status = getPhaseStatus(phase.id);
-              
-              return (
-                <motion.div
-                  key={phase.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className={`p-3 rounded-lg border transition-all duration-300 ${getPhaseStyle(status)}`}
-                >
-                  <div className="flex items-center gap-3">
-                    {/* FIXED: Phase icons don't blink - completed phases stay visible */}
-                    <div className={`${status === 'active' ? '' : ''}`}>
-                      {getPhaseIcon(phase, status)}
+        {/* Mission Phases - Dynamic appearance */}
+        {visiblePhases.length > 0 && (
+          <div>
+            <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION PHASES</h4>
+            
+            <div className="space-y-3">
+              {visiblePhases.map((phase, index) => {
+                const status = getPhaseStatus(phase.id);
+                const IconComponent = phase.icon;
+                
+                return (
+                  <motion.div
+                    key={phase.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className={`p-4 rounded-lg border transition-all duration-300 ${
+                      status === 'completed' 
+                        ? 'text-green-300 border-green-500/50 bg-green-900/20'
+                        : status === 'active'
+                        ? 'text-blue-300 border-blue-500/50 bg-blue-900/20'
+                        : status === 'error'
+                        ? 'text-red-300 border-red-500/50 bg-red-900/20'
+                        : 'text-slate-400 border-slate-600/50 bg-slate-800/20'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        {status === 'completed' ? (
+                          <CheckCircle2 className="w-5 h-5" />
+                        ) : status === 'error' ? (
+                          <AlertCircle className="w-5 h-5" />
+                        ) : (
+                          <IconComponent className="w-5 h-5" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1">
+                        <div className="font-cyber text-base">{phase.name}</div>
+                        {status === 'active' && (
+                          <motion.div 
+                            className="text-sm mt-1"
+                            animate={{ 
+                              color: ['#ffffff', '#3b82f6', '#ffffff'] 
+                            }}
+                            transition={{ 
+                              repeat: Infinity, 
+                              duration: 1.5,
+                              ease: "easeInOut"
+                            }}
+                          >
+                            In Progress...
+                          </motion.div>
+                        )}
+                        {status === 'completed' && (
+                          <div className="text-sm text-green-400 mt-1">
+                            Complete
+                          </div>
+                        )}
+                        {status === 'error' && (
+                          <div className="text-sm text-red-400 mt-1">
+                            Failed
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Phase number */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                        ${status === 'completed' ? 'bg-green-500 text-white' :
+                          status === 'active' ? 'bg-blue-500 text-white' :
+                          status === 'error' ? 'bg-red-500 text-white' :
+                          'bg-slate-600 text-slate-300'}`}>
+                        {index + 1}
+                      </div>
                     </div>
-                    
-                    <div className="flex-1">
-                      <div className="font-cyber text-sm">{phase.name}</div>
-                      {status === 'active' && (
-                        <motion.div 
-                          className="text-xs text-blue-400 mt-1"
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                        >
-                          In Progress...
-                        </motion.div>
-                      )}
-                      {status === 'completed' && (
-                        <div className="text-xs text-green-400 mt-1">
-                          Complete
-                        </div>
-                      )}
-                      {status === 'error' && (
-                        <div className="text-xs text-red-400 mt-1">
-                          Failed
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Phase number */}
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
-                      ${status === 'completed' ? 'bg-green-500 text-white' :
-                        status === 'active' ? 'bg-blue-500 text-white' :
-                        status === 'error' ? 'bg-red-500 text-white' :
-                        'bg-slate-600 text-slate-300'}`}>
-                      {index + 1}
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
