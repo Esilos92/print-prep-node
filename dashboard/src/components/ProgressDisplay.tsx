@@ -200,27 +200,24 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               <br />
 
-              {/* ✅ Timer and Percent — Fixed Width, No Jumps */}
+              {/* ✅ Timer and Progress Bar with Percent on Right */}
               <div className="mt-4 mb-2 text-sm font-cyber text-slate-400">
-                <div className="flex flex-row items-center gap-3 whitespace-nowrap">
-                  <div className="flex items-center gap-1 w-[100px]">
-                    <Clock className="w-3 h-3 text-slate-400" />
-                    <span className="tabular-nums w-[60px] inline-block text-left">
-                      {formatDuration(currentJob.startTime)}
-                    </span>
-                  </div>
-                  <span className="text-slate-600">|</span>
-                  <div className="text-blue-400 font-bold tabular-nums w-[50px] text-right">
-                    {currentJob.progress}%
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3 h-3 text-slate-400" />
+                  <span className="tabular-nums">{formatDuration(currentJob.startTime)}</span>
                 </div>
 
-                <div className="progress-bar h-4 mt-2">
-                  <motion.div
-                    className="progress-fill"
-                    animate={{ width: `${currentJob.progress}%` }}
-                    transition={{ duration: 0.8, ease: 'easeInOut' }}
-                  />
+                <div className="relative mt-2">
+                  <div className="progress-bar h-4">
+                    <motion.div
+                      className="progress-fill"
+                      animate={{ width: `${currentJob.progress}%` }}
+                      transition={{ duration: 0.8, ease: 'easeInOut' }}
+                    />
+                  </div>
+                  <div className="absolute top-1/2 right-0 -translate-y-1/2 pr-2 text-blue-400 text-xs font-cyber tabular-nums">
+                    {currentJob.progress}%
+                  </div>
                 </div>
 
                 <p className="text-xs text-slate-400 font-ui text-center mt-2">
@@ -234,7 +231,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
         </div>
 
         {currentJob && (
-          <div className="border-t border-slate-700 pt-4">
+          <div className="border-t border-slate-700 pt-[14px]">
             <h5 className="font-cyber text-sm text-slate-300 mb-4 tracking-wide">
               MISSION PHASES
             </h5>
