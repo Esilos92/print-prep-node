@@ -112,8 +112,11 @@ export default function GBotInterface({
         {/* LEFT SIDE - Fixed Structure with Hard Boundaries */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
-          {/* 🎯 FIX: ROBOT HEADER SECTION - Fixed Height Container */}
-          <div style={{ height: '88px', padding: '12px 0' }} className="flex items-center gap-3 mb-4">
+          {/* 🎯 FIX: EXTRA TOP SPACING - PUSH EVERYTHING DOWN */}
+          <div style={{ height: '24px' }}></div>
+          
+          {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
+          <div className="flex items-center gap-3 mb-4" style={{ padding: '12px 0' }}>
             <div className="relative">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
                 <Bot className="w-8 h-8 text-white" />
@@ -130,8 +133,11 @@ export default function GBotInterface({
             </div>
           </div>
 
-          {/* 🎯 FIX: SYSTEM STATUS SECTION - Fixed Height Container */}
-          <div style={{ height: '120px' }}>
+          {/* LINE BREAK */}
+          <br />
+
+          {/* System Status */}
+          <div>
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SYSTEM STATUS</h4>
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
               <p className="text-base font-ui leading-relaxed">
@@ -140,12 +146,21 @@ export default function GBotInterface({
             </div>
           </div>
 
-          {/* 🎯 FIX: SUBJECT INPUT SECTION - Positioned at Bottom with Fixed Space */}
-          <div style={{ position: 'absolute', bottom: '24px', left: '24px', right: '50%', paddingRight: '16px' }}>
+          {/* LINE BREAK */}
+          <br />
+
+          {/* LINE BREAK */}
+          <br />
+
+          {/* LINE BREAK */}
+          <br />
+
+          {/* Subject Input - Push to bottom */}
+          <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             
-            {/* 🎯 FIX: Reserved Space Container - Always 96px height */}
-            <div style={{ height: '96px' }}>
+            {/* 🎯 FIX: Reserved Space Container - Always same height */}
+            <div style={{ minHeight: '96px' }}>
               <div className="flex gap-3 items-center">
                 <input
                   type="text"
@@ -170,9 +185,9 @@ export default function GBotInterface({
                 </button>
               </div>
               
-              {/* 🎯 FIX: Fixed Status Message Container - Always present, sometimes invisible */}
-              <div style={{ height: '36px', marginTop: '12px' }}>
-                {currentJob?.status === 'running' ? (
+              {/* 🎯 FIX: Reserved space for status message */}
+              <div style={{ minHeight: '36px', marginTop: '12px' }}>
+                {currentJob?.status === 'running' && (
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -181,9 +196,6 @@ export default function GBotInterface({
                     <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                     <span>Battle routine executing... Stand by for mission updates</span>
                   </motion.div>
-                ) : (
-                  /* Invisible placeholder to maintain height */
-                  <div style={{ height: '24px' }}></div>
                 )}
               </div>
             </div>
@@ -192,8 +204,12 @@ export default function GBotInterface({
 
         {/* RIGHT SIDE - Communication Log with Fixed Header */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
-          {/* 🎯 FIX: Communication Header - Fixed Height Container */}
-          <div style={{ height: '88px', padding: '12px 0' }}>
+          
+          {/* 🎯 FIX: EXTRA TOP SPACING TO MATCH LEFT SIDE */}
+          <div style={{ height: '24px' }}></div>
+          
+          {/* Communication Header */}
+          <div style={{ padding: '12px 0' }}>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
