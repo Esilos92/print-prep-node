@@ -1,15 +1,15 @@
 import { motion } from 'framer-motion';
 import { 
-  Target, 
-  Search, 
   Download, 
-  Brain, 
-  Archive, 
-  CheckCircle2, 
   Clock, 
-  AlertCircle,
-  Zap,
-  Star
+  CheckCircle2, 
+  AlertCircle, 
+  User,
+  Calendar,
+  FileArchive,
+  Star,
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 
 interface JobStatus {
@@ -18,253 +18,249 @@ interface JobStatus {
   status: 'idle' | 'running' | 'completed' | 'error';
   currentPhase: string;
   progress: number;
-  roles?: string[]; // Clean role names from backend
+  roles?: string[]; // Real role names from backend (REMOVED from display)
   imagesProcessed?: number;
   imagesValidated?: number;
+  downloadLink?: string; // Google Drive link
   startTime?: Date;
   endTime?: Date;
 }
 
-interface ProgressDisplayProps {
-  currentJob: JobStatus | null;
+interface JobHistoryProps {
+  jobs: JobStatus[];
 }
 
-export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
-  // Mission phases in order
-  const phases = [
-    { id: 'filmography_scan', name: 'Filmography Scan', icon: Target },
-    { id: 'performance_analysis', name: 'Performance Analysis', icon: Brain },
-    { id: 'search_protocol', name: 'Search Protocol', icon: Search },
-    { id: 'image_download', name: 'Image Download', icon: Download },
-    { id: 'ai_validation', name: 'AI Validation', icon: Zap },
-    { id: 'file_compilation', name: 'File Compilation', icon: Archive }
-  ];
-
-  // Clean roles - remove celebrity name from role descriptions
-  const getCleanRoles = (roles?: string[], celebrityName?: string) => {
-    if (!roles || !celebrityName) return [];
-    
-    return roles
-      .map(role => {
-        // Remove celebrity name from role (case insensitive)
-        const cleanRole = role.replace(new RegExp(`${celebrityName}\\s*\\(([^)]+)\\)`, 'gi'), '$1').trim();
-        // Remove any remaining parentheses with celebrity name
-        return cleanRole.replace(new RegExp(`\\(${celebrityName}\\)`, 'gi'), '').trim();
-      })
-      .filter(role => role.length > 0)
-      .slice(0, 5); // Limit to maximum 5 roles
-  };
-
-  // Get phases that should be visible (completed + current)
-  const getVisiblePhases = () => {
-    if (!currentJob || currentJob.status === 'idle') return [];
-    
-    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
-    if (currentPhaseIndex === -1) return [];
-    
-    // Show all phases up to and including current
-    return phases.slice(0, currentPhaseIndex + 1);
-  };
-
-  const getPhaseStatus = (phaseId: string) => {
-    if (!currentJob) return 'pending';
-    
-    const currentPhaseIndex = phases.findIndex(p => p.id === currentJob.currentPhase);
-    const thisPhaseIndex = phases.findIndex(p => p.id === phaseId);
-    
-    if (currentJob.status === 'completed') return 'completed';
-    if (currentJob.status === 'error') {
-      return thisPhaseIndex <= currentPhaseIndex ? 'error' : 'pending';
+export default function JobHistory({ jobs }: JobHistoryProps) {
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle2 className="w-4 h-4 text-green-400" />;
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-red-400" />;
+      case 'running':
+        return <RefreshCw className="w-4 h-4 text-blue-400 animate-spin" />;
+      default:
+        return <Clock className="w-4 h-4 text-slate-400" />;
     }
-    if (thisPhaseIndex < currentPhaseIndex) return 'completed';
-    if (thisPhaseIndex === currentPhaseIndex) return 'active';
-    return 'pending';
   };
 
-  // Calculate cumulative validation progress (doesn't reset)
-  const getValidationProgress = () => {
-    if (!currentJob || !currentJob.imagesValidated) return 0;
-    
-    // If we have a target number of images, calculate percentage
-    if (currentJob.imagesProcessed && currentJob.imagesProcessed > 0) {
-      return Math.min((currentJob.imagesValidated / currentJob.imagesProcessed) * 100, 100);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'text-green-300';
+      case 'error':
+        return 'text-red-400';
+      case 'running':
+        return 'text-yellow-300';
+      default:
+        return 'text-slate-400';
     }
-    
-    // Otherwise, show progress based on validation count
-    return Math.min(currentJob.imagesValidated * 10, 100); // Assume 10 images = 100%
   };
 
-  const cleanRoles = getCleanRoles(currentJob?.roles, currentJob?.celebrity);
-  const visiblePhases = getVisiblePhases();
+  // REMOVED: formatDuration function - no longer needed
+
+  // Better job filtering - only show completed jobs in count
+  const completedCount = jobs.filter(j => j.status === 'completed').length;
+  const lastJob = jobs.length > 0 ? jobs[0] : null;
+
+  // Handle Google Drive download
+  const handleDownload = (downloadLink: string) => {
+    if (downloadLink?.includes('drive.google.com')) {
+      // Open Google Drive link in new tab
+      window.open(downloadLink, '_blank');
+    } else {
+      // Fallback for other links
+      window.open(downloadLink, '_blank');
+    }
+  };
 
   return (
     <div className="cyber-panel">
-      {/* Matching GBotInterface padding pattern: consistent 12px all around */}
-      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', height: '100%' }}>
-        
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <Target className="w-6 h-6 text-blue-400" />
-          <h3 className="font-cyber text-2xl font-bold text-glow-blue">MISSION CONTROL</h3>
-        </div>
-
-        {/* Current Subject */}
-        <div className="mb-6">
-          <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">CURRENT SUBJECT</h4>
-          <div className="font-cyber text-xl text-glow-pink">
-            {currentJob ? currentJob.celebrity : 'No Active Mission'}
-          </div>
-          
-          {/* Clean Roles Display - Limited to 5 */}
-          {cleanRoles.length > 0 && (
-            <div className="mt-2">
-              <span className="text-sm text-slate-400">Roles: </span>
-              <span className="text-sm text-blue-300">
-                {cleanRoles.join(', ')}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Mission Progress */}
-        <div className="mb-6">
-          <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION PROGRESS</h4>
-          
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-ui text-slate-300">
-                {currentJob?.status === 'running' ? 'Processing...' : 
-                 currentJob?.status === 'completed' ? 'Mission Complete' :
-                 currentJob?.status === 'error' ? 'Mission Failed' : 'Standby'}
-              </span>
-              <span className="text-sm font-cyber text-blue-300">
-                {currentJob ? `${Math.round(currentJob.progress || 0)}%` : '0% '}
-              </span>
-            </div>
-            
-            <div className="w-full bg-slate-800/50 rounded-full h-3 border border-slate-600/50 relative">
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
-                initial={{ width: 0 }}
-                animate={{ width: `${currentJob?.progress || 0}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-              />
-              {/* Progress percentage positioned above the end of the bar */}
-              {currentJob?.status === 'running' && (
-                <div 
-                  className="absolute -top-6 text-xs font-cyber text-blue-300"
-                  style={{ left: `${Math.max(currentJob.progress || 0, 10)}%`, transform: 'translateX(-50%)' }}
-                >
-                  {Math.round(currentJob.progress || 0)}%
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Validation Progress - Cumulative */}
-          {currentJob?.currentPhase === 'ai_validation' && currentJob.imagesValidated && (
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-ui text-slate-300">AI Validation Progress</span>
-                <span className="text-sm font-cyber text-green-300">
-                  {currentJob.imagesValidated} validated
-                </span>
-              </div>
-              
-              <div className="w-full bg-slate-800/50 rounded-full h-2 border border-slate-600/50">
-                <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${getValidationProgress()}%` }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Mission Phases - Dynamic appearance */}
-        {visiblePhases.length > 0 && (
+      {/* Headers Row - Mission Archive and Subject Log on same line */}
+      <div style={{ display: 'flex', flexDirection: 'row', padding: '12px 12px 0px 12px' }}>
+        <div style={{ width: '35%', paddingRight: '16px' }}>
           <div>
-            <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION PHASES</h4>
-            
-            <div className="space-y-3">
-              {visiblePhases.map((phase, index) => {
-                const status = getPhaseStatus(phase.id);
-                const IconComponent = phase.icon;
-                
-                return (
-                  <motion.div
-                    key={phase.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className={`p-4 rounded-lg border transition-all duration-300 ${
-                      status === 'completed' 
-                        ? 'text-green-300 border-green-500/50 bg-green-900/20'
-                        : status === 'active'
-                        ? 'text-blue-300 border-blue-500/50 bg-blue-900/20'
-                        : status === 'error'
-                        ? 'text-red-300 border-red-500/50 bg-red-900/20'
-                        : 'text-slate-400 border-slate-600/50 bg-slate-800/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        {status === 'completed' ? (
-                          <CheckCircle2 className="w-5 h-5" />
-                        ) : status === 'error' ? (
-                          <AlertCircle className="w-5 h-5" />
-                        ) : (
-                          <IconComponent className="w-5 h-5" />
-                        )}
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="font-cyber text-base">{phase.name}</div>
-                        {status === 'active' && (
-                          <motion.div 
-                            className="text-sm mt-1"
-                            animate={{ 
-                              color: ['#ffffff', '#3b82f6', '#ffffff'] 
-                            }}
-                            transition={{ 
-                              repeat: Infinity, 
-                              duration: 1.5,
-                              ease: "easeInOut"
-                            }}
-                          >
-                            In Progress...
-                          </motion.div>
-                        )}
-                        {status === 'completed' && (
-                          <div className="text-sm text-green-400 mt-1">
-                            Complete
-                          </div>
-                        )}
-                        {status === 'error' && (
-                          <div className="text-sm text-red-400 mt-1">
-                            Failed
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Phase number */}
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
-                        ${status === 'completed' ? 'bg-green-500 text-white' :
-                          status === 'active' ? 'bg-blue-500 text-white' :
-                          status === 'error' ? 'bg-red-500 text-white' :
-                          'bg-slate-600 text-slate-300'}`}>
-                        {index + 1}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+            <FileArchive className="w-6 h-6 text-blue-400 mb-2" />
+            <h3 className="font-cyber text-xl text-glow-blue">MISSION ARCHIVE</h3>
+            <div className="font-cyber text-lg text-blue-300">Completed - {completedCount}</div>
           </div>
-        )}
+        </div>
+        <div style={{ width: '65%', paddingLeft: '16px', borderLeft: '1px solid rgba(37, 99, 235, 0.3)' }}>
+          <div>
+            <FileArchive className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
+            <h3 className="font-cyber text-xl text-glow-blue">SUBJECT LOG</h3>
+          </div>
+        </div>
+      </div>
+      
+      <div style={{ display: 'flex', flexDirection: 'row', height: 'calc(100% - 60px)', padding: '0px 12px 12px 12px' }}>
+        
+        {/* LEFT COLUMN - 35% */}
+        <div style={{ width: '35%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+          
+          <br />
+          
+          {/* Last Subject Section - matching System Status style */}
+          <div>
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">LAST SUBJECT</h4>
+            <div className="font-cyber text-xl text-glow-pink">
+              {lastJob ? lastJob.celebrity : 'None'}
+            </div>
+            <div className={`text-sm font-ui mt-1 ${getStatusColor(lastJob?.status || 'idle')}`}>
+              {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
+            </div>
+            
+            {/* UPDATED: Simplified roles and image counts with line breaks */}
+            {lastJob && (
+              <div className="mt-3 space-y-2">
+                <br />
+                {/* Simplified roles display - just movie/TV show names */}
+                {lastJob.roles && lastJob.roles.length > 0 && (
+                  <div className="text-sm font-ui text-slate-300">
+                    <span className="text-slate-400">Roles:</span> {
+                      lastJob.roles
+                        .map(role => {
+                          // Extract just the content in parentheses (movie/show names)
+                          const match = role.match(/\(([^)]+)\)/);
+                          return match ? match[1] : role;
+                        })
+                        .filter(role => role.length > 0)
+                        .slice(0, 5)
+                        .join(', ')
+                    }
+                  </div>
+                )}
+                <br />
+                {/* Images: # Validated format */}
+                {lastJob.imagesValidated && (
+                  <div className="text-sm font-ui text-slate-300">
+                    <span className="text-slate-400">Images:</span> {lastJob.imagesValidated} Validated
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <br />
+          <br />
+          
+          {/* Enhanced Download Button with Google Drive support */}
+          {lastJob && lastJob.status === 'completed' && lastJob.downloadLink && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="cyber-button w-full flex items-center justify-center gap-2"
+              onClick={() => handleDownload(lastJob.downloadLink!)}
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Download Latest</span>
+            </motion.button>
+          )}
+          
+          {/* Show status if job completed but no download link */}
+          {lastJob && lastJob.status === 'completed' && !lastJob.downloadLink && (
+            <div className="w-full p-3 rounded-lg border border-yellow-500/30 bg-yellow-900/20 text-yellow-300 text-center text-sm">
+              <AlertCircle className="w-4 h-4 mx-auto mb-1" />
+              <span>Completed - Download link unavailable</span>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT COLUMN - 65% with HORIZONTAL SCROLL */}
+        <div style={{ width: '65%', paddingLeft: '16px' }}>
+          
+          {/* Horizontal scrolling job cards */}
+          <div style={{ height: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
+            {jobs.length === 0 ? (
+              <div className="flex items-center justify-center h-32 text-slate-500 font-ui">
+                No missions logged
+              </div>
+            ) : (
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  flexDirection: 'row', 
+                  gap: '16px',
+                  paddingBottom: '16px',
+                  minHeight: '100%'
+                }}
+              >
+                {jobs.map((job, index) => (
+                  <motion.div
+                    key={job.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="bg-slate-800/30 border border-slate-700 rounded-lg p-4 flex-shrink-0"
+                    style={{ 
+                      width: '280px',
+                      height: 'fit-content',
+                      maxHeight: 'calc(100% - 32px)',
+                      overflowY: 'auto'
+                    }}
+                  >
+                    {/* Header: Status Icon + Celebrity Name */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      {getStatusIcon(job.status)}
+                      <h4 className="font-cyber text-lg text-blue-300 truncate">{job.celebrity}</h4>
+                    </div>
+                    
+                    {/* Job Details - CLEANED UP */}
+                    <div className="space-y-2">
+                      
+                      {/* UPDATED: Images format - Downloaded / Validated */}
+                      {(job.imagesProcessed || job.imagesValidated) && (
+                        <div className="text-sm font-ui text-slate-300">
+                          <span className="text-slate-400">Images:</span>
+                          <div className="text-blue-300 font-cyber">
+                            {job.imagesProcessed || 0} Downloaded / {job.imagesValidated || 0} Validated
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* REMOVED: Duration display */}
+                      
+                      {/* REMOVED: Date display */}
+                      
+                      {/* Show error details for failed jobs */}
+                      {job.status === 'error' && (
+                        <div className="text-sm font-ui text-red-400">
+                          <span className="text-red-300">Error:</span> 
+                          <div className="text-xs mt-1 break-words">{job.currentPhase}</div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Enhanced Download Button for individual jobs */}
+                    {job.status === 'completed' && job.downloadLink && (
+                      <div className="mt-4 pt-3 border-t border-slate-700">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="cyber-button text-sm px-3 py-2 w-full flex items-center justify-center gap-2"
+                          onClick={() => handleDownload(job.downloadLink!)}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Download</span>
+                        </motion.button>
+                      </div>
+                    )}
+                    
+                    {/* Show completed but no download link available */}
+                    {job.status === 'completed' && !job.downloadLink && (
+                      <div className="mt-4 pt-3 border-t border-slate-700">
+                        <div className="text-xs text-yellow-400 flex items-center justify-center gap-2">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>Download unavailable</span>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
