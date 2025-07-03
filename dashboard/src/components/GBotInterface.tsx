@@ -28,6 +28,7 @@ export default function GBotInterface({
   const [messages, setMessages] = useState<any[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [lastAnnouncedPhase, setLastAnnouncedPhase] = useState<string | null>(null);
+  const [awaitingNewMission, setAwaitingNewMission] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -65,6 +66,17 @@ export default function GBotInterface({
       if (lastAnnouncedPhase !== 'completed') {
         addBotMessage(`Mission accomplished! ${currentJob.celebrity} image package is ready for download.`);
         setLastAnnouncedPhase('completed');
+        
+        // Add a final completion summary message
+        setTimeout(() => {
+          addBotMessage(`✅ MISSION COMPLETE ✅\n\nCelebrity: ${currentJob.celebrity}\nStatus: Package compiled and uploaded\nDownload: Available in Mission Archive\n\nGBot.EXE standing by for next assignment.`);
+          
+          // Ask for new mission after another delay
+          setTimeout(() => {
+            addBotMessage(`Ready for another mission, Commander?\n\nEnter a new celebrity name to begin next operation, or enjoy your downloads! 🎯`);
+            setAwaitingNewMission(true);
+          }, 3000);
+        }, 2000);
       }
     } else if (currentJob?.status === 'error') {
       if (lastAnnouncedPhase !== 'error') {
@@ -75,6 +87,7 @@ export default function GBotInterface({
     
     if (!currentJob) {
       setLastAnnouncedPhase(null);
+      setAwaitingNewMission(false);
     }
   }, [currentJob?.status, currentJob?.gBotPhaseChange, currentJob?.celebrity, lastAnnouncedPhase]);
 
@@ -101,6 +114,10 @@ export default function GBotInterface({
       isBot: false,
       timestamp: 'USER'
     }]);
+
+    // Reset state for new mission
+    setAwaitingNewMission(false);
+    setLastAnnouncedPhase(null);
 
     onStartJob();
   };
@@ -228,6 +245,16 @@ export default function GBotInterface({
                   >
                     <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
                     <span>Battle routine executing... Stand by for mission updates</span>
+                  </motion.div>
+                )}
+                {awaitingNewMission && !currentJob && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-2 text-base text-green-400 font-ui"
+                  >
+                    <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>Ready for next mission - Enter celebrity name above! 🚀</span>
                   </motion.div>
                 )}
               </div>
