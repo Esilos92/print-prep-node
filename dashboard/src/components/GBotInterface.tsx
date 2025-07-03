@@ -202,33 +202,49 @@ export default function GBotInterface({
         {/* RIGHT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingLeft: '16px' }} className="flex flex-col">
           
-          {/* Header section - EXACTLY like Mission Archive */}
-          <div>
-            <FileArchive className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
-            <h3 className="font-cyber text-xl text-glow-blue">COMMUNICATION LOG</h3>
+          {/* Invisible header section - EXACT match to left side GBot header */}
+          <div className="flex items-center gap-3" style={{ opacity: 0 }}>
+            <div className="relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                <Bot className="w-8 h-8 text-white" />
+              </div>
+              <motion.div 
+                className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              />
+            </div>
+            <div>
+              <h3 className="font-cyber text-2xl font-bold text-glow-blue">Invisible Header</h3>
+              <p className="text-base text-slate-400">Invisible Subtitle</p>
+            </div>
           </div>
 
-          {/* LINE BREAK */}
+          {/* LINE BREAK - match left side */}
           <br />
 
-          {/* Processing Status when running */}
-          {currentJob?.status === 'running' && (
-            <>
-              <div>
-                <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">PROCESSING STATUS</h4>
-                <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
-                  <span className="font-cyber text-xl text-glow-blue">PROCESSING</span>
-                  <div className="text-blue-300 font-cyber text-2xl">{currentJob.celebrity}</div>
-                </div>
-              </div>
-              
-              {/* LINE BREAK */}
-              <br />
-            </>
-          )}
+          {/* Invisible system status section - EXACT match to left side */}
+          <div style={{ opacity: 0 }}>
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">INVISIBLE STATUS</h4>
+            <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
+              <p className="text-base font-ui leading-relaxed">
+                Invisible status content to match left side spacing.
+              </p>
+            </div>
+          </div>
 
-          {/* Chat Interface - Takes remaining space */}
-          <div className="mt-auto flex-1">
+          {/* LINE BREAK - match left side */}
+          <br />
+
+          {/* LINE BREAK - match left side */}
+          <br />
+
+          {/* LINE BREAK - match left side */}
+          <br />
+
+          {/* Communication Log - NOW positioned to match Subject Input */}
+          <div className="mt-auto">
+            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
             
             {/* GBot texts with darker background - embedded chat box */}
             <div className="bg-slate-900/80 rounded-lg border border-slate-600 h-full flex flex-col overflow-hidden">
