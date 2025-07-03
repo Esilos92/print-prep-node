@@ -200,138 +200,110 @@ export default function GBotInterface({
         </div>
 
         {/* RIGHT SIDE - Exactly 50% */}
-        <div style={{ width: '50%', paddingLeft: '16px' }} className="flex flex-col">
+        <div style={{ width: '50%', paddingLeft: '16px' }}>
           
-          {/* Invisible header section - EXACT match to left side GBot header */}
-          <div className="flex items-center gap-3" style={{ opacity: 0 }}>
-            <div className="relative">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                <Bot className="w-8 h-8 text-white" />
-              </div>
-              <motion.div 
-                className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-              />
-            </div>
-            <div>
-              <h3 className="font-cyber text-2xl font-bold text-glow-blue">Invisible Header</h3>
-              <p className="text-base text-slate-400">Invisible Subtitle</p>
-            </div>
-          </div>
-
-          {/* LINE BREAK - match left side */}
-          <br />
-
-          {/* Invisible system status section - EXACT match to left side */}
-          <div style={{ opacity: 0 }}>
-            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">INVISIBLE STATUS</h4>
-            <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
-              <p className="text-base font-ui leading-relaxed">
-                Invisible status content to match left side spacing.
-              </p>
-            </div>
-          </div>
-
-          {/* LINE BREAK - match left side */}
-          <br />
-
-          {/* LINE BREAK - match left side */}
-          <br />
-
-          {/* LINE BREAK - match left side */}
-          <br />
-
-          {/* Communication Log - NOW positioned to match Subject Input */}
-          <div className="mt-auto">
-            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
+          {/* Static positioned Communication Log - matching Subject Input height */}
+          <div style={{ 
+            position: 'relative',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
             
-            {/* GBot texts with darker background - embedded chat box */}
-            <div className="bg-slate-900/80 rounded-lg border border-slate-600 h-full flex flex-col overflow-hidden">
+            {/* Push Communication Log to same level as Subject Input */}
+            <div style={{ flex: 1 }}></div>
+            
+            {/* Communication Log positioned at bottom */}
+            <div style={{ marginTop: 'auto' }}>
+              <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
               
-              {/* Chat Header */}
-              <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
-                <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
-              </div>
-              
-              {/* 🎯 FIX: Line break after header */}
-              <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }} className="flex-shrink-0"></div>
-              
-              {/* 🎯 GUARANTEED SCROLL: Chat Messages Area - Takes all remaining space and scrolls */}
-              <div 
-                className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90 min-h-0"
-                style={{ 
-                  scrollBehavior: 'smooth',
-                  overscrollBehavior: 'contain'
-                }}
-              >
-                {messages.map((message) => (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`font-mono px-3 py-1 rounded text-sm ${
-                        message.isBot 
-                          ? 'bg-blue-800/60 text-blue-200' 
-                          : 'bg-pink-800/60 text-pink-200'
-                      }`}>
-                        [{message.timestamp}]
-                      </span>
-                    </div>
-                    <div className={`p-4 rounded border-l-4 text-base ${
-                      message.isBot 
-                        ? 'bg-slate-800/80 text-green-300 border-blue-500 font-mono' 
-                        : 'bg-slate-800/80 text-cyan-300 border-pink-500 font-mono'
-                    }`}>
-                      <p className="leading-relaxed">{message.text}</p>
-                    </div>
-                  </motion.div>
-                ))}
+              {/* GBot texts with darker background - embedded chat box */}
+              <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: '300px' }}>
                 
-                {isTyping && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono px-3 py-1 rounded text-sm bg-blue-800/60 text-blue-200">
-                        [GBot.EXE]
-                      </span>
-                    </div>
-                    <div className="bg-slate-800/80 text-green-300 border-l-4 border-blue-500 p-4 rounded font-mono">
-                      <div className="flex items-center gap-3">
-                        <span className="text-base">Typing</span>
-                        <div className="flex space-x-1">
-                          <motion.div 
-                            className="w-2 h-2 bg-green-400 rounded-full"
-                            animate={{ scale: [1, 1.5, 1] }}
-                            transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
-                          />
-                          <motion.div 
-                            className="w-2 h-2 bg-green-400 rounded-full"
-                            animate={{ scale: [1, 1.5, 1] }}
-                            transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
-                          />
-                          <motion.div 
-                            className="w-2 h-2 bg-green-400 rounded-full"
-                            animate={{ scale: [1, 1.5, 1] }}
-                            transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
-                          />
+                {/* Chat Header */}
+                <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
+                </div>
+                
+                {/* Line break after header */}
+                <div style={{ height: '12px', backgroundColor: 'rgba(2, 6, 23, 0.9)' }}></div>
+                
+                {/* Chat Messages Area - Fixed height with scroll */}
+                <div 
+                  className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
+                  style={{ 
+                    scrollBehavior: 'smooth',
+                    overscrollBehavior: 'contain'
+                  }}
+                >
+                  {messages.map((message) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`font-mono px-3 py-1 rounded text-sm ${
+                          message.isBot 
+                            ? 'bg-blue-800/60 text-blue-200' 
+                            : 'bg-pink-800/60 text-pink-200'
+                        }`}>
+                          [{message.timestamp}]
+                        </span>
+                      </div>
+                      <div className={`p-4 rounded border-l-4 text-base ${
+                        message.isBot 
+                          ? 'bg-slate-800/80 text-green-300 border-blue-500 font-mono' 
+                          : 'bg-slate-800/80 text-cyan-300 border-pink-500 font-mono'
+                      }`}>
+                        <p className="leading-relaxed">{message.text}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                  
+                  {isTyping && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono px-3 py-1 rounded text-sm bg-blue-800/60 text-blue-200">
+                          [GBot.EXE]
+                        </span>
+                      </div>
+                      <div className="bg-slate-800/80 text-green-300 border-l-4 border-blue-500 p-4 rounded font-mono">
+                        <div className="flex items-center gap-3">
+                          <span className="text-base">Typing</span>
+                          <div className="flex space-x-1">
+                            <motion.div 
+                              className="w-2 h-2 bg-green-400 rounded-full"
+                              animate={{ scale: [1, 1.5, 1] }}
+                              transition={{ repeat: Infinity, duration: 0.6, delay: 0 }}
+                            />
+                            <motion.div 
+                              className="w-2 h-2 bg-green-400 rounded-full"
+                              animate={{ scale: [1, 1.5, 1] }}
+                              transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                            />
+                            <motion.div 
+                              className="w-2 h-2 bg-green-400 rounded-full"
+                              animate={{ scale: [1, 1.5, 1] }}
+                              transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                )}
-                
-                {/* 🎯 FIX: Auto-scroll anchor */}
-                <div ref={messagesEndRef} />
+                    </motion.div>
+                  )}
+                  
+                  {/* Auto-scroll anchor */}
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
             </div>
           </div>
