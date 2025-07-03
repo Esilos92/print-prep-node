@@ -110,15 +110,19 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
               {lastJob ? lastJob.status.toUpperCase() : 'IDLE'}
             </div>
             
-            {/* UPDATED: Only show image counts and cleaned roles */}
+            {/* UPDATED: Simplified roles and image counts */}
             {lastJob && (
               <div className="mt-3 space-y-2">
-                {/* Cleaned roles display */}
+                {/* Simplified roles display - just movie/TV show names */}
                 {lastJob.roles && lastJob.roles.length > 0 && (
                   <div className="text-sm font-ui text-slate-300">
                     <span className="text-slate-400">Roles:</span> {
                       lastJob.roles
-                        .map(role => role.replace(new RegExp(`${lastJob.celebrity}\\s*\\(([^)]+)\\)`, 'gi'), '$1').trim())
+                        .map(role => {
+                          // Extract just the content in parentheses (movie/show names)
+                          const match = role.match(/\(([^)]+)\)/);
+                          return match ? match[1] : role;
+                        })
                         .filter(role => role.length > 0)
                         .slice(0, 5)
                         .join(', ')
@@ -135,6 +139,7 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
             )}
           </div>
           
+          <br />
           <br />
           <br />
           
