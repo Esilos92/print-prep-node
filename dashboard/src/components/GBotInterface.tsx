@@ -115,14 +115,14 @@ export default function GBotInterface({
     <div className="cyber-panel">
       <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '12px' }}>
         
-        {/* LEFT SIDE - Exactly 50% - FIXED STATIC LAYOUT */}
+        {/* LEFT SIDE - Exactly 50% */}
         <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
-          {/* Robot + GBot.EXE + AI Image Sourcing Assistant - FIXED POSITION */}
-          <div className="flex items-center gap-3" style={{ minHeight: '80px', alignItems: 'flex-start', paddingTop: '12px' }}>
+          {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
+          <div className="flex items-center gap-3 mb-4" style={{ padding: '8px 0' }}>
             <div className="relative">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                <Bot className="w-8 h-8 text-white" />
+                <Bot className="w-6 h-6 text-white" />
               </div>
               <motion.div 
                 className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-slate-900"
@@ -136,8 +136,11 @@ export default function GBotInterface({
             </div>
           </div>
 
-          {/* System Status - FIXED POSITION */}
-          <div style={{ minHeight: '120px', paddingTop: '16px' }}>
+          {/* LINE BREAK */}
+          <br />
+
+          {/* System Status */}
+          <div>
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SYSTEM STATUS</h4>
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
               <p className="text-base font-ui leading-relaxed">
@@ -146,8 +149,17 @@ export default function GBotInterface({
             </div>
           </div>
 
-          {/* Subject Input - FIXED POSITION AT BOTTOM */}
-          <div className="mt-auto" style={{ paddingBottom: '16px' }}>
+          {/* LINE BREAK */}
+          <br />
+
+          {/* LINE BREAK */}
+          <br />
+
+          {/* LINE BREAK */}
+          <br />
+
+          {/* Subject Input - Push to bottom */}
+          <div className="mt-auto">
             <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">SUBJECT INPUT</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="flex gap-3 items-center">
@@ -187,10 +199,10 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT SIDE - Exactly 50% - FIXED STATIC LAYOUT */}
+        {/* RIGHT SIDE - Exactly 50% - 🎯 FIXED ALIGNMENT USING PROVEN PATTERN */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
-          {/* FIXED HEADER ALIGNMENT */}
-          <div style={{ minHeight: '80px', alignItems: 'flex-start', paddingTop: '12px', display: 'flex', flexDirection: 'column' }}>
+          {/* 🎯 CRITICAL FIX: Added invisible icon to match Mission Archive pattern */}
+          <div>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
