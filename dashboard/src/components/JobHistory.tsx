@@ -198,60 +198,63 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                       overflowY: 'auto'
                     }}
                   >
-                    {/* Header: Status Icon + Celebrity Name */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                      {getStatusIcon(job.status)}
-                      <h4 className="font-cyber text-lg text-blue-300 truncate">{job.celebrity}</h4>
-                    </div>
+                    {/* Celebrity Name */}
+                    <h4 className="font-cyber text-lg text-blue-300 truncate">{job.celebrity}</h4>
                     
-                    {/* Job Details - CLEANED UP */}
-                    <div className="space-y-2">
-                      
-                      {/* UPDATED: Images format - Downloaded / Validated */}
-                      {(job.imagesProcessed || job.imagesValidated) && (
-                        <div className="text-sm font-ui text-slate-300">
-                          <span className="text-slate-400">Images:</span>
-                          <div className="text-blue-300 font-cyber">
-                            {job.imagesProcessed || 0} Downloaded / {job.imagesValidated || 0} Validated
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* REMOVED: Duration display */}
-                      
-                      {/* REMOVED: Date display */}
-                      
-                      {/* Show error details for failed jobs */}
-                      {job.status === 'error' && (
-                        <div className="text-sm font-ui text-red-400">
-                          <span className="text-red-300">Error:</span> 
-                          <div className="text-xs mt-1 break-words">{job.currentPhase}</div>
-                        </div>
-                      )}
-                    </div>
+                    <br />
                     
-                    {/* Enhanced Download Button for individual jobs */}
+                    {/* Roles: just the shows/movies */}
+                    {job.roles && job.roles.length > 0 && (
+                      <div className="text-sm font-ui text-slate-300">
+                        <span className="text-slate-400">Roles:</span> {
+                          job.roles
+                            .map(role => {
+                              const match = role.match(/\(([^)]+)\)/);
+                              return match ? match[1] : role;
+                            })
+                            .filter(role => role.length > 0)
+                            .slice(0, 5)
+                            .join(', ')
+                        }
+                      </div>
+                    )}
+                    
+                    <br />
+                    
+                    {/* Images: # Validated */}
+                    {job.imagesValidated && (
+                      <div className="text-sm font-ui text-slate-300">
+                        <span className="text-slate-400">Images:</span> {job.imagesValidated} Validated
+                      </div>
+                    )}
+                    
+                    <br />
+                    
+                    {/* Download Button */}
                     {job.status === 'completed' && job.downloadLink && (
-                      <div className="mt-4 pt-3 border-t border-slate-700">
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="cyber-button text-sm px-3 py-2 w-full flex items-center justify-center gap-2"
-                          onClick={() => handleDownload(job.downloadLink!)}
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Download</span>
-                        </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="cyber-button text-sm px-3 py-2 w-full flex items-center justify-center gap-2"
+                        onClick={() => handleDownload(job.downloadLink!)}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Download</span>
+                      </motion.button>
+                    )}
+                    
+                    {/* Show error details for failed jobs */}
+                    {job.status === 'error' && (
+                      <div className="text-sm font-ui text-red-400">
+                        <span className="text-red-300">Error:</span> {job.currentPhase}
                       </div>
                     )}
                     
                     {/* Show completed but no download link available */}
                     {job.status === 'completed' && !job.downloadLink && (
-                      <div className="mt-4 pt-3 border-t border-slate-700">
-                        <div className="text-xs text-yellow-400 flex items-center justify-center gap-2">
-                          <AlertCircle className="w-3 h-3" />
-                          <span>Download unavailable</span>
-                        </div>
+                      <div className="text-xs text-yellow-400 flex items-center justify-center gap-2">
+                        <AlertCircle className="w-3 h-3" />
+                        <span>Download unavailable</span>
                       </div>
                     )}
                   </motion.div>
