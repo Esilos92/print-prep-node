@@ -201,11 +201,9 @@ export default function GBotInterface({
 
         {/* RIGHT SIDE - Exactly 50% - FIXED POSITIONING LIKE MISSION ARCHIVE */}
         <div style={{ width: '50%', paddingLeft: '16px' }}>
-          {/* 🎯 CRITICAL FIX: Use EXACT same pattern as Mission Archive */}
-          <div>
-            <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
-            <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
-          </div>
+          {/* 🎯 CRITICAL FIX: Invisible emoji ABOVE the text to create proper spacing */}
+          <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
+          <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
               
           {/* GBot texts with darker background - embedded chat box */}
           <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: '300px' }}>
