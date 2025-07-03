@@ -200,23 +200,21 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
               <br />
 
-              {/* Timer and Progress Line */}
+              {/* Timer and Progress Line (clean + stable layout) */}
               <div className="mt-4 mb-2 text-sm font-cyber text-slate-400">
                 <div className="inline-flex items-center gap-2 whitespace-nowrap">
                   {currentJob.startTime && (
                     <>
-                      <motion.span
-                        className="inline-flex items-center gap-1"
-                        animate={{ opacity: [1, 0.7, 1] }}
-                        transition={{ duration: 1.5, ease: 'easeInOut', repeat: Infinity }}
-                      >
+                      <span className="inline-flex items-center gap-1 min-w-[70px] justify-end">
                         <Clock className="w-3 h-3 text-slate-400" />
                         <span>{formatDuration(currentJob.startTime)}</span>
-                      </motion.span>
+                      </span>
                       <span className="text-slate-600">|</span>
                     </>
                   )}
-                  <span className="text-blue-400 font-bold">{currentJob.progress}%</span>
+                  <span className="text-blue-400 font-bold tabular-nums min-w-[38px] text-right">
+                    {currentJob.progress}%
+                  </span>
                 </div>
 
                 <div className="progress-bar h-4 mt-2">
