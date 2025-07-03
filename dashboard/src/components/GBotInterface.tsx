@@ -38,11 +38,11 @@ export default function GBotInterface({
   useEffect(() => {
     const initAudio = async () => {
       try {
-        // Create synth instance with reduced volume (65% quieter)
+        // Create synth instance with reduced volume (50% quieter)
         synthRef.current = new Tone.Synth({
           oscillator: { type: 'square' }, // Retro square wave
           envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
-          volume: -12 // Reduce volume by ~65% (from 0dB to -12dB)
+          volume: -6 // Reduce volume by 50% more (from -6dB to -12dB total)
         }).toDestination();
         
         console.log('🎵 Tone.js synth initialized successfully');
@@ -75,7 +75,7 @@ export default function GBotInterface({
       const synth = synthRef.current || new Tone.Synth({
         oscillator: { type: 'square' },
         envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 },
-        volume: -12 // 65% quieter
+        volume: -12 // 50% quieter than before
       }).toDestination();
 
       switch (type) {
@@ -390,22 +390,33 @@ export default function GBotInterface({
           </div>
         </div>
 
-        {/* RIGHT SIDE - Exactly 50% */}
+        {/* RIGHT SIDE - Exactly 50% with FIXED HEIGHT CONTAINER */}
         <div style={{ 
           width: '50%', 
-          paddingLeft: '16px'
+          paddingLeft: '16px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column'
         }}>
           
           {/* Communication Header */}
-          <div style={{ padding: '12px 0' }}>
+          <div style={{ padding: '12px 0', flexShrink: 0 }}>
             <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
-          {/* Chat Container - FIXED: Proper containment and scrolling */}
-          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 60px)' }}>
+          {/* Chat Container - FIXED: Absolute height constraint with embedded styling */}
+          <div 
+            className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col"
+            style={{ 
+              height: '400px', // Fixed height - will not grow
+              maxHeight: '400px',
+              minHeight: '400px',
+              overflow: 'hidden'
+            }}
+          >
             
-            {/* Chat Header */}
+            {/* Chat Header with embedded window styling */}
             <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
@@ -413,16 +424,17 @@ export default function GBotInterface({
               <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
             </div>
             
-            {/* Permanent dark separator line for chat box appearance */}
-            <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '1px', flexShrink: 0 }}></div>
+            {/* Embedded chat separator line */}
+            <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '2px', flexShrink: 0 }}></div>
             
-            {/* FIXED: Chat Messages Area - Proper containment with flex-1 and overflow */}
+            {/* Chat Messages Area - FIXED: Constrained scrolling area */}
             <div 
-              className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-950/90"
+              className="flex-1 p-4 overflow-y-auto space-y-4"
               style={{ 
+                backgroundColor: 'rgba(2, 6, 23, 0.95)', // Embedded chat background
                 scrollBehavior: 'smooth',
                 overscrollBehavior: 'contain',
-                minHeight: 0,  // Critical: Prevents flex overflow
+                minHeight: 0, // Critical: Prevents flex overflow
                 maxHeight: '100%' // Ensures containment
               }}
             >
