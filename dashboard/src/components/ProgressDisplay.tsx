@@ -139,17 +139,26 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                  currentJob?.status === 'error' ? 'Mission Failed' : 'Standby'}
               </span>
               <span className="text-sm font-cyber text-blue-300">
-                {currentJob ? `${Math.round(currentJob.progress || 0)}%` : '0%'}
+                {currentJob ? `${Math.round(currentJob.progress || 0)}%` : '0% '}
               </span>
             </div>
             
-            <div className="w-full bg-slate-800/50 rounded-full h-3 border border-slate-600/50">
+            <div className="w-full bg-slate-800/50 rounded-full h-3 border border-slate-600/50 relative">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
                 initial={{ width: 0 }}
                 animate={{ width: `${currentJob?.progress || 0}%` }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
               />
+              {/* Progress percentage positioned above the end of the bar */}
+              {currentJob?.status === 'running' && (
+                <div 
+                  className="absolute -top-6 text-xs font-cyber text-blue-300"
+                  style={{ left: `${Math.max(currentJob.progress || 0, 10)}%`, transform: 'translateX(-50%)' }}
+                >
+                  {Math.round(currentJob.progress || 0)}%
+                </div>
+              )}
             </div>
           </div>
 
