@@ -30,42 +30,103 @@ export default function GBotInterface({
   const [isTyping, setIsTyping] = useState(false);
   const [lastAnnouncedPhase, setLastAnnouncedPhase] = useState<string | null>(null);
   const [awaitingNewMission, setAwaitingNewMission] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const synthRef = useRef<Tone.Synth | null>(null);
 
-  // Cyber sound effects using Tone.js
+  // Initialize Tone.js synth
+  useEffect(() => {
+    const initAudio = async () => {
+      try {
+        // Create synth instance
+        synthRef.current = new Tone.Synth({
+          oscillator: { type: 'square' }, // Retro square wave
+          envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+        }).toDestination();
+        
+        console.log('🎵 Tone.js synth initialized successfully');
+      } catch (error) {
+        console.warn('⚠️ Tone.js initialization failed:', error);
+      }
+    };
+
+    initAudio();
+
+    // Cleanup on unmount
+    return () => {
+      if (synthRef.current) {
+        synthRef.current.dispose();
+      }
+    };
+  }, []);
+
+  // Enhanced cyber sound effects with better error handling
   const playCyberBeep = async (type: 'start' | 'phase' | 'complete' | 'error') => {
     try {
-      await Tone.start(); // Required for web audio
-      const synth = new Tone.Synth({
-        oscillator: { type: 'square' }, // Retro square wave
+      // Ensure Tone.js context is started (required for web audio)
+      if (Tone.context.state !== 'running') {
+        await Tone.start();
+        setAudioEnabled(true);
+        console.log('🎵 Audio context started');
+      }
+
+      // Use existing synth or create new one if needed
+      const synth = synthRef.current || new Tone.Synth({
+        oscillator: { type: 'square' },
         envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
       }).toDestination();
 
       switch (type) {
         case 'start':
-          // Quick ascending beep for mission start
+          // Quick ascending beep for mission start: C4 → E4
           synth.triggerAttackRelease('C4', '0.1');
           setTimeout(() => synth.triggerAttackRelease('E4', '0.1'), 100);
+          console.log('🔊 Mission start beep played');
           break;
+          
         case 'phase':
           // Single mid-tone beep for phase changes
           synth.triggerAttackRelease('G4', '0.15');
+          console.log('🔊 Phase change beep played');
           break;
+          
         case 'complete':
-          // Triumphant ascending sequence for completion
+          // Triumphant ascending sequence: C4→E4→G4→C5
           synth.triggerAttackRelease('C4', '0.2');
           setTimeout(() => synth.triggerAttackRelease('E4', '0.2'), 200);
           setTimeout(() => synth.triggerAttackRelease('G4', '0.2'), 400);
           setTimeout(() => synth.triggerAttackRelease('C5', '0.4'), 600);
+          console.log('🔊 Mission complete sequence played');
           break;
+          
         case 'error':
-          // Low descending beep for errors
+          // Low descending beep for errors: C4→G3
           synth.triggerAttackRelease('C4', '0.3');
           setTimeout(() => synth.triggerAttackRelease('G3', '0.3'), 300);
+          console.log('🔊 Error beep played');
           break;
       }
     } catch (error) {
-      console.log('Audio playback failed:', error);
+      console.warn('⚠️ Audio playback failed:', error);
+      // Add visual feedback when audio fails
+      if (type === 'start') {
+        console.log('🔇 [SILENT] Mission start sound would play here');
+      } else if (type === 'complete') {
+        console.log('🔇 [SILENT] Victory fanfare would play here');
+      }
+    }
+  };
+
+  // Enable audio on first user interaction
+  const enableAudioOnInteraction = async () => {
+    if (!audioEnabled) {
+      try {
+        await Tone.start();
+        setAudioEnabled(true);
+        console.log('🎵 Audio enabled by user interaction');
+      } catch (error) {
+        console.warn('⚠️ Could not enable audio:', error);
+      }
     }
   };
 
@@ -146,9 +207,12 @@ export default function GBotInterface({
     }, 1000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!celebrityName.trim() || currentJob?.status === 'running') return;
+
+    // Enable audio on first interaction
+    await enableAudioOnInteraction();
 
     setMessages(prev => [...prev, {
       id: Date.now(),
@@ -166,6 +230,15 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
+      {/* Audio Status Indicator */}
+      {!audioEnabled && (
+        <div className="absolute top-2 right-2 z-10">
+          <div className="bg-yellow-900/80 text-yellow-200 px-3 py-1 rounded text-sm font-mono">
+            🔇 Click Execute to enable audio
+          </div>
+        </div>
+      )}
+      
       {/* Matching ProgressDisplay padding pattern: consistent 12px all around */}
       <div style={{ padding: '12px', display: 'flex', flexDirection: 'row', height: '100%', position: 'relative' }}>
         
@@ -194,6 +267,16 @@ export default function GBotInterface({
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ repeat: Infinity, duration: 2 }}
               />
+              {/* Audio status indicator */}
+              {audioEnabled && (
+                <motion.div 
+                  className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-slate-900 flex items-center justify-center"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                >
+                  <div className="w-2 h-2 bg-yellow-600 rounded-full"></div>
+                </motion.div>
+              )}
             </div>
             <div>
               <h3 className="font-cyber text-2xl font-bold text-glow-blue">GBot.EXE</h3>
@@ -210,6 +293,11 @@ export default function GBotInterface({
             <div className="p-4 rounded-lg border bg-blue-900/20 text-blue-100 border-blue-500/30">
               <p className="text-base font-ui leading-relaxed">
                 GBot.EXE online! Ready to execute celebrity image sourcing missions.
+                {audioEnabled && (
+                  <span className="block mt-2 text-sm text-green-300">
+                    🎵 Cyber audio systems: ACTIVE
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -234,6 +322,7 @@ export default function GBotInterface({
                   type="text"
                   value={celebrityName}
                   onChange={(e) => setCelebrityName(e.target.value)}
+                  onFocus={enableAudioOnInteraction}
                   placeholder="input celebrity subject name..."
                   className="cyber-input flex-1 text-base"
                   style={{ 
@@ -325,6 +414,9 @@ export default function GBotInterface({
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
               <span className="text-sm font-mono text-slate-300 ml-3">chat://gbot.exe</span>
+              {audioEnabled && (
+                <span className="text-xs font-mono text-green-400 ml-auto">♪ AUDIO</span>
+              )}
             </div>
             
             {/* Line break after header */}
