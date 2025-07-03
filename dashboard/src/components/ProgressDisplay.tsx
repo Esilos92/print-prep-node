@@ -188,8 +188,8 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
           </div>
         )}
 
-        {/* Mission Phases - Dynamic appearance */}
-        {visiblePhases.length > 0 && (
+        {/* Mission Phases - Dynamic appearance - Only show when there's an active job */}
+        {currentJob && visiblePhases.length > 0 && (
           <div>
             <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION PHASES</h4>
             
@@ -269,6 +269,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
