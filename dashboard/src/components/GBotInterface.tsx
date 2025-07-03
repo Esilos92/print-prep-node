@@ -113,10 +113,10 @@ export default function GBotInterface({
 
   return (
     <div className="cyber-panel">
-      <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', height: '100%', padding: '24px' }}>
         
         {/* LEFT SIDE - Exactly 50% */}
-        <div style={{ width: '50%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
+        <div style={{ width: '50%', paddingRight: '24px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }} className="flex flex-col">
           
           {/* Robot + GBot.EXE + AI Image Sourcing Assistant */}
           <div className="flex items-center gap-3">
@@ -168,17 +168,30 @@ export default function GBotInterface({
                   value={celebrityName}
                   onChange={(e) => setCelebrityName(e.target.value)}
                   placeholder="input celebrity subject name..."
-                  className="cyber-input flex-1 text-base"
-                  style={{ padding: '12px 16px', height: '48px', boxSizing: 'border-box' }}
+                  className="cyber-input"
+                  style={{ 
+                    padding: '12px 16px', 
+                    height: '48px', 
+                    width: '200px',
+                    boxSizing: 'border-box' 
+                  }}
                   disabled={currentJob?.status === 'running'}
                 />
                 <button
                   type="submit"
                   disabled={!celebrityName.trim() || currentJob?.status === 'running'}
-                  className={`cyber-button px-8 py-4 text-base whitespace-nowrap ${
+                  className={`cyber-button ${
                     currentJob?.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
-                  style={{ height: '48px', boxSizing: 'border-box', minHeight: 'unset' }}
+                  style={{ 
+                    height: '48px', 
+                    padding: '0 24px',
+                    boxSizing: 'border-box', 
+                    minHeight: 'unset',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    whiteSpace: 'nowrap'
+                  }}
                 >
                   <Send className="w-5 h-5 mr-2" />
                   Execute
@@ -200,7 +213,7 @@ export default function GBotInterface({
         </div>
 
         {/* RIGHT SIDE - Exactly 50% - FIXED POSITIONING LIKE MISSION ARCHIVE */}
-        <div style={{ width: '50%', paddingLeft: '16px' }}>
+        <div style={{ width: '50%', paddingLeft: '24px' }}>
           {/* 🎯 CRITICAL FIX: Invisible emoji ABOVE the text to create proper spacing */}
           <Zap className="w-6 h-6 text-blue-400 mb-2" style={{ opacity: 0 }} />
           <h4 className="text-base font-cyber text-slate-300 mb-4 tracking-wide">COMMUNICATION LOG</h4>
