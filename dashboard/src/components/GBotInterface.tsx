@@ -115,7 +115,7 @@ export default function GBotInterface({
           position: 'absolute',
           left: '50%',
           top: '36px',    // Increased top spacing
-          bottom: '12px', // Decreased bottom spacing back to 12px
+          bottom: '8px',  // Decreased bottom spacing to 8px
           width: '1px',
           backgroundColor: 'rgba(37, 99, 235, 0.3)',
           transform: 'translateX(-8px)' // Offset to account for padding between columns
