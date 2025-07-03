@@ -1,15 +1,14 @@
 import { motion } from 'framer-motion';
 import { 
-  Target, 
   Search, 
-  Download, 
   Brain, 
-  Archive, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle,
-  Zap,
-  Star
+  Target, 
+  Download, 
+  Zap, 
+  Archive,
+  Clock,
+  CheckCircle2,
+  Activity
 } from 'lucide-react';
 
 interface JobStatus {
@@ -22,7 +21,6 @@ interface JobStatus {
   imagesProcessed?: number;
   imagesValidated?: number;
   startTime?: Date;
-  endTime?: Date;
 }
 
 interface ProgressDisplayProps {
@@ -54,18 +52,6 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
       .slice(0, 5); // Limit to maximum 5 roles
   };
 
-  const getPhaseProgress = (phaseIndex: number) => {
-    if (!currentJob) return 0;
-    const phaseThresholds = [10, 25, 40, 70, 90, 100];
-    const currentThreshold = phaseThresholds[phaseIndex];
-    const prevThreshold = phaseIndex > 0 ? phaseThresholds[phaseIndex - 1] : 0;
-    
-    if (currentJob.progress < prevThreshold) return 0;
-    if (currentJob.progress >= currentThreshold) return 100;
-    
-    return ((currentJob.progress - prevThreshold) / (currentThreshold - prevThreshold)) * 100;
-  };
-
   const getCurrentPhaseIndex = () => {
     if (!currentJob) return -1;
     const thresholds = [10, 25, 40, 70, 90, 100];
@@ -92,7 +78,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
     return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
   };
 
-  // Smart phase item with selective animation
+  // FIXED: PhaseItem with proper pulsing logic
   const PhaseItem = ({ phase, index }: { phase: any; index: number }) => {
     const Icon = phase.icon;
     const isActive = isPhaseActive(index);
@@ -109,35 +95,37 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
         transition={{ delay: index * 0.2 }}
         style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}
       >
-        {/* Conditional animation - only current phase pulses */}
+        {/* FIXED: Proper pulsing animation - only current phase pulses white to blue */}
         {isComplete ? (
-          // Completed phases: static checkmark, no animation
+          // Completed phases: static white checkmark
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.5, type: "spring" }}
             style={{ marginRight: '8px' }}
           >
-            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            <CheckCircle2 className="w-4 h-4 text-white" />
           </motion.span>
         ) : isCurrent ? (
-          // Current phase: pulsing animation
+          // Current phase: pulsing white to blue animation
           <motion.span
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 1.5 }}
+            animate={{ 
+              color: ['#ffffff', '#60a5fa', '#ffffff'] // white -> blue -> white
+            }}
+            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
             style={{ marginRight: '8px' }}
           >
-            <Icon className="w-4 h-4 text-blue-400" />
+            <Icon className="w-4 h-4" />
           </motion.span>
         ) : (
-          // Future phases: static icon
+          // Future phases: static gray icon
           <span style={{ marginRight: '8px' }}>
             <Icon className="w-4 h-4 text-slate-600" />
           </span>
         )}
         
         <span className={`text-sm font-ui ${
-          isComplete ? 'text-green-300' : isCurrent ? 'text-blue-300' : 'text-slate-400'
+          isComplete ? 'text-white' : isCurrent ? 'text-blue-300' : 'text-slate-400'
         }`}>
           {phase.name}
         </span>
@@ -149,95 +137,146 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
   return (
     <div className="cyber-panel">
-      {/* Matching GBotInterface padding pattern: consistent 12px all around */}
-      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: '12px' }}>
         
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <Target className="w-6 h-6 text-blue-400" />
-          <h3 className="font-cyber text-2xl font-bold text-glow-blue">PROGRESS DISPLAY</h3>
-        </div>
-
-        <br />
-
-        {/* Current Subject */}
+        {/* ROW 1 - Header Section */}
         <div className="mb-6">
-          <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">CURRENT SUBJECT</h4>
-          <div className="font-cyber text-xl text-glow-pink">
-            {currentJob ? currentJob.celebrity : 'No Active Mission'}
+          {/* Mission Status Header */}
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="w-5 h-5 text-blue-400" />
+            <h3 className="text-lg font-cyber font-bold text-glow-blue">
+              MISSION STATUS
+            </h3>
           </div>
-          
-          {/* Clean Roles Display - Limited to 5 */}
-          {cleanRoles.length > 0 && (
-            <div className="mt-2">
-              <span className="text-sm text-slate-400">Roles: </span>
-              <span className="text-sm text-blue-300">
-                {cleanRoles.join(', ')}
-              </span>
-            </div>
-          )}
-        </div>
 
-        {/* Mission Progress - Only show when there's an active job */}
-        {currentJob && (
-          <div className="mb-6">
-            <h4 className="text-base font-cyber text-slate-300 mb-3 tracking-wide">MISSION STATUS</h4>
-            
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-ui text-slate-300">
-                  {currentJob?.status === 'running' ? 'Processing...' : 
-                   currentJob?.status === 'completed' ? 'Mission Complete' :
-                   currentJob?.status === 'error' ? 'Mission Failed' : 'Standby'}
-                </span>
-                <span className="text-sm font-cyber text-blue-300">
-                  {currentJob ? `${Math.round(currentJob.progress || 0)}%` : '0% '}
-                </span>
+          {!currentJob ? (
+            /* Idle State */
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Search className="w-8 h-8 text-slate-600" />
               </div>
-              
-              <div className="w-full bg-slate-800/50 rounded-full h-3 border border-slate-600/50 relative">
-                <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${currentJob?.progress || 0}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-                {/* Progress percentage positioned above the end of the bar */}
-                {currentJob?.status === 'running' && (
-                  <div 
-                    className="absolute -top-6 text-xs font-cyber text-blue-300"
-                    style={{ left: `${Math.max(currentJob.progress || 0, 10)}%`, transform: 'translateX(-50%)' }}
-                  >
-                    {Math.round(currentJob.progress || 0)}%
+              <h4 className="text-sm font-cyber text-slate-400 mb-2">
+                AWAITING MISSION
+              </h4>
+              <p className="text-xs text-slate-500 font-ui">
+                Enter celebrity name to begin
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Two Column Layout */}
+              <div style={{ display: 'flex', flexDirection: 'row', gap: '32px' }}>
+                
+                {/* Column 1 - Celebrity Info */}
+                <div style={{ flex: 1, paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                  {/* Celebrity Name */}
+                  <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
+                    {currentJob.celebrity}
+                  </h4>
+
+                  {/* Clean roles beneath celebrity name */}
+                  {cleanRoles.length > 0 && (
+                    <div className="text-center mb-4">
+                      <span className="text-sm text-blue-200 font-ui">
+                        {cleanRoles.slice(0, 3).join(', ')}
+                      </span>
+                      {cleanRoles.length > 3 && (
+                        <span className="text-xs text-slate-400 font-ui block mt-1">
+                          +{cleanRoles.length - 3} more roles
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Column 2 - Image Stats */}
+                {(currentJob.imagesProcessed || currentJob.imagesValidated) && (
+                  <div style={{ flex: 1, paddingLeft: '16px' }}>
+                    <h6 className="font-cyber text-xl text-glow-blue mb-4 tracking-wide">
+                      IMAGES
+                    </h6>
+                    <div className="text-center">
+                      <div className="text-2xl font-cyber font-bold text-blue-300">
+                        {currentJob.imagesProcessed || 0} Downloaded
+                        {currentJob.imagesValidated && (
+                          <> / {currentJob.imagesValidated} Validated</>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Validation Progress - Cumulative */}
-            {currentJob?.currentPhase === 'ai_validation' && currentJob.imagesValidated && (
-              <div className="mb-4">
+              {/* Line Break between Mission Status row and Progress row */}
+              <br />
+
+              {/* RESTORED: Progress Bar Row - Full Width */}
+              <div className="mt-4 mb-2">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-ui text-slate-300">AI Validation Progress</span>
-                  <span className="text-sm font-cyber text-green-300">
-                    {currentJob.imagesValidated} validated
+                  <span className="text-2xl font-cyber font-bold text-blue-400">
+                    {currentJob.progress}%
                   </span>
+                  {currentJob.startTime && (
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      <span className="font-cyber">{formatDuration(currentJob.startTime)}</span>
+                    </div>
+                  )}
                 </div>
                 
-                <div className="w-full bg-slate-800/50 rounded-full h-2 border border-slate-600/50">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400"
+                {/* RESTORED: Progress bar with smooth transitions */}
+                <div className="progress-bar h-4">
+                  <motion.div 
+                    className="progress-fill"
                     initial={{ width: 0 }}
-                    animate={{ width: `${getValidationProgress()}%` }}
-                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    animate={{ width: `${currentJob.progress}%` }}
+                    transition={{ duration: 0.8, ease: "easeInOut" }}
                   />
                 </div>
+                
+                <p className="text-xs text-slate-400 font-ui text-center mt-2">
+                  {currentJob.currentPhase}
+                </p>
               </div>
-            )}
+            </>
+          )}
+
+          {/* Line Break between progress bar and mission phases */}
+          {currentJob && <br />}
+        </div>
+
+        {/* RESTORED: Mission Phases in 3 Columns */}
+        {currentJob && (
+          <div className="border-t border-slate-700 pt-4">
+            <h5 className="font-cyber text-sm text-slate-300 mb-4 tracking-wide">
+              MISSION PHASES
+            </h5>
+            
+            <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+              
+              {/* Column 1 - 33.33% */}
+              <div style={{ width: '33.33%', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                <br />
+                <PhaseItem phase={phases[0]} index={0} />
+                <PhaseItem phase={phases[1]} index={1} />
+              </div>
+
+              {/* Column 2 - 33.33% */}
+              <div style={{ width: '33.33%', paddingLeft: '16px', paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                <br />
+                <PhaseItem phase={phases[2]} index={2} />
+                <PhaseItem phase={phases[3]} index={3} />
+              </div>
+
+              {/* Column 3 - 33.33% */}
+              <div style={{ width: '33.33%', paddingLeft: '16px' }}>
+                <br />
+                <PhaseItem phase={phases[4]} index={4} />
+                <PhaseItem phase={phases[5]} index={5} />
+              </div>
+            </div>
           </div>
         )}
-
       </div>
     </div>
   );
