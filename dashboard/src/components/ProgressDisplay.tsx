@@ -218,17 +218,17 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               {/* FIXED: Progress Bar Row with time and percentage on same line */}
               <div className="mt-4 mb-2">
                 {/* FIXED: Time | Percentage on same line with proper spacing */}
-                <div className="flex items-center gap-4 mb-2">
+                <div className="flex items-center mb-2" style={{ gap: '16px' }}>
                   {currentJob.startTime && (
                     <>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center" style={{ gap: '8px' }}>
                         <Clock className="w-4 h-4 text-slate-400" />
-                        <span className="font-cyber text-base text-slate-400">{formatDuration(currentJob.startTime)}</span>
+                        <span className="font-cyber text-base text-slate-400 whitespace-nowrap">{formatDuration(currentJob.startTime)}</span>
                       </div>
                       <span className="text-slate-500">|</span>
                     </>
                   )}
-                  <span className="text-2xl font-cyber font-bold text-blue-400">
+                  <span className="text-2xl font-cyber font-bold text-blue-400 whitespace-nowrap">
                     {currentJob.progress}%
                   </span>
                 </div>
