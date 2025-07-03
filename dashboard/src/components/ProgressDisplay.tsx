@@ -124,6 +124,7 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
             <Icon className="w-4 h-4 text-slate-600" />
           )}
         </span>
+
         <span className={`text-sm font-ui transition-colors duration-200 ${
           isComplete ? 'text-white' : isCurrent ? 'text-blue-300' : 'text-slate-400'
         }`}>
@@ -137,11 +138,13 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
 
   return (
     <div className="cyber-panel">
-      <div className="p-3">
+      <div style={{ padding: '12px' }}>
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Activity className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-cyber font-bold text-glow-blue">MISSION STATUS</h3>
+            <h3 className="text-lg font-cyber font-bold text-glow-blue">
+              MISSION STATUS
+            </h3>
           </div>
 
           {!currentJob ? (
@@ -149,14 +152,20 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Search className="w-8 h-8 text-slate-600" />
               </div>
-              <h4 className="text-sm font-cyber text-slate-400 mb-2">AWAITING MISSION</h4>
-              <p className="text-xs text-slate-500 font-ui">Enter celebrity name to begin</p>
+              <h4 className="text-sm font-cyber text-slate-400 mb-2">
+                AWAITING MISSION
+              </h4>
+              <p className="text-xs text-slate-500 font-ui">
+                Enter celebrity name to begin
+              </p>
             </div>
           ) : (
             <>
-              <div className="flex flex-row gap-8">
-                <div className="flex-1 pr-4 border-r border-blue-700/30">
-                  <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">{currentJob.celebrity}</h4>
+              <div style={{ display: 'flex', flexDirection: 'row', gap: '32px' }}>
+                <div style={{ flex: 1, paddingRight: '16px', borderRight: '1px solid rgba(37, 99, 235, 0.3)' }}>
+                  <h4 className="font-cyber text-xl text-glow-pink mb-4 text-center">
+                    {currentJob.celebrity}
+                  </h4>
 
                   {cleanRoles.length > 0 && (
                     <div className="text-center mb-4">
@@ -173,31 +182,35 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
                 </div>
 
                 {(currentJob.imagesProcessed || currentJob.imagesValidated) && (
-                  <div className="flex-1 pl-4">
-                    <h6 className="font-cyber text-xs text-blue-300 mb-1 uppercase tracking-wider">
-                      Images
+                  <div style={{ flex: 1, paddingLeft: '16px' }}>
+                    <h6 className="font-cyber text-xl text-glow-blue mb-4 tracking-wide">
+                      IMAGES
                     </h6>
-                    <div className="text-right text-white font-cyber text-lg tabular-nums">
-                      {currentJob.imagesProcessed || 0} Downloaded
-                      {currentJob.imagesValidated !== undefined && (
-                        <> / {currentJob.imagesValidated}</>
-                      )}
+                    <div className="text-center">
+                      <div className="text-2xl font-cyber font-bold text-blue-300">
+                        {currentJob.imagesProcessed || 0} Downloaded
+                        {currentJob.imagesValidated && (
+                          <> / {currentJob.imagesValidated} Validated</>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="mt-4 font-cyber text-sm text-slate-400">
-                {/* FIXED TIMER & PERCENT HORIZONTAL */}
-                <div className="flex items-center justify-between whitespace-nowrap gap-2">
+              <br />
+
+              {/* ✅ Timer and Percent — Fixed Width, No Jumps */}
+              <div className="mt-4 mb-2 text-sm font-cyber text-slate-400">
+                <div className="flex flex-row items-center gap-3 whitespace-nowrap">
                   <div className="flex items-center gap-1 w-[100px]">
-                    <Clock className="w-4 h-4 text-slate-400" />
-                    <span className="tabular-nums w-[70px] inline-block text-left">
+                    <Clock className="w-3 h-3 text-slate-400" />
+                    <span className="tabular-nums w-[60px] inline-block text-left">
                       {formatDuration(currentJob.startTime)}
                     </span>
                   </div>
-                  <div className="text-slate-600">|</div>
-                  <div className="w-[50px] text-right text-blue-400 font-bold tabular-nums">
+                  <span className="text-slate-600">|</span>
+                  <div className="text-blue-400 font-bold tabular-nums w-[50px] text-right">
                     {currentJob.progress}%
                   </div>
                 </div>
@@ -226,18 +239,35 @@ export default function ProgressDisplay({ currentJob }: ProgressDisplayProps) {
               MISSION PHASES
             </h5>
 
-            <div className="flex flex-row h-full">
-              <div className="w-1/3 pr-4 border-r border-slate-700 min-h-[120px]">
+            <div style={{ display: 'flex', flexDirection: 'row', height: '100%' }}>
+              <div style={{
+                width: '33.33%',
+                paddingRight: '16px',
+                borderRight: '1px solid rgba(37, 99, 235, 0.3)',
+                minHeight: '120px'
+              }}>
                 <br />
                 <PhaseItem phase={phases[0]} index={0} />
                 <PhaseItem phase={phases[1]} index={1} />
               </div>
-              <div className="w-1/3 px-4 border-r border-slate-700 min-h-[120px]">
+
+              <div style={{
+                width: '33.33%',
+                paddingLeft: '16px',
+                paddingRight: '16px',
+                borderRight: '1px solid rgba(37, 99, 235, 0.3)',
+                minHeight: '120px'
+              }}>
                 <br />
                 <PhaseItem phase={phases[2]} index={2} />
                 <PhaseItem phase={phases[3]} index={3} />
               </div>
-              <div className="w-1/3 pl-4 min-h-[120px]">
+
+              <div style={{
+                width: '33.33%',
+                paddingLeft: '16px',
+                minHeight: '120px'
+              }}>
                 <br />
                 <PhaseItem phase={phases[4]} index={4} />
                 <PhaseItem phase={phases[5]} index={5} />
