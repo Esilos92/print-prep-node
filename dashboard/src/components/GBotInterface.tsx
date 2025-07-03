@@ -402,8 +402,8 @@ export default function GBotInterface({
             <h3 className="font-cyber text-2xl font-bold text-glow-blue">COMMUNICATION LOG</h3>
           </div>
               
-          {/* Chat Container - ONLY fix internal scrolling, keep original size */}
-          <div className="bg-slate-900/80 rounded-lg border border-slate-600 flex flex-col overflow-hidden" style={{ height: 'calc(100% - 60px)' }}>
+          {/* Chat Container - FIXED SCROLLING */}
+          <div className="gbot-chat-container bg-slate-900/80 rounded-lg border border-slate-600" style={{ height: 'calc(100% - 60px)' }}>
             
             {/* Chat Header */}
             <div className="bg-slate-800/70 px-4 py-3 border-b border-slate-600 flex items-center gap-2 flex-shrink-0">
@@ -416,17 +416,8 @@ export default function GBotInterface({
             {/* Embedded chat separator line */}
             <div className="bg-slate-950/90 border-b border-slate-700" style={{ height: '2px', flexShrink: 0 }}></div>
             
-            {/* Chat Messages Area - ONLY fix scrolling behavior */}
-            <div 
-              className="flex-1 p-4 overflow-y-auto space-y-4"
-              style={{ 
-                backgroundColor: 'rgba(2, 6, 23, 0.95)', // Embedded chat background
-                scrollBehavior: 'smooth',
-                overscrollBehavior: 'contain',
-                minHeight: 0, // Critical: Prevents flex overflow
-                maxHeight: '100%' // Ensures containment
-              }}
-            >
+            {/* Chat Messages Area - FIXED SCROLLING */}
+            <div className="gbot-chat-messages space-y-4">
               {messages.map((message) => (
                 <motion.div
                   key={message.id}
