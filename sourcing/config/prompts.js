@@ -6,38 +6,47 @@
 const PROMPTS = {
 
   /**
-   * ENHANCED: Universal role fetching prompt - works for ANY celebrity level
+   * FIXED: Anti-hallucination role discovery for all celebrity levels
    */
-  FETCH_ROLES: (actorName) => `You are an entertainment expert. For "${actorName}", find their TOP 5 most popular/recognizable CHARACTER ROLES from any level of fame.
+  FETCH_ROLES: (actorName) => `You are an entertainment expert. For "${actorName}", find their TOP 5 most notable CHARACTER ROLES. BE EXTREMELY CAREFUL not to invent or guess roles.
+
+CRITICAL INSTRUCTIONS:
+- Only include roles you are CERTAIN about
+- If you're unsure about a role, do NOT include it
+- Better to return fewer real roles than many fake ones
+- Focus on verifiable filmography
 
 DISCOVERY STRATEGY:
 1. If mainstream celebrity: Focus on their most iconic roles
-2. If emerging/breakout star: Focus heavily on their breakthrough performance + any supporting roles
-3. If niche/indie actor: Find their most notable work even if small-scale
+2. If emerging/breakout star: Focus heavily on their breakthrough performance + any supporting roles  
+3. If niche/indie actor: Find their most notable work even if small-scale (ESPECIALLY HORROR/INDIE FILMS)
 4. If voice actor: Focus on character roles people know them for
 5. If viral-to-actor: Focus ONLY on their acting roles, ignore viral content
 
 SEARCH APPROACH:
 - Check recent breakout roles and trending performances
 - Include indie films, streaming shows, and animation that gained popularity
+- PRIORITIZE HORROR FILMS (independent horror is often overlooked)
 - For voice actors: Focus on character images, not actor photos
 - Look for roles that audiences actually discuss or remember
+- Include film festival circuit and cult films
 
 INCLUDE:
 - Named character roles (priority)
+- Horror films (especially independent horror)
 - Breakout/trending performances
 - Popular indie/streaming content
 - Voice acting characters (for anime/animation)
 - Recent notable work gaining attention
 - Small but memorable roles
-- Guest appearances that gained attention
+- Genre films (horror, thriller, sci-fi)
 
 AVOID:
 - Hosting/presenting roles
 - Background/extra work
 - Social media content (focus on acting only)
-- Unreleased or completely unknown projects
-- Reality TV appearances
+- Unreleased or unknown projects
+- NEVER INVENT OR GUESS ROLES
 
 MEDIUM CLASSIFICATION:
 - live_action_tv: TV series/streaming shows (any budget)
@@ -59,7 +68,60 @@ Format as JSON array with EXACT character names:
   }
 ]
 
-Focus on what "${actorName}" is actually KNOWN for, regardless of fame level. Include recent work if they're a rising star.`,
+Focus on what "${actorName}" is actually KNOWN for, regardless of fame level. Include recent work if they're a rising star. 
+
+VERIFICATION: Double-check each role before including it. Only include roles you can verify.`,
+
+  /**
+   * ENHANCED: Horror/indie specific discovery for missed content
+   */
+  HORROR_INDIE_DISCOVERY: (actorName) => `"${actorName}" may be primarily known for horror, thriller, or independent films. These are often missed by general searches.
+
+FOCUS ON:
+- Horror films (especially independent horror like "Terrifier")
+- Thriller and suspense films
+- Independent/art house cinema
+- Cult films and B-movies
+- Film festival circuit movies
+- Streaming platform horror content
+
+INCLUDE:
+- Low-budget horror films
+- Indie productions
+- Genre films (horror, thriller, sci-fi)
+- Film festival entries
+- Cult favorites
+
+Be specific about character names and exact film titles. Only include verified roles.
+
+Format as JSON array:
+[
+  {
+    "character": "Exact Character Name",
+    "title": "Exact Film Title", 
+    "medium": "live_action_movie",
+    "year": "YYYY",
+    "popularity": "low",
+    "genre": "horror/indie"
+  }
+]`,
+
+  /**
+   * ENHANCED: Self-verification prompt to catch hallucinations
+   */
+  VERIFY_DISCOVERED_ROLES: (actorName, roles) => `Verify these roles for "${actorName}". Mark any you're uncertain about.
+
+${roles.map(r => `- ${r.character} in ${r.title} (${r.year})`).join('\n')}
+
+For each role, respond:
+- CONFIRMED: You're certain this is correct
+- UNCERTAIN: You're not sure about this role  
+- INCORRECT: You believe this is wrong
+
+Format: TITLE|STATUS|REASON
+Example: "Terrifier|CONFIRMED|Horror film from 2016"
+
+IMPORTANT: If you're not certain about a role, mark it as UNCERTAIN or INCORRECT. Better to be safe.`,
 
   /**
    * ENHANCED: Broad discovery for difficult/unknown celebrities
