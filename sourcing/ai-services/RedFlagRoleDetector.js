@@ -2,8 +2,7 @@ const OpenAI = require('openai');
 const axios = require('axios');
 
 /**
- * SIMPLE Red Flag Emergency System
- * Emergency = Search IMDb directly, only return what's actually on IMDb
+ * SIMPLE Red Flag Emergency System - FIXED CHARACTER EXTRACTION
  */
 class RedFlagRoleDetector {
   constructor() {
@@ -174,7 +173,7 @@ class RedFlagRoleDetector {
       const year = titleMatch[2];
       
       if (this.isValidMovieTitle(movieTitle)) {
-        // Try to get character name from snippet
+        // FIXED: Try to get character name from snippet
         const character = this.extractCharacterFromSnippet(snippet, celebrityName);
         
         roles.push({
@@ -196,49 +195,71 @@ class RedFlagRoleDetector {
   }
 
   /**
-   * SIMPLE: Extract character name from IMDb snippet
+   * FIXED: Extract character name from IMDb snippet - PRECISE PATTERNS ONLY
    */
   extractCharacterFromSnippet(snippet, celebrityName) {
     const snippetLower = snippet.toLowerCase();
     const celebrityLower = celebrityName.toLowerCase();
     
-    // Pattern 1: "Celebrity as Character"
-    const asPattern = new RegExp(`${celebrityLower}\\s+as\\s+([A-Z][a-zA-Z\\s]+?)(?:\\s|,|\\.|$)`, 'i');
+    // FIXED Pattern 1: "Celebrity as Character"
+    const asPattern = new RegExp(`${this.escapeRegex(celebrityLower)}\\s+as\\s+([A-Z][a-zA-Z\\s]{2,25})`, 'i');
     const asMatch = snippet.match(asPattern);
     if (asMatch) {
       const character = asMatch[1].trim();
       if (this.isValidCharacterName(character)) {
+        console.log(`✅ Found character via "as": ${character}`);
         return character;
       }
     }
     
-    // Pattern 2: "Celebrity plays Character"
-    const playsPattern = new RegExp(`${celebrityLower}\\s+plays\\s+([A-Z][a-zA-Z\\s]+?)(?:\\s|,|\\.|$)`, 'i');
+    // FIXED Pattern 2: "Celebrity plays Character"
+    const playsPattern = new RegExp(`${this.escapeRegex(celebrityLower)}\\s+plays\\s+([A-Z][a-zA-Z\\s]{2,25})`, 'i');
     const playsMatch = snippet.match(playsPattern);
     if (playsMatch) {
       const character = playsMatch[1].trim();
       if (this.isValidCharacterName(character)) {
+        console.log(`✅ Found character via "plays": ${character}`);
         return character;
       }
     }
     
-    // Pattern 3: Look for capitalized names near the celebrity name
-    const words = snippet.split(/\s+/);
-    const celebrityIndex = words.findIndex(word => word.toLowerCase().includes(celebrityLower.split(' ')[0].toLowerCase()));
-    
-    if (celebrityIndex !== -1) {
-      // Look for capitalized names within 5 words
-      for (let i = Math.max(0, celebrityIndex - 5); i < Math.min(words.length, celebrityIndex + 5); i++) {
-        const word = words[i];
-        if (word.length > 2 && word[0] === word[0].toUpperCase() && 
-            !word.toLowerCase().includes(celebrityLower.toLowerCase()) &&
-            this.isValidCharacterName(word)) {
-          return word;
-        }
+    // FIXED Pattern 3: Cast format "Character ... Celebrity"
+    const castPattern = new RegExp(`([A-Z][a-zA-Z\\s]{2,25})\\s*[\\.\\.\\-]+\\s*${this.escapeRegex(celebrityLower)}`, 'i');
+    const castMatch = snippet.match(castPattern);
+    if (castMatch) {
+      const character = castMatch[1].trim();
+      if (this.isValidCharacterName(character)) {
+        console.log(`✅ Found character via cast: ${character}`);
+        return character;
       }
     }
     
+    console.log(`❌ No character found for ${celebrityName}`);
     return null;
+  }
+
+  /**
+   * FIXED: Escape regex special characters
+   */
+  escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * FIXED: Stricter character name validation
+   */
+  isValidCharacterName(name) {
+    if (!name || name.length < 2 || name.length > 50) return false;
+    
+    const nameLower = name.toLowerCase();
+    
+    // FIXED: Block obvious junk
+    const excludeWords = [
+      'actor', 'actress', 'character', 'imdb', 'movie', 'film', 'show', 'series',
+      'cast', 'starring', 'featuring', 'director', 'producer', 'writer'
+    ];
+    
+    return !excludeWords.some(word => nameLower.includes(word));
   }
 
   /**
@@ -251,18 +272,6 @@ class RedFlagRoleDetector {
     const titleLower = title.toLowerCase();
     
     return !excludeWords.some(word => titleLower.includes(word));
-  }
-
-  /**
-   * SIMPLE: Check if it's a valid character name
-   */
-  isValidCharacterName(name) {
-    if (!name || name.length < 2 || name.length > 50) return false;
-    
-    const excludeWords = ['actor', 'actress', 'character', 'imdb', 'movie', 'film', 'show'];
-    const nameLower = name.toLowerCase();
-    
-    return !excludeWords.some(word => nameLower.includes(word));
   }
 
   /**
