@@ -4,7 +4,7 @@
  */
 
 const PROMPTS = {
-  
+
   /**
    * Main role fetching prompt - focused on visual character roles
    */
@@ -13,7 +13,7 @@ const PROMPTS = {
 INCLUDE:
 - Named character roles with strong visual presence
 - Cult horror, viral hits, genre favorites, and indie standouts
-- Roles fans would recognize from posters, trailers, or iconic scenes
+- Roles fans would recognize from posters, trailers, scenes, or fan-favorite moments — even if the project was niche or cult
 - Live-action and animated work from 2010 onward (unless earlier roles are definitive)
 
 AVOID:
@@ -51,7 +51,7 @@ Provide exactly 5 roles ordered by visual recognition and fan familiarity.`,
 GOAL: Find professional production photos, promotional images, and official character stills. Avoid celebrity autograph photos.
 
 EXCLUSIONS for ALL terms:
-"-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -signature -inscription -fan -art -edit -meme -comic -dvd -case"
+"-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -signature -inscription -fan -art -edit -meme -comic -dvd -case -poster"
 
 SEARCH STRATEGY:
 ${medium.includes('voice') ? 
@@ -66,10 +66,14 @@ ${medium.includes('voice') ?
   - "${actorName || 'ACTOR_NAME'} ${character}" production still
   - "${character} ${title}" official image
   - "${actorName || 'ACTOR_NAME'} ${title}" scene
-  - "${title} ${character}" promo shot
-  - "${character}" character still
-  - "${title}" cast promotional photo`
+  - "${title} ${character}" still
+  - "${character}" scene still from "${title}"
+  - "${title}" cast behind the scenes`
 }
+
+Include genre-specific modifiers when relevant:
+- For horror: add "horror still", "slasher scene", or "cult film shot"
+- For sci-fi: add "sci-fi frame", "tech background"
 
 Return 6 clean search terms with exclusions:
 ["term 1", "term 2", "term 3", "term 4", "term 5", "term 6"]`,
