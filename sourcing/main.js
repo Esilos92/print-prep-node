@@ -1,7 +1,7 @@
 const AIRoleFetcher = require('./ai-services/AIRoleFetcher.js');
 const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
 const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js');
-const RedFlagRoleDetector = require('./ai-services/RedFlagRoleDetector.js'); // NEW
+const RedFlagRoleDetector = require('./ai-services/RedFlagRoleDetector.js');
 const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
 
 class CelebrityRoleOrchestrator {
@@ -9,16 +9,16 @@ class CelebrityRoleOrchestrator {
     this.roleFetcher = new AIRoleFetcher();
     this.searchOptimizer = new SearchOptimizer();
     this.roleVerifier = new SimpleRoleVerifier();
-    this.redFlagDetector = new RedFlagRoleDetector(); // NEW
+    this.redFlagDetector = new RedFlagRoleDetector();
     this.cache = new Map();
   }
 
   /**
-   * STREAMLINED: Celebrity role discovery with optimized verification
+   * ENHANCED: Celebrity role discovery with advanced red flag detection and recovery
    */
   async getCelebrityRoles(celebrityName) {
     try {
-      console.log(`\n🎬 Starting optimized role discovery for: ${celebrityName}`);
+      console.log(`\n🎬 Starting enhanced role discovery for: ${celebrityName}`);
       
       // Check cache first
       if (this.cache.has(celebrityName)) {
@@ -40,34 +40,44 @@ class CelebrityRoleOrchestrator {
       console.log(`🔍 Verifying ${rolesWithValidatedNames.length} discovered roles...`);
       const verifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, rolesWithValidatedNames);
       
-      // NEW: Red flag detection for AI hallucinations
+      // Step 4: ENHANCED Red flag detection for AI hallucinations
       const rejectedRoles = rolesWithValidatedNames.filter(role => 
         !verifiedRoles.some(verified => verified.character === role.character && verified.title === role.title)
       );
       
       const redFlagResult = this.redFlagDetector.detectRedFlags(celebrityName, verifiedRoles, rejectedRoles);
       
+      // Step 5: ENHANCED Emergency recovery with character name extraction
       if (redFlagResult.triggerEmergency) {
         console.log(`🚨 RED FLAGS DETECTED: ${redFlagResult.redFlags.length} issues found`);
-        console.log(`🌐 Triggering emergency web search for actual filmography...`);
+        console.log(`📊 Analysis: ${JSON.stringify(redFlagResult.analysis, null, 2)}`);
+        console.log(`🌐 Triggering ENHANCED emergency web search with character extraction...`);
         
-        // Emergency web search for actual roles
+        // ENHANCED emergency web search with character name extraction
         const emergencyRoles = await this.redFlagDetector.emergencyFilmographySearch(celebrityName);
         
         if (emergencyRoles && emergencyRoles.length > 0) {
-          console.log(`✅ Emergency search found ${emergencyRoles.length} actual roles`);
+          console.log(`✅ Emergency search found ${emergencyRoles.length} roles with character names`);
+          
+          // ENHANCED: Re-verify emergency roles with lenient approach
+          const emergencyVerifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, emergencyRoles);
           
           // Merge emergency results with any verified roles
-          const combinedRoles = [...verifiedRoles, ...emergencyRoles];
-          const finalVerifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, combinedRoles);
+          const allVerifiedRoles = [...verifiedRoles, ...emergencyVerifiedRoles];
           
-          console.log(`🎯 Emergency recovery: ${finalVerifiedRoles.length} total verified roles`);
+          // Remove duplicates based on title and character
+          const uniqueVerifiedRoles = this.removeDuplicateRoles(allVerifiedRoles);
           
-          if (finalVerifiedRoles.length > verifiedRoles.length) {
-            console.log(`✅ Emergency search recovered ${finalVerifiedRoles.length - verifiedRoles.length} additional roles`);
-            // Continue with emergency results
-            return await this.processWithEmergencyResults(celebrityName, finalVerifiedRoles, redFlagResult);
+          console.log(`🎯 Emergency recovery complete: ${uniqueVerifiedRoles.length} total verified roles`);
+          
+          if (uniqueVerifiedRoles.length > verifiedRoles.length) {
+            console.log(`✅ Emergency search recovered ${uniqueVerifiedRoles.length - verifiedRoles.length} additional roles`);
+            return await this.processWithEmergencyResults(celebrityName, uniqueVerifiedRoles, redFlagResult, emergencyRoles);
+          } else {
+            console.log(`⚠️ Emergency search did not find additional valid roles`);
           }
+        } else {
+          console.log(`❌ Emergency search found no roles with character names`);
         }
       }
       
@@ -80,24 +90,25 @@ class CelebrityRoleOrchestrator {
         console.log(`❌ Rejected ${rejectedCount} invalid roles - saved ~${(rejectedCount * 0.18).toFixed(2)} in wasted searches`);
       }
 
-      // Step 4: Add celebrity metadata and analyze roles
+      // Step 6: Add celebrity metadata and analyze roles
       const rolesWithMetadata = verifiedRoles.map(role => ({ 
         ...role,
         celebrity: celebrityName,
         actorName: celebrityName,
         characterProminent: this.analyzeCharacterProminence(role, celebrityName),
-        searchPriority: this.calculateSearchPriority(role, celebrityName)
+        searchPriority: this.calculateSearchPriority(role, celebrityName),
+        originalDiscovery: true
       }));
 
       console.log(`🔍 Optimizing search terms for ${rolesWithMetadata.length} verified roles`);
 
-      // Step 5: Generate optimized search terms
+      // Step 7: Generate optimized search terms
       const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithMetadata);
 
-      // Step 6: Add smart search strategies
+      // Step 8: Add smart search strategies
       const rolesWithStrategies = await this.addSmartSearchStrategies(optimizedRoles, celebrityName);
 
-      // Step 7: Generate final results
+      // Step 9: Generate final results
       const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithStrategies);
       const finalResults = this.processOptimizedResults(celebrityName, rolesWithStrategies, optimizationStats);
 
@@ -112,6 +123,85 @@ class CelebrityRoleOrchestrator {
     } catch (error) {
       console.error(`❌ Failed to get results for ${celebrityName}:`, error.message);
       return this.handleFailure(celebrityName, error);
+    }
+  }
+
+  /**
+   * ENHANCED: Remove duplicate roles based on title and character similarity
+   */
+  removeDuplicateRoles(roles) {
+    const uniqueRoles = [];
+    const seen = new Set();
+    
+    for (const role of roles) {
+      const key = `${role.title.toLowerCase().trim()}_${role.character.toLowerCase().trim()}`;
+      
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueRoles.push(role);
+      } else {
+        console.log(`🔄 Duplicate role removed: ${role.character} in ${role.title}`);
+      }
+    }
+    
+    return uniqueRoles;
+  }
+
+  /**
+   * ENHANCED: Process results after emergency web search with character extraction
+   */
+  async processWithEmergencyResults(celebrityName, emergencyVerifiedRoles, redFlagResult, rawEmergencyRoles) {
+    try {
+      console.log(`🚨 Processing enhanced emergency results for ${celebrityName}`);
+      
+      // Add metadata to emergency results
+      const rolesWithMetadata = emergencyVerifiedRoles.map(role => ({ 
+        ...role,
+        celebrity: celebrityName,
+        actorName: celebrityName,
+        characterProminent: this.analyzeCharacterProminence(role, celebrityName),
+        searchPriority: this.calculateSearchPriority(role, celebrityName),
+        emergencyRecovered: true,
+        recoveryMethod: role.recoveryMethod || 'web_search_with_character_extraction'
+      }));
+
+      // Optimize search terms
+      const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithMetadata);
+      const rolesWithStrategies = await this.addSmartSearchStrategies(optimizedRoles, celebrityName);
+      
+      // Generate results with emergency context
+      const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithStrategies);
+      const finalResults = this.processOptimizedResults(celebrityName, rolesWithStrategies, optimizationStats);
+      
+      // Add enhanced emergency context to results
+      finalResults.emergencyRecovery = {
+        triggered: true,
+        redFlags: redFlagResult.redFlags,
+        analysis: redFlagResult.analysis,
+        recoveredRoles: emergencyVerifiedRoles.length,
+        emergencyMethod: 'enhanced_web_search_with_character_extraction',
+        characterExtractionSuccess: rawEmergencyRoles.filter(r => r.character !== 'Character').length,
+        totalEmergencyRoles: rawEmergencyRoles.length,
+        verificationSuccess: emergencyVerifiedRoles.length,
+        recoveryStats: {
+          titlesFound: rawEmergencyRoles.length,
+          charactersExtracted: rawEmergencyRoles.filter(r => r.character !== 'Character').length,
+          rolesVerified: emergencyVerifiedRoles.length,
+          successRate: rawEmergencyRoles.length > 0 ? (emergencyVerifiedRoles.length / rawEmergencyRoles.length * 100).toFixed(1) : 0
+        }
+      };
+      
+      // Cache results
+      this.cache.set(celebrityName, finalResults);
+      
+      console.log(`✅ Enhanced emergency recovery complete: ${finalResults.roles.length} roles for ${celebrityName}`);
+      console.log(`📊 Recovery stats: ${finalResults.emergencyRecovery.recoveryStats.successRate}% success rate`);
+      
+      return finalResults;
+      
+    } catch (error) {
+      console.error(`❌ Emergency processing failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -226,52 +316,6 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
   }
 
   /**
-   * NEW: Process results after emergency web search
-   */
-  async processWithEmergencyResults(celebrityName, emergencyVerifiedRoles, redFlagResult) {
-    try {
-      console.log(`🚨 Processing emergency results for ${celebrityName}`);
-      
-      // Add metadata to emergency results
-      const rolesWithMetadata = emergencyVerifiedRoles.map(role => ({ 
-        ...role,
-        celebrity: celebrityName,
-        actorName: celebrityName,
-        characterProminent: this.analyzeCharacterProminence(role, celebrityName),
-        searchPriority: this.calculateSearchPriority(role, celebrityName),
-        emergencyRecovered: true
-      }));
-
-      // Optimize search terms
-      const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithMetadata);
-      const rolesWithStrategies = await this.addSmartSearchStrategies(optimizedRoles, celebrityName);
-      
-      // Generate results with emergency context
-      const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithStrategies);
-      const finalResults = this.processOptimizedResults(celebrityName, rolesWithStrategies, optimizationStats);
-      
-      // Add emergency context to results
-      finalResults.emergencyRecovery = {
-        triggered: true,
-        redFlags: redFlagResult.redFlags,
-        analysis: redFlagResult.analysis,
-        recoveredRoles: emergencyVerifiedRoles.length,
-        emergencyMethod: 'web_search_filmography'
-      };
-      
-      // Cache results
-      this.cache.set(celebrityName, finalResults);
-      
-      console.log(`✅ Emergency recovery complete: ${finalResults.roles.length} roles for ${celebrityName}`);
-      return finalResults;
-      
-    } catch (error) {
-      console.error(`❌ Emergency processing failed: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
    * Analyze character prominence for search optimization
    */
   analyzeCharacterProminence(role, celebrityName) {
@@ -292,7 +336,12 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     
     // Recent popular content
     const year = parseInt(role.year) || 0;
-    if (year >= 2000 && character !== 'unknown character') {
+    if (year >= 2000 && character !== 'unknown character' && character !== 'character') {
+      return 'medium';
+    }
+    
+    // Emergency recovery roles with actual character names
+    if (role.source === 'emergency_recovery' && character !== 'character' && character.length > 2) {
       return 'medium';
     }
     
@@ -325,19 +374,28 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     if (year >= 2010) priority += 1;
     if (year >= 2020) priority += 1;
     
+    // Emergency recovery boost (these are likely real)
+    if (role.source === 'emergency_recovery') priority += 2;
+    
+    // Character name quality boost
+    const character = (role.character || '').toLowerCase();
+    if (character !== 'character' && character.length > 2 && !character.includes('unknown')) {
+      priority += 1;
+    }
+    
     return priority;
   }
 
   /**
-   * STREAMLINED: Process optimized results with proper data structure
+   * ENHANCED: Process optimized results with emergency recovery context
    */
   processOptimizedResults(celebrityName, optimizedRoles, optimizationStats) {
     return {
       celebrity: celebrityName,
       totalRoles: optimizedRoles.length,
       timestamp: new Date().toISOString(),
-      source: 'optimized_discovery',
-      strategy: 'universal_with_verification',
+      source: 'enhanced_discovery_with_emergency_recovery',
+      strategy: 'universal_with_verification_and_character_extraction',
       roles: optimizedRoles.map((role, index) => ({
         ...role,
         priority: index + 1,
@@ -361,12 +419,45 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
           isMultiActorCharacter: role.isMultiActorCharacter || false,
           smartSearchApproach: role.searchApproach || 'Standard',
           maxImages: role.maxImages || 20,
-          verificationConfidence: role.verificationConfidence || 'UNKNOWN'
+          verificationConfidence: role.verificationConfidence || 'UNKNOWN',
+          emergencyRecovered: role.emergencyRecovered || false,
+          recoveryMethod: role.recoveryMethod || 'normal_discovery',
+          characterNameQuality: this.assessCharacterNameQuality(role.character)
         }
       })),
       summary: this.generateSummary(optimizedRoles, optimizationStats),
       optimizationReport: this.generateOptimizationReport(optimizedRoles, optimizationStats)
     };
+  }
+
+  /**
+   * ENHANCED: Assess character name quality
+   */
+  assessCharacterNameQuality(characterName) {
+    const name = (characterName || '').toLowerCase();
+    
+    if (name === 'character' || name === 'unknown character' || name === 'various characters') {
+      return 'poor';
+    }
+    
+    if (name.length < 3) {
+      return 'poor';
+    }
+    
+    if (name.includes('unknown') || name.includes('various')) {
+      return 'poor';
+    }
+    
+    // Check for proper names (multiple words with capitals)
+    if (name.split(' ').length > 1 && name.split(' ').every(word => word.length > 1)) {
+      return 'excellent';
+    }
+    
+    if (name.length > 5) {
+      return 'good';
+    }
+    
+    return 'fair';
   }
 
   /**
@@ -392,6 +483,15 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     if (year >= 2010) baseEstimate *= 1.2;
     if (year >= 2020) baseEstimate *= 1.1;
     
+    // Character name quality multiplier
+    const nameQuality = this.assessCharacterNameQuality(role.character);
+    if (nameQuality === 'excellent') baseEstimate *= 1.4;
+    else if (nameQuality === 'good') baseEstimate *= 1.2;
+    else if (nameQuality === 'poor') baseEstimate *= 0.7;
+    
+    // Emergency recovery multiplier (these are likely real)
+    if (role.source === 'emergency_recovery') baseEstimate *= 1.3;
+    
     // Optimization quality multiplier
     if ((role.searchTerms?.character_images?.length || 0) === 6) baseEstimate *= 1.3;
     
@@ -408,7 +508,7 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
   }
 
   /**
-   * Generate summary with key insights
+   * ENHANCED: Generate summary with emergency recovery insights
    */
   generateSummary(optimizedRoles, optimizationStats) {
     const mediumCounts = {};
@@ -416,6 +516,8 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     let totalCharacterFirstTerms = 0;
     let highProminenceRoles = 0;
     let verifiedRoles = 0;
+    let emergencyRecoveredRoles = 0;
+    let excellentCharacterNames = 0;
     
     optimizedRoles.forEach(role => {
       mediumCounts[role.medium] = (mediumCounts[role.medium] || 0) + 1;
@@ -427,6 +529,10 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       
       if (role.characterProminent === 'high') highProminenceRoles++;
       if (role.verificationConfidence === 'HIGH') verifiedRoles++;
+      if (role.emergencyRecovered) emergencyRecoveredRoles++;
+      
+      const nameQuality = this.assessCharacterNameQuality(role.character);
+      if (nameQuality === 'excellent') excellentCharacterNames++;
     });
 
     const primaryMedium = Object.keys(mediumCounts).reduce((a, b) => 
@@ -446,18 +552,22 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       hasLiveActionRoles: optimizedRoles.some(r => r.medium.includes('live_action')),
       highProminenceRoles,
       verifiedRoles,
+      emergencyRecoveredRoles,
+      excellentCharacterNames,
       totalCharacterFirstTerms,
       optimizationSuccessRate: optimizationStats.characterFirstSuccessRate || 0,
-      averageSearchPriority: Math.round(optimizedRoles.reduce((sum, r) => sum + (r.searchPriority || 0), 0) / optimizedRoles.length)
+      averageSearchPriority: Math.round(optimizedRoles.reduce((sum, r) => sum + (r.searchPriority || 0), 0) / optimizedRoles.length),
+      characterNameQuality: (excellentCharacterNames / optimizedRoles.length * 100).toFixed(1) + '%',
+      emergencyRecoveryRate: emergencyRecoveredRoles > 0 ? (emergencyRecoveredRoles / optimizedRoles.length * 100).toFixed(1) + '%' : '0%'
     };
   }
 
   /**
-   * Generate optimization report
+   * ENHANCED: Generate optimization report with emergency recovery details
    */
   generateOptimizationReport(optimizedRoles, optimizationStats) {
     const report = {
-      optimizationApproach: 'universal_with_verification',
+      optimizationApproach: 'enhanced_universal_with_character_extraction',
       totalSearchTermsGenerated: optimizationStats.characterFirstTerms + optimizationStats.balancedTerms + optimizationStats.fallbackTerms,
       characterFirstTerms: optimizationStats.characterFirstTerms,
       balancedTerms: optimizationStats.balancedTerms,
@@ -465,6 +575,8 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       strategiesUsed: optimizationStats.strategies,
       verificationEnabled: true,
       multiActorDetection: optimizedRoles.some(r => r.isMultiActorCharacter),
+      emergencyRecoveryEnabled: true,
+      characterExtractionEnabled: true,
       expectedPerformanceImprovement: this.calculateExpectedImprovement(optimizedRoles),
       roleAnalysis: optimizedRoles.map(role => ({
         character: role.character,
@@ -475,8 +587,18 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
         termsGenerated: role.searchTerms?.character_images?.length || 0,
         expectedImages: role.searchMetadata?.expectedImageVolume || 0,
         verificationConfidence: role.verificationConfidence || 'UNKNOWN',
-        isMultiActor: role.isMultiActorCharacter || false
-      }))
+        isMultiActor: role.isMultiActorCharacter || false,
+        emergencyRecovered: role.emergencyRecovered || false,
+        recoveryMethod: role.recoveryMethod || 'normal_discovery',
+        characterNameQuality: this.assessCharacterNameQuality(role.character)
+      })),
+      qualityMetrics: {
+        excellentCharacterNames: optimizedRoles.filter(r => this.assessCharacterNameQuality(r.character) === 'excellent').length,
+        goodCharacterNames: optimizedRoles.filter(r => this.assessCharacterNameQuality(r.character) === 'good').length,
+        poorCharacterNames: optimizedRoles.filter(r => this.assessCharacterNameQuality(r.character) === 'poor').length,
+        emergencyRecoveredRoles: optimizedRoles.filter(r => r.emergencyRecovered).length,
+        highConfidenceRoles: optimizedRoles.filter(r => r.verificationConfidence === 'HIGH').length
+      }
     };
 
     return report;
@@ -488,22 +610,25 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
   calculateExpectedImprovement(roles) {
     const characterFirstRoles = roles.filter(r => (r.searchTerms?.character_images?.length || 0) === 6);
     const verifiedRoles = roles.filter(r => r.verificationConfidence === 'HIGH');
+    const excellentCharacterNames = roles.filter(r => this.assessCharacterNameQuality(r.character) === 'excellent');
     
     const improvementFactor = characterFirstRoles.length / roles.length;
     const verificationFactor = verifiedRoles.length / roles.length;
+    const characterNameFactor = excellentCharacterNames.length / roles.length;
     
     let expectedMultiplier = 1;
-    if (improvementFactor >= 0.8 && verificationFactor >= 0.6) expectedMultiplier = 3.5;
-    else if (improvementFactor >= 0.6 && verificationFactor >= 0.4) expectedMultiplier = 2.8;
-    else if (improvementFactor >= 0.4) expectedMultiplier = 2.2;
-    else expectedMultiplier = 1.5;
+    if (improvementFactor >= 0.8 && verificationFactor >= 0.6 && characterNameFactor >= 0.5) expectedMultiplier = 4.0;
+    else if (improvementFactor >= 0.6 && verificationFactor >= 0.4 && characterNameFactor >= 0.3) expectedMultiplier = 3.2;
+    else if (improvementFactor >= 0.4 && characterNameFactor >= 0.2) expectedMultiplier = 2.5;
+    else expectedMultiplier = 1.8;
     
     return {
       estimatedImageIncreaseMultiplier: expectedMultiplier,
       baselineExpectation: '5-15 images per role',
       optimizedExpectation: `${Math.round(10 * expectedMultiplier)}-${Math.round(30 * expectedMultiplier)} images per role`,
       confidenceLevel: improvementFactor >= 0.8 ? 'high' : improvementFactor >= 0.5 ? 'medium' : 'low',
-      verificationQuality: verificationFactor >= 0.6 ? 'high' : verificationFactor >= 0.4 ? 'medium' : 'low'
+      verificationQuality: verificationFactor >= 0.6 ? 'high' : verificationFactor >= 0.4 ? 'medium' : 'low',
+      characterNameQuality: characterNameFactor >= 0.5 ? 'excellent' : characterNameFactor >= 0.3 ? 'good' : 'fair'
     };
   }
 
@@ -524,7 +649,8 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
           actorName: celebrityName,
           characterProminent: this.analyzeCharacterProminence(role, celebrityName),
           searchPriority: this.calculateSearchPriority(role, celebrityName),
-          verificationConfidence: 'UNKNOWN'
+          verificationConfidence: 'UNKNOWN',
+          fallbackRole: true
         }));
         
         const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithMetadata);
@@ -545,7 +671,7 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
    * Simplified fetch for difficult cases
    */
   async trySimplifiedFetch(celebrityName) {
-    const simplifiedPrompt = `List 3-5 most famous roles for "${celebrityName}". Format: [{"character": "Character Name", "title": "Show/Movie", "medium": "type", "year": "YYYY", "popularity": "medium"}]`;
+    const simplifiedPrompt = `List 3-5 most famous roles for "${celebrityName}". Use exact character names. Format: [{"character": "Exact Character Name", "title": "Show/Movie", "medium": "type", "year": "YYYY", "popularity": "medium"}]`;
 
     try {
       if (this.roleFetcher.hasOpenAI) {
@@ -590,9 +716,13 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
         hasLiveActionRoles: false,
         highProminenceRoles: 0,
         verifiedRoles: 0,
+        emergencyRecoveredRoles: 0,
+        excellentCharacterNames: 0,
         totalCharacterFirstTerms: 0,
         optimizationSuccessRate: 0,
-        averageSearchPriority: 0
+        averageSearchPriority: 0,
+        characterNameQuality: '0%',
+        emergencyRecoveryRate: '0%'
       },
       optimizationReport: {
         optimizationApproach: 'failed',
@@ -602,9 +732,17 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
           baselineExpectation: 'manual research required',
           optimizedExpectation: 'manual research required',
           confidenceLevel: 'none',
-          verificationQuality: 'none'
+          verificationQuality: 'none',
+          characterNameQuality: 'none'
         },
-        roleAnalysis: []
+        roleAnalysis: [],
+        qualityMetrics: {
+          excellentCharacterNames: 0,
+          goodCharacterNames: 0,
+          poorCharacterNames: 0,
+          emergencyRecoveredRoles: 0,
+          highConfidenceRoles: 0
+        }
       }
     };
   }
@@ -643,11 +781,17 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       expectedImageVolume: role.searchMetadata?.expectedImageVolume || 20,
       verificationConfidence: role.verificationConfidence || 'UNKNOWN',
       
+      // Enhanced metadata
+      emergencyRecovered: role.emergencyRecovered || false,
+      recoveryMethod: role.recoveryMethod || 'normal_discovery',
+      characterNameQuality: role.searchMetadata?.characterNameQuality || 'fair',
+      
       // Flags
       focusedOnCharacterImages: (role.searchTerms?.character_images?.length || 0) === 6,
       isVoiceRole: role.medium?.includes('voice') || false,
       isHighPriority: (role.searchPriority || 0) >= 5,
       useCharacterFirstApproach: role.characterProminent !== 'low',
+      hasExcellentCharacterName: role.searchMetadata?.characterNameQuality === 'excellent',
       
       priority: role.priority
     }));
@@ -657,14 +801,16 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
    * System health check
    */
   async systemHealthCheck() {
-    console.log('🔍 Running system health check...');
+    console.log('🔍 Running enhanced system health check...');
     
     const checks = {
       aiConnection: false,
       roleFetcher: false,
       roleVerifier: false,
       searchOptimizer: false,
-      webSearch: false
+      webSearch: false,
+      redFlagDetector: false,
+      emergencyRecovery: false
     };
 
     try {
@@ -683,16 +829,22 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       // Test web search
       checks.webSearch = this.roleVerifier.hasWebSearch;
 
+      // Test red flag detector
+      checks.redFlagDetector = this.redFlagDetector.hasWebSearch || this.redFlagDetector.hasOpenAI;
+
+      // Test emergency recovery
+      checks.emergencyRecovery = this.redFlagDetector.hasWebSearch;
+
       const allPassed = Object.values(checks).every(check => check === true);
       
-      console.log('Health Check Results:', checks);
+      console.log('Enhanced Health Check Results:', checks);
       console.log(allPassed ? '✅ All systems operational' : '⚠️ Some systems have issues');
       
       return { 
         passed: allPassed, 
         details: checks,
         recommendations: this.generateHealthRecommendations(checks),
-        expectedPerformance: allPassed ? 'Optimal' : 'Degraded'
+        expectedPerformance: allPassed ? 'Optimal with Emergency Recovery' : 'Degraded'
       };
 
     } catch (error) {
@@ -725,12 +877,20 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       recommendations.push('Enable web search for highest verification accuracy');
     }
     
+    if (!checks.redFlagDetector) {
+      recommendations.push('Enable red flag detection for hallucination protection');
+    }
+
+    if (!checks.emergencyRecovery) {
+      recommendations.push('Enable emergency recovery (requires web search) for character extraction');
+    }
+    
     if (!checks.searchOptimizer) {
       recommendations.push('Search optimization failed - verify system configuration');
     }
     
-    if (checks.webSearch && checks.roleVerifier && checks.searchOptimizer) {
-      recommendations.push('System optimized for high-quality image discovery');
+    if (checks.webSearch && checks.roleVerifier && checks.searchOptimizer && checks.emergencyRecovery) {
+      recommendations.push('System fully optimized with emergency recovery and character extraction');
     }
     
     return recommendations;
@@ -764,7 +924,7 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     return {
       size: this.cache.size,
       celebrities: Array.from(this.cache.keys()),
-      cacheType: 'optimized_verified_roles'
+      cacheType: 'enhanced_verified_roles_with_emergency_recovery'
     };
   }
 }
@@ -781,7 +941,7 @@ async function fetchCelebrityRoles(celebrityName) {
  * Initialize system
  */
 async function initializeSystem() {
-  console.log('🚀 Initializing optimized celebrity discovery system...');
+  console.log('🚀 Initializing enhanced celebrity discovery system with emergency recovery...');
   
   const orchestrator = new CelebrityRoleOrchestrator();
   const healthCheck = await orchestrator.systemHealthCheck();
@@ -790,7 +950,7 @@ async function initializeSystem() {
     console.warn('⚠️ System initialization completed with warnings');
     console.warn('Recommendations:', healthCheck.recommendations);
   } else {
-    console.log('✅ Celebrity discovery system fully operational');
+    console.log('✅ Enhanced celebrity discovery system fully operational');
     console.log(`📈 Expected performance: ${healthCheck.expectedPerformance}`);
   }
   
