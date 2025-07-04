@@ -8,15 +8,13 @@ class OpenAIVerifier {
     this.hasOpenAI = false;
     this.initializeOpenAI();
     
-    // Verification results
+    // Simplified verification results
     this.verificationResults = {
       VALID: 'valid',
       INVALID_WRONG_PERSON: 'wrong_person',
       INVALID_WRONG_CHARACTER: 'wrong_character', 
-      INVALID_PRODUCTION_QUALITY: 'production_quality',
       INVALID_MERCHANDISE: 'merchandise',
-      INVALID_EVENT_PHOTO: 'event_photo',
-      INVALID_OTHER: 'other',
+      INVALID_UNRELATED: 'unrelated',
       VERIFICATION_FAILED: 'failed'
     };
   }
@@ -26,22 +24,22 @@ class OpenAIVerifier {
       if (process.env.OPENAI_API_KEY) {
         this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         this.hasOpenAI = true;
-        console.log('✅ OpenAI Vision initialized for final validation');
+        console.log('✅ OpenAI Vision initialized for identity verification');
       } else {
-        console.log('ℹ️ OpenAI not configured for final validation');
+        console.log('ℹ️ OpenAI not configured for identity verification');
       }
     } catch (error) {
-      console.log('⚠️ OpenAI Vision not available for final validation');
+      console.log('⚠️ OpenAI Vision not available for identity verification');
       this.hasOpenAI = false;
     }
   }
 
   /**
-   * MAIN: Final validation for pre-filtered, high-quality images
+   * SIMPLIFIED: Identity verification focused on "Is this the right person/character?"
    */
   async finalValidation(images, celebrityName, character, title, medium) {
     try {
-      console.log(`🔍 OpenAI final validation for ${images.length} pre-verified images...`);
+      console.log(`🔍 OpenAI identity verification for ${images.length} images...`);
       
       if (!this.hasOpenAI) {
         console.log('📝 OpenAI unavailable, passing all pre-filtered images');
@@ -58,14 +56,14 @@ class OpenAIVerifier {
         cost: 0
       };
 
-      // Process images individually for highest accuracy
+      // Process images for identity verification only
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
         
         try {
-          console.log(`🔄 OpenAI validating ${i + 1}/${images.length}: ${image.filename}`);
+          console.log(`🔄 Identity check ${i + 1}/${images.length}: ${image.filename}`);
           
-          const validation = await this.validatePrintReadyImage(
+          const validation = await this.validateIdentity(
             image.filepath, 
             celebrityName, 
             character, 
@@ -78,16 +76,16 @@ class OpenAIVerifier {
           if (validation.result === this.verificationResults.VALID) {
             results.valid.push({
               ...image,
-              openaiValidation: validation,
-              finalValidationReason: validation.reasoning || 'passed_openai_validation'
+              identityVerification: validation,
+              verificationReason: validation.reasoning || 'identity_confirmed'
             });
             console.log(`✅ ${image.filename}: ${validation.reasoning || 'VALID'}`);
           } else {
             results.invalid.push({
               ...image,
-              openaiValidation: validation,
-              finalValidationReason: validation.result,
-              rejectionReason: validation.reasoning || validation.result
+              identityVerification: validation,
+              rejectionReason: validation.result,
+              verificationReason: validation.reasoning || validation.result
             });
             console.log(`❌ ${image.filename}: ${validation.reasoning || validation.result}`);
           }
@@ -98,23 +96,23 @@ class OpenAIVerifier {
           }
 
         } catch (error) {
-          console.warn(`⚠️ OpenAI validation failed for ${image.filename}: ${error.message}`);
-          // Conservative approach: if validation fails, include in valid set
+          console.warn(`⚠️ Identity verification failed for ${image.filename}: ${error.message}`);
+          // Conservative approach: if verification fails, include in valid set
           results.valid.push({
             ...image,
-            finalValidationReason: 'openai_validation_failed'
+            verificationReason: 'verification_failed_included'
           });
         }
       }
 
       const passRate = Math.round((results.valid.length / images.length) * 100);
-      console.log(`✅ OpenAI final validation complete: ${results.valid.length}/${images.length} passed (${passRate}%)`);
-      console.log(`💰 OpenAI validation cost: $${results.cost.toFixed(4)}`);
+      console.log(`✅ Identity verification complete: ${results.valid.length}/${images.length} confirmed (${passRate}%)`);
+      console.log(`💰 Identity verification cost: $${results.cost.toFixed(4)}`);
 
       return results;
 
     } catch (error) {
-      console.error(`❌ OpenAI final validation failed: ${error.message}`);
+      console.error(`❌ Identity verification failed: ${error.message}`);
       // Fallback: pass all images
       return {
         valid: images,
@@ -125,59 +123,50 @@ class OpenAIVerifier {
   }
 
   /**
-   * Validate image for print-ready quality using OpenAI Vision
+   * SIMPLIFIED: Focus purely on identity verification
    */
-  async validatePrintReadyImage(imagePath, celebrityName, character, title, medium) {
+  async validateIdentity(imagePath, celebrityName, character, title, medium) {
     try {
       const imageBase64 = await this.imageToBase64(imagePath);
       const isAnimated = medium.includes('animation') || medium.includes('voice') || medium.includes('anime');
       
-      const prompt = `You are the FINAL VALIDATOR for PRINT-READY autograph photos. This image has already passed pre-filtering.
+      const prompt = `You are verifying identity only. Is this image showing ${isAnimated ? `the character "${character}" from "${title}"` : `${celebrityName} as ${character} from ${title}`}?
 
-CONTEXT: ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}
-
-PRINT-READY REQUIREMENTS (STRICT):
 ${isAnimated ? 
-`ANIMATED CONTENT:
-- ${character} must be clearly visible and recognizable
-- Must be official production art, screenshot, or promotional material
-- Character should be the primary focus, not background element
-- NO fan art, NO merchandise, NO toys
+`ANIMATED CONTENT - Looking for character "${character}":
+✅ VALID if:
+- This clearly shows ${character} from ${title}
+- Character is recognizable as ${character}
+- Group scenes with ${character} visible are OK
+- Different art styles of ${character} are OK
 
-REJECT if:
-- ${character} is not clearly identifiable
-- Shows only other characters without ${character}
-- Fan art or unofficial artwork
-- Toys, figurines, merchandise
-- Text overlays, watermarks, or logos covering character` :
+❌ INVALID if:
+- This shows different characters from ${title} (not ${character})
+- This shows characters from completely different shows
+- This shows toys/merchandise/collectibles
+- This shows real people (not animated characters)` :
 
-`LIVE ACTION:
-- ${celebrityName} must be clearly visible and recognizable (any age/era)
-- Must show ${celebrityName} IN CHARACTER as ${character} from ${title}
-- Official production still, promotional photo, or scene capture
-- Face should be clear and unobstructed for autograph purposes
+`LIVE ACTION - Looking for ${celebrityName}:
+✅ VALID if:
+- This clearly shows ${celebrityName} (any age/era)
+- ${celebrityName} is recognizable as the same person
+- Group scenes with ${celebrityName} visible are OK
+- Different ages of ${celebrityName} are OK (child vs adult roles)
 
-REJECT if:
-- ${celebrityName} not clearly visible or recognizable
-- Shows ${celebrityName} out of character (red carpet, personal life, etc.)
-- Face too small, blurred, or obscured for autograph signing
-- Fan conventions, meet & greets, or signing events
-- Toys, merchandise, or collectibles`}
+❌ INVALID if:
+- This shows a completely different person (not ${celebrityName})
+- This shows toys/merchandise/collectibles
+- This shows only other actors from ${title} (not ${celebrityName})
+- This is completely unrelated content`}
 
-PRODUCTION QUALITY REQUIREMENTS:
-- Image should appear professional/official
-- Acceptable resolution and clarity
-- Suitable for autograph signing (clear face/character area)
-- NO obvious watermarks or "PREVIEW" stamps
+IMPORTANT: Be permissive with uncertain cases. Only reject if you're confident it's wrong.
 
-RESPOND WITH EXACTLY ONE WORD:
-- VALID: Meets all print-ready requirements for autograph use
-- INVALID_WRONG_PERSON: Different person shown
-- INVALID_WRONG_CHARACTER: Different character shown  
-- INVALID_PRODUCTION_QUALITY: Poor quality or unofficial source
-- INVALID_MERCHANDISE: Toys, collectibles, or products
-- INVALID_EVENT_PHOTO: Convention, signing, or personal event
-- INVALID_OTHER: Other issues preventing autograph use`;
+Respond with exactly one word:
+- VALID: This shows the correct ${isAnimated ? 'character' : 'person'}
+- INVALID_WRONG_PERSON: This shows a different person
+- INVALID_WRONG_CHARACTER: This shows a different character
+- INVALID_MERCHANDISE: This shows toys/collectibles
+- INVALID_UNRELATED: This is completely unrelated content`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o",
@@ -189,83 +178,78 @@ RESPOND WITH EXACTLY ONE WORD:
               type: "image_url", 
               image_url: { 
                 url: `data:image/jpeg;base64,${imageBase64}`,
-                detail: "high" // High detail for final validation
+                detail: "low"  // Sufficient for identity verification
               }
             }
           ]
         }],
         max_tokens: 50,
-        temperature: 0.05 // Very low temperature for consistent results
+        temperature: 0.05 // Very low for consistent results
       });
 
       const response = completion.choices[0].message.content.trim();
-      const result = this.parseValidationResponse(response);
+      const result = this.parseVerificationResponse(response);
       
       return {
         result: result,
         reasoning: this.getReasoningForResult(result),
-        rawResponse: response
+        rawResponse: response,
+        isAnimated: isAnimated
       };
 
     } catch (error) {
-      throw new Error(`OpenAI validation failed: ${error.message}`);
+      throw new Error(`Identity verification failed: ${error.message}`);
     }
   }
 
   /**
-   * Parse OpenAI validation response
+   * SIMPLIFIED: Parse verification response with permissive approach
    */
-  parseValidationResponse(response) {
+  parseVerificationResponse(response) {
     const upperResponse = response.toUpperCase();
     
-    // Parse specific validation results
+    // Only accept clear VALID responses
     if (upperResponse.includes('VALID') && !upperResponse.includes('INVALID')) {
       return this.verificationResults.VALID;
     }
+    
+    // Parse specific rejections
     if (upperResponse.includes('WRONG_PERSON') || upperResponse.includes('DIFFERENT_PERSON')) {
       return this.verificationResults.INVALID_WRONG_PERSON;
     }
     if (upperResponse.includes('WRONG_CHARACTER') || upperResponse.includes('DIFFERENT_CHARACTER')) {
       return this.verificationResults.INVALID_WRONG_CHARACTER;
     }
-    if (upperResponse.includes('PRODUCTION_QUALITY') || upperResponse.includes('POOR_QUALITY') || upperResponse.includes('UNOFFICIAL')) {
-      return this.verificationResults.INVALID_PRODUCTION_QUALITY;
-    }
     if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY') || upperResponse.includes('COLLECTIBLE')) {
       return this.verificationResults.INVALID_MERCHANDISE;
     }
-    if (upperResponse.includes('EVENT_PHOTO') || upperResponse.includes('CONVENTION') || upperResponse.includes('SIGNING')) {
-      return this.verificationResults.INVALID_EVENT_PHOTO;
-    }
-    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('OTHER_ISSUES')) {
-      return this.verificationResults.INVALID_OTHER;
+    if (upperResponse.includes('UNRELATED') || upperResponse.includes('COMPLETELY_DIFFERENT')) {
+      return this.verificationResults.INVALID_UNRELATED;
     }
     
-    // Any other invalid response
-    if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT') || upperResponse.includes('NO')) {
-      return this.verificationResults.INVALID_OTHER;
+    // For any other INVALID response, categorize as unrelated
+    if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT')) {
+      return this.verificationResults.INVALID_UNRELATED;
     }
     
-    // Default to invalid for ambiguous responses in final validation
-    return this.verificationResults.INVALID_OTHER;
+    // PERMISSIVE: If unclear, default to valid for borderline cases
+    return this.verificationResults.VALID;
   }
 
   /**
-   * Get human-readable reasoning for validation result
+   * Get human-readable reasoning for verification result
    */
   getReasoningForResult(result) {
     const reasoningMap = {
-      [this.verificationResults.VALID]: 'Meets all print-ready requirements for autograph use',
+      [this.verificationResults.VALID]: 'Identity confirmed - correct person/character',
       [this.verificationResults.INVALID_WRONG_PERSON]: 'Wrong person shown in image',
       [this.verificationResults.INVALID_WRONG_CHARACTER]: 'Wrong character shown in image',
-      [this.verificationResults.INVALID_PRODUCTION_QUALITY]: 'Poor quality or unofficial source',
       [this.verificationResults.INVALID_MERCHANDISE]: 'Shows toys, collectibles, or merchandise',
-      [this.verificationResults.INVALID_EVENT_PHOTO]: 'Convention, signing, or personal event photo',
-      [this.verificationResults.INVALID_OTHER]: 'Other issues preventing autograph use',
-      [this.verificationResults.VERIFICATION_FAILED]: 'Validation process failed'
+      [this.verificationResults.INVALID_UNRELATED]: 'Unrelated or completely different content',
+      [this.verificationResults.VERIFICATION_FAILED]: 'Identity verification process failed'
     };
     
-    return reasoningMap[result] || 'Unknown validation result';
+    return reasoningMap[result] || 'Unknown verification result';
   }
 
   /**
@@ -277,23 +261,23 @@ RESPOND WITH EXACTLY ONE WORD:
   }
 
   /**
-   * Batch validation for smaller sets (used for testing)
+   * SIMPLIFIED: Batch validation for smaller sets
    */
-  async batchValidate(images, celebrityName, character, title, medium, batchSize = 5) {
+  async batchValidate(images, celebrityName, character, title, medium, batchSize = 10) {
     const results = {
       valid: [],
       invalid: [],
       cost: 0
     };
 
-    // Process in small batches to manage costs and rate limits
+    // Process in batches
     for (let i = 0; i < images.length; i += batchSize) {
       const batch = images.slice(i, i + batchSize);
-      console.log(`🔄 Processing OpenAI batch ${Math.floor(i/batchSize) + 1}: ${batch.length} images`);
+      console.log(`🔄 Processing identity batch ${Math.floor(i/batchSize) + 1}: ${batch.length} images`);
 
       for (const image of batch) {
         try {
-          const validation = await this.validatePrintReadyImage(
+          const validation = await this.validateIdentity(
             image.filepath, 
             celebrityName, 
             character, 
@@ -306,20 +290,23 @@ RESPOND WITH EXACTLY ONE WORD:
           if (validation.result === this.verificationResults.VALID) {
             results.valid.push({
               ...image,
-              openaiValidation: validation
+              identityVerification: validation
             });
           } else {
             results.invalid.push({
               ...image,
-              openaiValidation: validation,
+              identityVerification: validation,
               rejectionReason: validation.result
             });
           }
 
         } catch (error) {
-          console.warn(`⚠️ Validation failed for ${image.filename}: ${error.message}`);
-          // Conservative: include in valid set if validation fails
-          results.valid.push(image);
+          console.warn(`⚠️ Identity verification failed for ${image.filename}: ${error.message}`);
+          // Conservative: include in valid set if verification fails
+          results.valid.push({
+            ...image,
+            verificationReason: 'verification_failed_included'
+          });
         }
       }
 
@@ -333,56 +320,19 @@ RESPOND WITH EXACTLY ONE WORD:
   }
 
   /**
-   * Get verification statistics
+   * SIMPLIFIED: Quick identity confidence check
    */
-  getVerificationStats() {
-    return {
-      hasOpenAI: this.hasOpenAI,
-      service: 'OpenAI GPT-4 Vision',
-      primaryUse: 'Final validation for print-ready quality',
-      costPerImage: '$0.002',
-      processingSpeed: '3-8 seconds per image',
-      accuracy: 'Highest (final validation)',
-      detailLevel: 'High'
-    };
-  }
-
-  /**
-   * Test OpenAI connection
-   */
-  async testConnection() {
-    if (!this.hasOpenAI) return false;
-
-    try {
-      // Test with a simple text completion
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: "Test" }],
-        max_tokens: 5
-      });
-
-      return completion.choices && completion.choices.length > 0;
-
-    } catch (error) {
-      console.error('OpenAI connection test failed:', error.message);
-      return false;
-    }
-  }
-
-  /**
-   * Print-ready quality assessment without full validation
-   */
-  async quickQualityCheck(imagePath) {
-    if (!this.hasOpenAI) return { quality: 'unknown', reason: 'OpenAI unavailable' };
+  async quickIdentityCheck(imagePath, celebrityName, character, isAnimated = false) {
+    if (!this.hasOpenAI) return { confidence: 'unknown', reason: 'OpenAI unavailable' };
 
     try {
       const imageBase64 = await this.imageToBase64(imagePath);
       
-      const prompt = `Rate this image's suitability for autograph signing on a scale of 1-10. Consider:
-- Image clarity and resolution
-- Face/character visibility
-- Professional/official appearance
-- Print quality potential
+      const prompt = `Rate your confidence that this image shows ${isAnimated ? `the character "${character}"` : celebrityName} on a scale of 1-10.
+
+1-3: Not the right ${isAnimated ? 'character' : 'person'}
+4-6: Uncertain
+7-10: Confident this is the right ${isAnimated ? 'character' : 'person'}
 
 Respond with just a number 1-10.`;
 
@@ -408,13 +358,49 @@ Respond with just a number 1-10.`;
       const score = parseInt(completion.choices[0].message.content.trim());
       
       return {
-        quality: score >= 7 ? 'high' : score >= 5 ? 'medium' : 'low',
+        confidence: score >= 7 ? 'high' : score >= 4 ? 'medium' : 'low',
         score: score,
-        reason: score >= 7 ? 'Excellent for autographs' : score >= 5 ? 'Acceptable quality' : 'Below standard'
+        reason: score >= 7 ? 'High confidence match' : score >= 4 ? 'Uncertain match' : 'Low confidence match'
       };
 
     } catch (error) {
-      return { quality: 'unknown', reason: `Quality check failed: ${error.message}` };
+      return { confidence: 'unknown', reason: `Confidence check failed: ${error.message}` };
+    }
+  }
+
+  /**
+   * Get verification statistics
+   */
+  getVerificationStats() {
+    return {
+      hasOpenAI: this.hasOpenAI,
+      service: 'OpenAI GPT-4 Vision',
+      primaryUse: 'Identity verification only',
+      costPerImage: '$0.002',
+      processingSpeed: '2-5 seconds per image',
+      accuracy: 'High (focused on identity)',
+      approach: 'Permissive - only reject clear mismatches'
+    };
+  }
+
+  /**
+   * Test OpenAI connection
+   */
+  async testConnection() {
+    if (!this.hasOpenAI) return false;
+
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Test" }],
+        max_tokens: 5
+      });
+
+      return completion.choices && completion.choices.length > 0;
+
+    } catch (error) {
+      console.error('OpenAI connection test failed:', error.message);
+      return false;
     }
   }
 }
