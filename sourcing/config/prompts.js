@@ -6,93 +6,84 @@
 const PROMPTS = {
 
   /**
-   * FIXED: Anti-hallucination role discovery for all celebrity levels
+   * FIXED: Ultra-conservative role discovery to prevent hallucination
    */
-  FETCH_ROLES: (actorName) => `You are an entertainment expert. For "${actorName}", find their TOP 5 most notable CHARACTER ROLES. BE EXTREMELY CAREFUL not to invent or guess roles.
+  FETCH_ROLES: (actorName) => `You are an entertainment expert. For "${actorName}", find their verified acting roles.
 
-CRITICAL INSTRUCTIONS:
-- Only include roles you are CERTAIN about
-- If you're unsure about a role, do NOT include it
-- Better to return fewer real roles than many fake ones
-- Focus on verifiable filmography
+🚨 CRITICAL: DO NOT INVENT OR GUESS ANY ROLES
+- If you're not 100% certain about a role, DO NOT include it
+- Better to return 1-2 real roles than 5 fake ones
+- Only include roles you can absolutely verify
+- If uncertain about "${actorName}", return fewer roles or empty array
 
-DISCOVERY STRATEGY:
-1. If mainstream celebrity: Focus on their most iconic roles
-2. If emerging/breakout star: Focus heavily on their breakthrough performance + any supporting roles  
-3. If niche/indie actor: Find their most notable work even if small-scale (ESPECIALLY HORROR/INDIE FILMS)
-4. If voice actor: Focus on character roles people know them for
-5. If viral-to-actor: Focus ONLY on their acting roles, ignore viral content
+DISCOVERY APPROACH:
+- Only include roles you are completely confident about
+- Check your knowledge carefully before including any role
+- Include all types of acting work (movies, TV, voice work, indie films)
+- Focus on roles the actor is actually known for
 
-SEARCH APPROACH:
-- Check recent breakout roles and trending performances
-- Include indie films, streaming shows, and animation that gained popularity
-- PRIORITIZE HORROR FILMS (independent horror is often overlooked)
-- For voice actors: Focus on character images, not actor photos
-- Look for roles that audiences actually discuss or remember
-- Include film festival circuit and cult films
-
-INCLUDE:
-- Named character roles (priority)
-- Horror films (especially independent horror)
-- Breakout/trending performances
-- Popular indie/streaming content
-- Voice acting characters (for anime/animation)
-- Recent notable work gaining attention
-- Small but memorable roles
-- Genre films (horror, thriller, sci-fi)
-
-AVOID:
-- Hosting/presenting roles
-- Background/extra work
-- Social media content (focus on acting only)
-- Unreleased or unknown projects
-- NEVER INVENT OR GUESS ROLES
+VERIFICATION BEFORE INCLUDING:
+- Am I certain "${actorName}" played this character?
+- Am I certain this show/movie exists?
+- Am I certain about the character name?
+- If ANY uncertainty, exclude the role
 
 MEDIUM CLASSIFICATION:
-- live_action_tv: TV series/streaming shows (any budget)
-- live_action_movie: Films (any budget level)
+- live_action_tv: TV series/streaming shows
+- live_action_movie: Films (any budget)
 - voice_anime_tv: Anime TV series
 - voice_anime_movie: Anime films
 - voice_cartoon: Western animation
 - voice_game: Video game characters
 
-Format as JSON array with EXACT character names:
+Format as JSON array with EXACT information:
 [
   {
     "character": "Exact Character Name",
-    "title": "Show/Movie Title", 
-    "medium": "live_action_tv",
+    "title": "Exact Show/Movie Title", 
+    "medium": "live_action_movie",
     "year": "YYYY",
     "popularity": "high/medium/low",
-    "note": "breakout role" or "trending" or "popular indie" or "recent work" (if applicable)
+    "confidence": "high"
   }
 ]
 
-Focus on what "${actorName}" is actually KNOWN for, regardless of fame level. Include recent work if they're a rising star. 
+🚨 FINAL CHECK: Review each role before including it. Only include roles you can verify with high confidence.
 
-VERIFICATION: Double-check each role before including it. Only include roles you can verify.`,
+If you're not confident about "${actorName}"'s filmography, return fewer roles or an empty array: []`,
 
   /**
    * ENHANCED: Horror/indie specific discovery for missed content
    */
-  HORROR_INDIE_DISCOVERY: (actorName) => `"${actorName}" may be primarily known for horror, thriller, or independent films. These are often missed by general searches.
+  HORROR_INDIE_DISCOVERY: (actorName) => `"${actorName}" may have appeared in horror, thriller, or independent films that are often missed by general searches.
 
-FOCUS ON:
-- Horror films (especially independent horror like "Terrifier")
+SPECIFIC FOCUS:
+- Horror films (especially independent horror like "Terrifier", "The Conjuring", "Insidious", etc.)
 - Thriller and suspense films
 - Independent/art house cinema
-- Cult films and B-movies
+- Low-budget genre films
 - Film festival circuit movies
+- Cult films and B-movies
 - Streaming platform horror content
 
-INCLUDE:
-- Low-budget horror films
-- Indie productions
-- Genre films (horror, thriller, sci-fi)
-- Film festival entries
-- Cult favorites
+SEARCH STRATEGY:
+- Check horror film databases and lists
+- Look for indie horror from 2010-2020 period
+- Include low-budget horror films
+- Check for horror sequels and franchises
+- Look for film festival horror entries
 
-Be specific about character names and exact film titles. Only include verified roles.
+INCLUDE:
+- Any horror film appearances (even small roles)
+- Thriller and suspense films
+- Independent productions
+- Genre films that gained cult followings
+- Film festival entries
+
+CHARACTER NAMES:
+- Use exact character names from official sources
+- If character name is unclear, use "Character" as placeholder
+- Include year of release if known
 
 Format as JSON array:
 [
@@ -102,9 +93,11 @@ Format as JSON array:
     "medium": "live_action_movie",
     "year": "YYYY",
     "popularity": "low",
-    "genre": "horror/indie"
+    "note": "horror film"
   }
-]`,
+]
+
+IMPORTANT: Only include roles you can verify. If uncertain, do not include.`,
 
   /**
    * ENHANCED: Self-verification prompt to catch hallucinations
