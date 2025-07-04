@@ -8,19 +8,13 @@ const PROMPTS = {
   /**
    * Main role fetching prompt - focused on visual character roles
    */
-  FETCH_ROLES: (actorName) => `You are an entertainment expert. For "${actorName}", list their TOP 5 most visually recognizable CHARACTER ROLES that have clear, high-quality images available.
-
-FOCUS ON:
-- Named character roles with strong visual presence
-- Popular shows/movies with good image availability
-- Characters fans would recognize from photos
-- Roles from well-documented productions
+  FETCH_ROLES: (actorName) => `You are an entertainment expert. For "${actorName}", list their TOP 5 most visually iconic CHARACTER ROLES from film, TV, or animation.
 
 INCLUDE:
-- Main and supporting characters
-- Both recent and classic roles
-- Live-action and voice/animated roles
-- TV series, movies, and animation
+- Named character roles with strong visual presence
+- Cult horror, viral hits, genre favorites, and indie standouts
+- Roles fans would recognize from posters, trailers, or iconic scenes
+- Live-action and animated work from 2010 onward (unless earlier roles are definitive)
 
 AVOID:
 - Hosting or presenting roles
@@ -47,17 +41,17 @@ Format as JSON array with exact character names from credits:
   }
 ]
 
-Provide exactly 5 roles ordered by visual recognition and image availability.`,
+Provide exactly 5 roles ordered by visual recognition and fan familiarity.`,
 
   /**
    * Search term optimization prompt - high-quality character images
    */
   OPTIMIZE_SEARCH: (character, title, medium, actorName) => `Create 6 search terms to find high-quality images of "${character}" from "${title}" (${medium}).
 
-GOAL: Find professional production photos, promotional images, and official character artwork.
+GOAL: Find professional production photos, promotional images, and official character stills. Avoid celebrity autograph photos.
 
 EXCLUSIONS for ALL terms:
-"-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -fan -art -edit -meme -comic -dvd -case"
+"-funko -pop -action -figure -toy -merchandise -convention -signed -autograph -signature -inscription -fan -art -edit -meme -comic -dvd -case"
 
 SEARCH STRATEGY:
 ${medium.includes('voice') ? 
@@ -69,12 +63,12 @@ ${medium.includes('voice') ?
   - "${character}" anime character
   - "${title}" official art` :
   `ACTOR + CHARACTER (live-action):
-  - "${actorName || 'ACTOR_NAME'} ${character}"
-  - "${character} ${title}" production
-  - "${actorName || 'ACTOR_NAME'} ${title}"
-  - "${title} ${character}" scene
-  - "${character}" character photo
-  - "${title}" cast photo`
+  - "${actorName || 'ACTOR_NAME'} ${character}" production still
+  - "${character} ${title}" official image
+  - "${actorName || 'ACTOR_NAME'} ${title}" scene
+  - "${title} ${character}" promo shot
+  - "${character}" character still
+  - "${title}" cast promotional photo`
 }
 
 Return 6 clean search terms with exclusions:
@@ -140,7 +134,7 @@ const PROMPT_CONFIG = {
 
   // Token limits
   MAX_TOKENS: {
-    ROLE_FETCHING: 800,    // Reduced since no descriptions
+    ROLE_FETCHING: 800,
     SEARCH_OPTIMIZATION: 200,
     ACTOR_DETECTION: 50,
     VALIDATION: 150,
