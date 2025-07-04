@@ -2,7 +2,7 @@ const OpenAI = require('openai');
 const axios = require('axios');
 
 /**
- * FIXED: Red Flag Emergency System with Precise IMDb Character Extraction
+ * SIMPLE: Red Flag Emergency - Direct IMDb Page Approach
  */
 class RedFlagRoleDetector {
   constructor() {
@@ -95,7 +95,7 @@ class RedFlagRoleDetector {
   }
 
   /**
-   * EMERGENCY: Search IMDb directly and extract character names precisely
+   * SIMPLE: Find their IMDb page and extract filmography
    */
   async emergencyFilmographySearch(celebrityName) {
     if (!this.hasWebSearch) {
@@ -104,13 +104,21 @@ class RedFlagRoleDetector {
     }
 
     try {
-      console.log(`🚨 EMERGENCY: Searching IMDb for ${celebrityName} with precise character extraction`);
+      console.log(`🚨 EMERGENCY: Finding ${celebrityName} IMDb page...`);
       
-      // FIXED: Multiple targeted IMDb searches
-      const imdbRoles = await this.searchIMDbWithCharacterExtraction(celebrityName);
+      // Step 1: Find their IMDb page
+      const imdbUrl = await this.findIMDbPage(celebrityName);
       
-      console.log(`✅ Emergency found ${imdbRoles.length} roles with character names`);
-      return imdbRoles;
+      if (!imdbUrl) {
+        console.log(`❌ Could not find IMDb page for ${celebrityName}`);
+        return [];
+      }
+      
+      // Step 2: Get filmography from IMDb page
+      const roles = await this.getFilmographyFromIMDb(celebrityName, imdbUrl);
+      
+      console.log(`✅ Emergency extracted ${roles.length} roles from IMDb`);
+      return roles;
 
     } catch (error) {
       console.error(`❌ Emergency search failed: ${error.message}`);
@@ -119,237 +127,24 @@ class RedFlagRoleDetector {
   }
 
   /**
-   * FIXED: Search IMDb with precise character name extraction
+   * SIMPLE: Find their IMDb page
    */
-  async searchIMDbWithCharacterExtraction(celebrityName) {
-    const imdbRoles = [];
+  async findIMDbPage(celebrityName) {
+    const query = `"${celebrityName}" site:imdb.com`;
     
-    // FIXED: Target IMDb cast pages and filmography directly
-    const searchQueries = [
-      `"${celebrityName}" site:imdb.com filmography`,
-      `"${celebrityName}" site:imdb.com cast`,
-      `"${celebrityName}" site:imdb.com actor`,
-      `"${celebrityName}" site:imdb.com actress`
-    ];
-    
-    for (const query of searchQueries) {
-      try {
-        console.log(`🔍 Emergency search: ${query}`);
-        const searchResult = await this.performWebSearch(query);
-        
-        if (searchResult.organic_results) {
-          for (const result of searchResult.organic_results) {
-            if (result.link && result.link.includes('imdb.com')) {
-              const roles = await this.extractRolesFromIMDbResult(result, celebrityName);
-              imdbRoles.push(...roles);
-            }
-          }
-        }
-        
-        // Brief pause between searches
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-      } catch (error) {
-        console.log(`⚠️ Emergency search failed for: ${query}`);
-      }
-    }
-    
-    // Remove duplicates and return
-    return this.removeDuplicateRoles(imdbRoles);
-  }
-
-  /**
-   * FIXED: Extract roles from IMDb search results with precise character extraction
-   */
-  async extractRolesFromIMDbResult(result, celebrityName) {
-    const roles = [];
-    const url = result.link || '';
-    const title = result.title || '';
-    const snippet = result.snippet || '';
-    
-    console.log(`🔍 Processing IMDb result: ${title}`);
-    console.log(`📄 Snippet: ${snippet.substring(0, 200)}...`);
-    
-    // FIXED: Extract movie titles from IMDb page titles
-    const movieTitles = this.extractMovieTitlesFromIMDbTitle(title);
-    
-    for (const movieTitle of movieTitles) {
-      console.log(`🎬 Found movie: ${movieTitle.title} (${movieTitle.year})`);
-      
-      // FIXED: Search for character name in this specific movie
-      const character = await this.findCharacterForMovie(celebrityName, movieTitle.title, snippet);
-      
-      if (character) {
-        roles.push({
-          character: character,
-          title: movieTitle.title,
-          medium: this.guessMediumFromTitle(movieTitle.title),
-          year: movieTitle.year,
-          popularity: 'medium',
-          source: 'imdb_emergency',
-          confidence: 'high',
-          imdbUrl: url
-        });
-        
-        console.log(`✅ EMERGENCY EXTRACTED: ${character} in ${movieTitle.title} (${movieTitle.year})`);
-      } else {
-        console.log(`❌ No character found for ${movieTitle.title}`);
-      }
-    }
-    
-    return roles;
-  }
-
-  /**
-   * FIXED: Extract movie titles from IMDb page titles
-   */
-  extractMovieTitlesFromIMDbTitle(title) {
-    const movies = [];
-    
-    // Pattern 1: Standard IMDb format "Movie Title (Year)"
-    const standardPattern = /^(.+?)\s*\((\d{4})\)/;
-    const standardMatch = title.match(standardPattern);
-    
-    if (standardMatch) {
-      const movieTitle = standardMatch[1].trim();
-      const year = standardMatch[2];
-      
-      if (this.isValidMovieTitle(movieTitle)) {
-        movies.push({ title: movieTitle, year: year });
-      }
-    }
-    
-    // Pattern 2: Filmography pages - extract from title
-    if (title.toLowerCase().includes('filmography')) {
-      // Look for movie titles in snippet later
-      movies.push({ title: 'FILMOGRAPHY_PAGE', year: 'unknown' });
-    }
-    
-    return movies;
-  }
-
-  /**
-   * FIXED: Find character name for specific movie
-   */
-  async findCharacterForMovie(celebrityName, movieTitle, snippet) {
-    if (movieTitle === 'FILMOGRAPHY_PAGE') {
-      // Extract from filmography snippet
-      return this.extractCharacterFromFilmographySnippet(snippet, celebrityName);
-    }
-    
-    // FIXED: Precise character extraction patterns
-    const character = this.extractCharacterFromSnippet(snippet, celebrityName, movieTitle);
-    
-    if (character) {
-      return character;
-    }
-    
-    // FIXED: If no character found, do a specific search for this movie
-    return await this.searchSpecificMovieForCharacter(celebrityName, movieTitle);
-  }
-
-  /**
-   * FIXED: Extract character from IMDb snippet with precise patterns
-   */
-  extractCharacterFromSnippet(snippet, celebrityName, movieTitle = '') {
-    const snippetLower = snippet.toLowerCase();
-    const celebrityLower = celebrityName.toLowerCase();
-    
-    console.log(`🔍 Extracting character from snippet for ${celebrityName}`);
-    
-    // FIXED Pattern 1: "Celebrity as Character" - EXACT extraction
-    const asPatterns = [
-      new RegExp(`${this.escapeRegex(celebrityLower)}\\s+as\\s+([A-Z][a-zA-Z\\s'-]{1,30})`, 'i'),
-      new RegExp(`${this.escapeRegex(celebrityLower)}\\s+as\\s+([A-Z][a-zA-Z\\s'-]{1,30})\\s*[,\\.]`, 'i')
-    ];
-    
-    for (const pattern of asPatterns) {
-      const match = snippet.match(pattern);
-      if (match) {
-        const character = match[1].trim();
-        if (this.isValidCharacterName(character, celebrityName)) {
-          console.log(`✅ Found via "as" pattern: ${character}`);
-          return character;
-        }
-      }
-    }
-    
-    // FIXED Pattern 2: "Celebrity plays Character"
-    const playsPatterns = [
-      new RegExp(`${this.escapeRegex(celebrityLower)}\\s+plays\\s+([A-Z][a-zA-Z\\s'-]{1,30})`, 'i'),
-      new RegExp(`${this.escapeRegex(celebrityLower)}\\s+plays\\s+([A-Z][a-zA-Z\\s'-]{1,30})\\s*[,\\.]`, 'i')
-    ];
-    
-    for (const pattern of playsPatterns) {
-      const match = snippet.match(pattern);
-      if (match) {
-        const character = match[1].trim();
-        if (this.isValidCharacterName(character, celebrityName)) {
-          console.log(`✅ Found via "plays" pattern: ${character}`);
-          return character;
-        }
-      }
-    }
-    
-    // FIXED Pattern 3: "Character (Celebrity)" or "Character - Celebrity"
-    const castPatterns = [
-      new RegExp(`([A-Z][a-zA-Z\\s'-]{1,30})\\s*\\(${this.escapeRegex(celebrityLower)}\\)`, 'i'),
-      new RegExp(`([A-Z][a-zA-Z\\s'-]{1,30})\\s*-\\s*${this.escapeRegex(celebrityLower)}`, 'i'),
-      new RegExp(`([A-Z][a-zA-Z\\s'-]{1,30})\\s*\\.\\.\\s*${this.escapeRegex(celebrityLower)}`, 'i')
-    ];
-    
-    for (const pattern of castPatterns) {
-      const match = snippet.match(pattern);
-      if (match) {
-        const character = match[1].trim();
-        if (this.isValidCharacterName(character, celebrityName)) {
-          console.log(`✅ Found via cast pattern: ${character}`);
-          return character;
-        }
-      }
-    }
-    
-    console.log(`❌ No character found in snippet`);
-    return null;
-  }
-
-  /**
-   * FIXED: Extract character from filmography snippet
-   */
-  extractCharacterFromFilmographySnippet(snippet, celebrityName) {
-    const lines = snippet.split(/[.\n]/);
-    const celebrityLower = celebrityName.toLowerCase();
-    
-    for (const line of lines) {
-      if (line.toLowerCase().includes(celebrityLower)) {
-        const character = this.extractCharacterFromSnippet(line, celebrityName);
-        if (character) {
-          return character;
-        }
-      }
-    }
-    
-    return null;
-  }
-
-  /**
-   * FIXED: Search for specific movie to find character
-   */
-  async searchSpecificMovieForCharacter(celebrityName, movieTitle) {
     try {
-      const query = `"${celebrityName}" "${movieTitle}" character site:imdb.com`;
-      console.log(`🔍 Specific character search: ${query}`);
-      
+      console.log(`🔍 Finding IMDb page: ${query}`);
       const searchResult = await this.performWebSearch(query);
       
       if (searchResult.organic_results) {
         for (const result of searchResult.organic_results) {
-          if (result.link && result.link.includes('imdb.com')) {
-            const character = this.extractCharacterFromSnippet(result.snippet || '', celebrityName, movieTitle);
-            if (character) {
-              console.log(`✅ Found via specific search: ${character}`);
-              return character;
-            }
+          const url = result.link || '';
+          
+          // Look for their main IMDb page (not specific movies)
+          if (url.includes('imdb.com/name/') || 
+              (url.includes('imdb.com') && result.title && result.title.toLowerCase().includes(celebrityName.toLowerCase()))) {
+            console.log(`✅ Found IMDb page: ${url}`);
+            return url;
           }
         }
       }
@@ -357,20 +152,147 @@ class RedFlagRoleDetector {
       return null;
       
     } catch (error) {
-      console.log(`❌ Specific character search failed: ${error.message}`);
+      console.log(`❌ IMDb page search failed: ${error.message}`);
       return null;
     }
   }
 
   /**
-   * FIXED: Escape regex special characters
+   * SIMPLE: Get filmography from IMDb page using search
+   */
+  async getFilmographyFromIMDb(celebrityName, imdbUrl) {
+    try {
+      // Search for filmography info about this person
+      const query = `"${celebrityName}" filmography site:imdb.com`;
+      
+      console.log(`🔍 Getting filmography: ${query}`);
+      const searchResult = await this.performWebSearch(query);
+      
+      const roles = [];
+      
+      if (searchResult.organic_results) {
+        for (const result of searchResult.organic_results) {
+          if (result.link && result.link.includes('imdb.com')) {
+            const snippet = result.snippet || '';
+            const title = result.title || '';
+            
+            // Extract roles from this result
+            const extractedRoles = this.extractRolesFromText(snippet + ' ' + title, celebrityName);
+            roles.push(...extractedRoles);
+          }
+        }
+      }
+      
+      return this.removeDuplicateRoles(roles);
+      
+    } catch (error) {
+      console.log(`❌ Filmography extraction failed: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * SIMPLE: Extract roles from text using basic patterns
+   */
+  extractRolesFromText(text, celebrityName) {
+    const roles = [];
+    const lines = text.split(/[.\n]/);
+    
+    for (const line of lines) {
+      const lineLower = line.toLowerCase();
+      const celebrityLower = celebrityName.toLowerCase();
+      
+      // Look for lines that mention the celebrity
+      if (lineLower.includes(celebrityLower)) {
+        
+        // Pattern 1: "Celebrity as Character in Movie (Year)"
+        const pattern1 = new RegExp(`${this.escapeRegex(celebrityLower)}\\s+as\\s+([A-Z][a-zA-Z\\s'-]{1,30})\\s+in\\s+([A-Z][^\\(]+)\\s*\\(?(\\d{4})?`, 'i');
+        const match1 = line.match(pattern1);
+        
+        if (match1) {
+          const character = match1[1].trim();
+          const movie = match1[2].trim();
+          const year = match1[3] || 'unknown';
+          
+          if (this.isValidCharacterName(character, celebrityName) && this.isValidMovieTitle(movie)) {
+            roles.push({
+              character: character,
+              title: movie,
+              medium: 'live_action_movie',
+              year: year,
+              popularity: 'medium',
+              source: 'imdb_emergency',
+              confidence: 'high'
+            });
+            
+            console.log(`✅ Found: ${character} in ${movie} (${year})`);
+          }
+        }
+        
+        // Pattern 2: "Movie (Year) ... Celebrity as Character"
+        const pattern2 = new RegExp(`([A-Z][^\\(]+)\\s*\\((\\d{4})\\).*${this.escapeRegex(celebrityLower)}\\s+as\\s+([A-Z][a-zA-Z\\s'-]{1,30})`, 'i');
+        const match2 = line.match(pattern2);
+        
+        if (match2) {
+          const movie = match2[1].trim();
+          const year = match2[2];
+          const character = match2[3].trim();
+          
+          if (this.isValidCharacterName(character, celebrityName) && this.isValidMovieTitle(movie)) {
+            roles.push({
+              character: character,
+              title: movie,
+              medium: 'live_action_movie',
+              year: year,
+              popularity: 'medium',
+              source: 'imdb_emergency',
+              confidence: 'high'
+            });
+            
+            console.log(`✅ Found: ${character} in ${movie} (${year})`);
+          }
+        }
+        
+        // Pattern 3: Basic "Celebrity as Character"
+        const pattern3 = new RegExp(`${this.escapeRegex(celebrityLower)}\\s+as\\s+([A-Z][a-zA-Z\\s'-]{1,30})`, 'i');
+        const match3 = line.match(pattern3);
+        
+        if (match3) {
+          const character = match3[1].trim();
+          
+          // Try to find movie title in the same line
+          const moviePattern = /([A-Z][^\\(]+)\\s*\\((\\d{4})\\)/;
+          const movieMatch = line.match(moviePattern);
+          
+          if (movieMatch && this.isValidCharacterName(character, celebrityName) && this.isValidMovieTitle(movieMatch[1])) {
+            roles.push({
+              character: character,
+              title: movieMatch[1].trim(),
+              medium: 'live_action_movie',
+              year: movieMatch[2],
+              popularity: 'medium',
+              source: 'imdb_emergency',
+              confidence: 'high'
+            });
+            
+            console.log(`✅ Found: ${character} in ${movieMatch[1]} (${movieMatch[2]})`);
+          }
+        }
+      }
+    }
+    
+    return roles;
+  }
+
+  /**
+   * Escape regex special characters
    */
   escapeRegex(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   /**
-   * FIXED: Strict character name validation
+   * Validate character name
    */
   isValidCharacterName(name, celebrityName) {
     if (!name || name.length < 2 || name.length > 50) return false;
@@ -387,14 +309,14 @@ class RedFlagRoleDetector {
     const excludeWords = [
       'character', 'actor', 'actress', 'imdb', 'movie', 'film', 'show', 'series',
       'cast', 'starring', 'featuring', 'director', 'producer', 'writer', 'plays',
-      'portrays', 'performance', 'role', 'unknown', 'various', 'and', 'the', 'of', 'in'
+      'portrays', 'performance', 'role', 'unknown', 'various'
     ];
     
     return !excludeWords.some(word => nameLower.includes(word));
   }
 
   /**
-   * Check if it's a valid movie title
+   * Validate movie title
    */
   isValidMovieTitle(title) {
     if (!title || title.length < 2 || title.length > 100) return false;
@@ -403,19 +325,6 @@ class RedFlagRoleDetector {
     const titleLower = title.toLowerCase();
     
     return !excludeWords.some(word => titleLower.includes(word));
-  }
-
-  /**
-   * Guess medium from title
-   */
-  guessMediumFromTitle(title) {
-    const titleLower = title.toLowerCase();
-    
-    if (titleLower.includes('tv') || titleLower.includes('series')) {
-      return 'live_action_tv';
-    }
-    
-    return 'live_action_movie';
   }
 
   /**
@@ -444,7 +353,7 @@ class RedFlagRoleDetector {
       api_key: this.serpApiKey,
       engine: 'google',
       q: query,
-      num: 20
+      num: 10
     };
 
     const response = await axios.get('https://serpapi.com/search', { 
@@ -462,7 +371,7 @@ class RedFlagRoleDetector {
     return {
       hasWebSearch: this.hasWebSearch,
       hasOpenAI: this.hasOpenAI,
-      emergencyMethod: this.hasWebSearch ? 'Precise IMDb Character Extraction' : 'None',
+      emergencyMethod: this.hasWebSearch ? 'Simple IMDb Direct' : 'None',
       systemReady: this.hasWebSearch
     };
   }
