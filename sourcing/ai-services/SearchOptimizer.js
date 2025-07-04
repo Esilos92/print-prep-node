@@ -16,224 +16,238 @@ class SearchOptimizer {
       if (process.env.OPENAI_API_KEY) {
         this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         this.hasOpenAI = true;
-        console.log('✅ OpenAI initialized for CHARACTER-FIRST search optimization');
+        console.log('✅ OpenAI initialized for ENHANCED search optimization');
       } else {
-        console.log('ℹ️ OpenAI not configured, using character-first template');
+        console.log('ℹ️ OpenAI not configured, using enhanced template generation');
       }
     } catch (error) {
-      console.log('⚠️ OpenAI initialization failed, using character-first template');
+      console.log('⚠️ OpenAI initialization failed, using enhanced template generation');
       this.hasOpenAI = false;
     }
   }
 
   /**
-   * ENHANCED: CHARACTER-FIRST search term generation
+   * ENHANCED: Universal search term generation for all celebrity types
    */
   async optimizeSearchTerms(roles) {
     try {
-      console.log(`🔍 Generating CHARACTER-FIRST search terms for ${roles.length} roles`);
+      console.log(`🔍 Generating ENHANCED search terms for ${roles.length} roles`);
       
       const optimizedRoles = await Promise.all(
-        roles.map(role => this.optimizeRoleForCharacterFirst(role))
+        roles.map(role => this.optimizeRoleForUniversalSearch(role))
       );
 
-      console.log(`✅ CHARACTER-FIRST search optimization complete`);
+      console.log(`✅ ENHANCED search optimization complete`);
       return optimizedRoles;
 
     } catch (error) {
-      console.error(`❌ Search optimization failed:`, error.message);
-      return this.generateFallbackTerms(roles);
+      console.error(`❌ Enhanced search optimization failed:`, error.message);
+      return this.generateEnhancedFallbackTerms(roles);
     }
   }
 
   /**
-   * ENHANCED: Generate CHARACTER-FIRST search terms for any role type
+   * ENHANCED: Generate search terms based on role characteristics
    */
-  async optimizeRoleForCharacterFirst(role) {
+  async optimizeRoleForUniversalSearch(role) {
     try {
       const celebrityName = this.extractCelebrityName(role);
+      const searchStrategy = role.searchStrategy || this.determineSearchStrategy(role);
       
-      // Determine search strategy based on role type
-      const searchStrategy = this.determineSearchStrategy(role);
+      // Generate strategy-specific terms
+      let primaryTerms = [];
+      let fallbackTerms = [];
       
-      const characterFirstTerms = await this.generateCharacterFirstTerms(
-        celebrityName,
-        role.character, 
-        role.title, 
-        role.medium,
-        searchStrategy
-      );
-      
-      const balancedTerms = this.generateBalancedTerms(role, searchStrategy);
-      const fallbackTerms = this.generateFallbackTerms([role])[0]?.searchTerms?.basic || [];
-
-      return {
-        ...role,
-        searchTerms: {
-          character_images: characterFirstTerms,     // Primary: CHARACTER-FIRST
-          ai: characterFirstTerms,                   // Unified AI field
-          balanced: balancedTerms,                   // Balanced character+actor
-          basic: fallbackTerms,                      // Fallback
-          all: [...characterFirstTerms, ...balancedTerms, ...fallbackTerms]
-        },
-        searchStrategy: searchStrategy
-      };
-
-    } catch (error) {
-      console.error(`⚠️ CHARACTER-FIRST optimization failed for ${role.character}, using fallback`);
-      return {
-        ...role,
-        searchTerms: {
-          character_images: [],
-          ai: [],
-          balanced: this.generateBalancedTerms(role, 'mixed'),
-          basic: this.generateFallbackTerms([role])[0]?.searchTerms?.basic || [],
-          all: []
-        }
-      };
-    }
-  }
-
-  /**
-   * NEW: Determine optimal search strategy for role
-   */
-  determineSearchStrategy(role) {
-    const medium = (role.medium || '').toLowerCase();
-    const title = (role.title || '').toLowerCase();
-    
-    // Voice/Animation roles - pure character focus
-    if (medium.includes('voice') || medium.includes('anime') || 
-        medium.includes('animation') || medium.includes('cartoon')) {
-      return 'character_pure';
-    }
-    
-    // Iconic characters (like Captain Kirk) - character-first even for live action
-    const iconicIndicators = ['star trek', 'star wars', 'marvel', 'dc comics', 'batman', 'superman', 'spider-man'];
-    if (iconicIndicators.some(indicator => title.includes(indicator))) {
-      return 'character_iconic';
-    }
-    
-    // Recent/popular live action - character-first with actor support
-    const year = parseInt(role.year) || 0;
-    if (year >= 2000) {
-      return 'character_modern';
-    }
-    
-    // Older live action - balanced approach
-    return 'balanced_classic';
-  }
-
-  /**
-   * ENHANCED: Generate SMART CHARACTER-FIRST search terms with multi-actor awareness
-   */
-  async generateCharacterFirstTerms(celebrityName, character, title, medium, strategy) {
-    const characterName = character || 'Unknown Character';
-    const showTitle = title || 'Unknown Title';
-    
-    // CRITICAL: Check if this is a multi-actor character role
-    const isMultiActorCharacter = await this.detectMultiActorCharacter(characterName, showTitle);
-    
-    let terms = [];
-    
-    if (isMultiActorCharacter) {
-      // ACTOR-SPECIFIC searches for multi-actor characters
-      terms = this.generateActorSpecificTerms(celebrityName, characterName, showTitle, strategy);
-    } else {
-      // Standard character-first approach for single-actor characters
-      switch (strategy) {
-        case 'character_pure':
-          // CLEAN character focus for voice/animation - like manual search
-          terms = [
-            `"${characterName}"`,
-            `"${characterName}" "${showTitle}"`,
-            `"${characterName}" ${showTitle.split(' ').slice(0, 2).join(' ')}`,
-            `"${showTitle}" "${characterName}"`,
-            `"${characterName}" anime`,
-            `"${showTitle}" character`
-          ];
+      switch (searchStrategy) {
+        case 'character_images_only':
+          primaryTerms = this.generateCharacterOnlyTerms(role);
+          fallbackTerms = this.generateVoiceActorFallbacks(celebrityName, role);
           break;
           
-        case 'character_iconic':
-          // Clean character-first for iconic roles
-          terms = [
-            `"${characterName}"`,
-            `"${characterName}" "${showTitle}"`,
-            `"${showTitle}" "${characterName}"`,
-            `"${characterName}" character`,
-            `"${characterName}" official`,
-            `"${celebrityName}" "${characterName}"`
-          ];
+        case 'character_with_context':
+          primaryTerms = this.generateContextualTerms(celebrityName, role);
+          fallbackTerms = this.generateRecentContentFallbacks(celebrityName, role);
           break;
           
-        case 'character_modern':
-          // Clean character-first for modern content
-          terms = [
-            `"${characterName}" "${showTitle}"`,
-            `"${characterName}" HD`,
-            `"${showTitle}" "${characterName}"`,
-            `"${characterName}" character`,
-            `"${celebrityName}" "${characterName}"`,
-            `"${characterName}" official`
-          ];
+        case 'broad_search':
+          primaryTerms = this.generateBroadSearchTerms(celebrityName, role);
+          fallbackTerms = this.generateIndieActorFallbacks(celebrityName, role);
           break;
           
-        case 'balanced_classic':
-          // Clean balanced approach
-          terms = [
-            `"${characterName}" "${showTitle}"`,
-            `"${celebrityName}" "${characterName}"`,
-            `"${showTitle}" "${characterName}"`,
-            `"${characterName}" character`,
-            `"${celebrityName}" "${showTitle}"`,
-            `"${characterName}"`
-          ];
+        case 'actor_headshots':
+          primaryTerms = this.generateHeadshotTerms(celebrityName, role);
+          fallbackTerms = this.generatePromotionalFallbacks(celebrityName, role);
+          break;
+          
+        case 'promotional_photos':
+          primaryTerms = this.generatePromotionalTerms(celebrityName, role);
+          fallbackTerms = this.generateOfficialPhotoFallbacks(celebrityName, role);
           break;
           
         default:
-          // Clean fallback
-          terms = [
-            `"${characterName}" "${showTitle}"`,
-            `"${characterName}"`,
-            `"${showTitle}" "${characterName}"`,
-            `"${celebrityName}" "${characterName}"`,
-            `"${characterName}" character`,
-            `"${showTitle}" character`
-          ];
+          primaryTerms = this.generateCharacterFirstTerms(celebrityName, role);
+          fallbackTerms = this.generateStandardFallbacks(celebrityName, role);
       }
+      
+      // Check for multi-actor situations
+      const isMultiActorCharacter = await this.detectMultiActorCharacter(
+        role.character || role.characterName || 'Unknown', 
+        role.title || role.name || 'Unknown'
+      );
+      
+      if (isMultiActorCharacter) {
+        primaryTerms = this.generateActorSpecificTerms(celebrityName, role);
+        role.isMultiActorCharacter = true;
+        role.smartSearchApproach = 'actor_specific';
+      }
+      
+      const allTerms = [...primaryTerms, ...fallbackTerms];
+      
+      return {
+        ...role,
+        finalSearchTerms: primaryTerms, // Main terms for fetcher
+        searchTerms: {
+          character_images: primaryTerms,
+          balanced: fallbackTerms,
+          all: allTerms
+        },
+        searchStrategy: searchStrategy,
+        isMultiActorCharacter: isMultiActorCharacter || false,
+        smartSearchApproach: isMultiActorCharacter ? 'actor_specific' : 'character_first'
+      };
+
+    } catch (error) {
+      console.error(`⚠️ Enhanced optimization failed for ${role.character || role.name}, using fallback`);
+      return this.createEnhancedFallbackRole(role);
     }
-    
-    // Filter out malformed terms and keep clean
-    return terms
-      .filter(term => term.length > 5 && term.length < 80) // Reasonable length
-      .filter(term => !term.includes('Unknown')); // Remove unknown placeholders
   }
 
   /**
-   * SMART: Simple but effective multi-actor detection with fallback
+   * ENHANCED: Generate character-only search terms (voice actors)
+   */
+  generateCharacterOnlyTerms(role) {
+    const characterName = role.character || role.characterName || 'Unknown';
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    if (characterName === 'Unknown' || showTitle === 'Unknown') {
+      return [`"anime character" HD`, `"animation character" HD`];
+    }
+    
+    return [
+      `"${characterName}"`,
+      `"${characterName}" "${showTitle}"`,
+      `"${characterName}" anime`,
+      `"${showTitle}" "${characterName}"`,
+      `"${characterName}" character`,
+      `"${showTitle}" character`
+    ];
+  }
+
+  /**
+   * ENHANCED: Generate contextual search terms (recent/trending)
+   */
+  generateContextualTerms(celebrityName, role) {
+    const characterName = role.character || role.characterName || 'Unknown';
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    return [
+      `"${characterName}" "${showTitle}"`,
+      `"${celebrityName}" "${characterName}"`,
+      `"${showTitle}" "${characterName}"`,
+      `"${characterName}" scene`,
+      `"${celebrityName}" "${showTitle}"`,
+      `"${characterName}" official`
+    ];
+  }
+
+  /**
+   * ENHANCED: Generate broad search terms (indie/unknown)
+   */
+  generateBroadSearchTerms(celebrityName, role) {
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    return [
+      `"${celebrityName}" actor`,
+      `"${celebrityName}" "${showTitle}"`,
+      `"${celebrityName}" headshot`,
+      `"${celebrityName}" photo`,
+      `"${celebrityName}" promotional`,
+      `"${celebrityName}" press`
+    ];
+  }
+
+  /**
+   * ENHANCED: Generate headshot terms (fallback)
+   */
+  generateHeadshotTerms(celebrityName, role) {
+    return [
+      `"${celebrityName}" headshot`,
+      `"${celebrityName}" actor photo`,
+      `"${celebrityName}" promotional photo`,
+      `"${celebrityName}" press photo`,
+      `"${celebrityName}" portrait`,
+      `"${celebrityName}" professional photo`
+    ];
+  }
+
+  /**
+   * ENHANCED: Generate promotional terms
+   */
+  generatePromotionalTerms(celebrityName, role) {
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    return [
+      `"${celebrityName}" "${showTitle}" promo`,
+      `"${celebrityName}" promotional`,
+      `"${celebrityName}" press photo`,
+      `"${celebrityName}" "${showTitle}" press`,
+      `"${celebrityName}" official photo`,
+      `"${celebrityName}" publicity`
+    ];
+  }
+
+  /**
+   * ENHANCED: Generate character-first terms (standard)
+   */
+  generateCharacterFirstTerms(celebrityName, role) {
+    const characterName = role.character || role.characterName || 'Unknown';
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    if (characterName === 'Unknown' || showTitle === 'Unknown') {
+      return this.generateHeadshotTerms(celebrityName, role);
+    }
+    
+    return [
+      `"${characterName}" "${showTitle}"`,
+      `"${characterName}"`,
+      `"${showTitle}" "${characterName}"`,
+      `"${celebrityName}" "${characterName}"`,
+      `"${characterName}" character`,
+      `"${celebrityName}" "${showTitle}"`
+    ];
+  }
+
+  /**
+   * ENHANCED: Smart multi-actor detection
    */
   async detectMultiActorCharacter(characterName, showTitle) {
     const character = characterName.toLowerCase();
     const title = showTitle.toLowerCase();
     
-    // GUARANTEED multi-actor cases (no AI needed)
+    // GUARANTEED multi-actor cases
     const definiteMultiActor = [
-      // Doctor Who - GUARANTEED multi-actor
       { char: 'doctor', show: 'doctor who', reason: 'The Doctor has 14+ actors' },
-      
-      // James Bond - GUARANTEED multi-actor  
       { char: 'bond', show: 'bond', reason: 'James Bond has 6+ actors' },
       { char: '007', show: 'bond', reason: 'James Bond has 6+ actors' },
-      
-      // Batman - GUARANTEED multi-actor
       { char: 'batman', show: 'batman', reason: 'Batman has 8+ actors' },
       { char: 'bruce wayne', show: 'batman', reason: 'Batman has 8+ actors' },
-      
-      // Spider-Man - GUARANTEED multi-actor
       { char: 'spider', show: 'spider', reason: 'Spider-Man has 3+ actors' },
       { char: 'peter parker', show: 'spider', reason: 'Spider-Man has 3+ actors' },
-      
-      // Sherlock - GUARANTEED multi-actor
-      { char: 'sherlock', show: 'sherlock', reason: 'Sherlock has 10+ actors' }
+      { char: 'sherlock', show: 'sherlock', reason: 'Sherlock has 10+ actors' },
+      { char: 'superman', show: 'superman', reason: 'Superman has 6+ actors' },
+      { char: 'clark kent', show: 'superman', reason: 'Superman has 6+ actors' },
+      { char: 'joker', show: 'batman', reason: 'Joker has 10+ actors' },
+      { char: 'wolverine', show: 'x-men', reason: 'Multiple Wolverine actors' }
     ];
     
     // Check guaranteed cases first
@@ -244,87 +258,31 @@ class SearchOptimizer {
       }
     }
     
-    // Try AI detection for edge cases (with timeout)
-    if (this.hasOpenAI) {
-      try {
-        return await Promise.race([
-          this.aiDetectMultiActor(characterName, showTitle),
-          new Promise(resolve => setTimeout(() => resolve(false), 3000)) // 3 second timeout
-        ]);
-      } catch (error) {
-        console.log(`⚠️ AI detection failed, assuming single-actor: ${error.message}`);
-      }
-    }
-    
-    // Safe fallback: assume single actor
+    // Safe fallback: assume single actor for cost efficiency
     console.log(`🤖 Assuming single-actor character: ${characterName} in ${showTitle}`);
     return false;
   }
 
   /**
-   * AI-powered multi-actor detection
+   * ENHANCED: Generate actor-specific search terms for multi-actor characters
    */
-  async aiDetectMultiActor(characterName, showTitle) {
-    try {
-      const prompt = `Has the character "${characterName}" from "${showTitle}" been played by multiple different actors across different movies, TV shows, or reboots?
-
-Consider:
-- Different actors in reboots/remakes
-- Recasting across film series
-- Different TV vs movie versions
-- Voice actors vs live-action actors for same character
-
-Answer with just "YES" if multiple actors have played this character, or "NO" if it's typically one actor.
-
-Examples:
-- The Doctor (Doctor Who) = YES (14+ actors)
-- James Bond = YES (6+ actors) 
-- Tyrion Lannister (Game of Thrones) = NO (only Peter Dinklage)
-- Tony Stark/Iron Man (MCU) = NO (only Robert Downey Jr in MCU)
-
-Answer:`;
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
-        max_tokens: 10
-      });
-
-      const response = completion.choices[0].message.content.trim().toUpperCase();
-      const isMultiActor = response.includes('YES');
-      
-      if (isMultiActor) {
-        console.log(`🤖 AI detected multi-actor character: ${characterName} in ${showTitle}`);
-      } else {
-        console.log(`🤖 AI confirmed single-actor character: ${characterName} in ${showTitle}`);
-      }
-      
-      return isMultiActor;
-      
-    } catch (error) {
-      console.log(`⚠️ AI multi-actor detection failed: ${error.message}`);
-      return false; // Safe fallback
-    }
-  }
-
-  /**
-   * NEW: Generate actor-specific search terms for multi-actor characters
-   */
-  generateActorSpecificTerms(celebrityName, characterName, showTitle, strategy) {
+  generateActorSpecificTerms(celebrityName, role) {
+    const characterName = role.character || role.characterName || 'Unknown';
+    const showTitle = role.title || role.name || 'Unknown';
+    
     console.log(`🎯 Generating ACTOR-SPECIFIC terms for ${celebrityName} as ${characterName}`);
     
     // PRIORITY: Actor name comes FIRST to avoid other actors
     const terms = [
-      `"${celebrityName}" "${showTitle}"`,           // Jodie Whittaker Doctor Who
-      `"${celebrityName}" "${characterName}"`,       // Jodie Whittaker The Doctor
-      `"${celebrityName}" as "${characterName}"`,    // Jodie Whittaker as The Doctor
-      `"${celebrityName}" "${showTitle}" "${characterName}"`, // Jodie Whittaker Doctor Who The Doctor
-      `"${showTitle}" "${celebrityName}"`,           // Doctor Who Jodie Whittaker
-      `"${celebrityName}" ${showTitle.split(' ').slice(0, 2).join(' ')}` // Jodie Whittaker Doctor Who (shortened)
+      `"${celebrityName}" "${showTitle}"`,
+      `"${celebrityName}" "${characterName}"`,
+      `"${celebrityName}" as "${characterName}"`,
+      `"${celebrityName}" "${showTitle}" "${characterName}"`,
+      `"${showTitle}" "${celebrityName}"`,
+      `"${celebrityName}" ${showTitle.split(' ').slice(0, 2).join(' ')}`
     ];
     
-    // Add specific terms based on known multi-actor characters
+    // Add specific terms for known multi-actor characters
     const specificTerms = this.generateSpecificActorTerms(celebrityName, characterName, showTitle);
     terms.push(...specificTerms);
     
@@ -332,7 +290,7 @@ Answer:`;
   }
 
   /**
-   * NEW: Generate highly specific terms for known multi-actor characters
+   * ENHANCED: Generate highly specific terms for known multi-actor characters
    */
   generateSpecificActorTerms(celebrityName, characterName, showTitle) {
     const character = characterName.toLowerCase();
@@ -346,16 +304,12 @@ Answer:`;
       if (actor.includes('jodie whittaker')) {
         specificTerms.push('"Jodie Whittaker" "13th Doctor"');
         specificTerms.push('"Jodie Whittaker" "Thirteenth Doctor"');
-        specificTerms.push('"13th Doctor" "Jodie Whittaker"');
       } else if (actor.includes('david tennant')) {
         specificTerms.push('"David Tennant" "10th Doctor"');
         specificTerms.push('"David Tennant" "Tenth Doctor"');
       } else if (actor.includes('matt smith')) {
         specificTerms.push('"Matt Smith" "11th Doctor"');
         specificTerms.push('"Matt Smith" "Eleventh Doctor"');
-      } else if (actor.includes('peter capaldi')) {
-        specificTerms.push('"Peter Capaldi" "12th Doctor"');
-        specificTerms.push('"Peter Capaldi" "Twelfth Doctor"');
       }
     }
     
@@ -366,8 +320,6 @@ Answer:`;
         specificTerms.push('"Daniel Craig" "007"');
       } else if (actor.includes('pierce brosnan')) {
         specificTerms.push('"Pierce Brosnan" "Bond"');
-      } else if (actor.includes('sean connery')) {
-        specificTerms.push('"Sean Connery" "Bond"');
       }
     }
     
@@ -378,8 +330,6 @@ Answer:`;
         specificTerms.push('"Christian Bale" "Dark Knight"');
       } else if (actor.includes('michael keaton')) {
         specificTerms.push('"Michael Keaton" "Batman"');
-      } else if (actor.includes('ben affleck')) {
-        specificTerms.push('"Ben Affleck" "Batman"');
       }
     }
     
@@ -387,83 +337,120 @@ Answer:`;
   }
 
   /**
-   * NEW: Generate balanced character+actor terms (3 terms)
+   * ENHANCED: Generate various fallback terms
    */
-  generateBalancedTerms(role, strategy) {
-    const celebrityName = this.extractCelebrityName(role);
-    const characterName = role.character || 'Unknown Character';
-    const showTitle = role.title || 'Unknown Title';
-    const exclusions = this.exclusions;
+  generateVoiceActorFallbacks(celebrityName, role) {
+    const characterName = role.character || role.characterName || 'Unknown';
+    const showTitle = role.title || role.name || 'Unknown';
     
-    if (strategy === 'character_pure') {
-      // For pure character roles, still focus on character but allow some actor context
-      return [
-        `"${showTitle}" voice cast "${characterName}" ${exclusions}`,
-        `"${characterName}" voice actor "${showTitle}" ${exclusions}`,
-        `"${celebrityName}" voices "${characterName}" ${exclusions}`
-      ];
-    }
-    
-    // Standard balanced terms
     return [
-      `"${celebrityName}" "${characterName}" "${showTitle}" scene ${exclusions}`,
-      `"${celebrityName}" as "${characterName}" "${showTitle}" ${exclusions}`,
-      `"${showTitle}" cast "${celebrityName}" "${characterName}" ${exclusions}`
+      `"${showTitle}" voice cast`,
+      `"${characterName}" voice actor`,
+      `"${celebrityName}" voice`,
+      `"${showTitle}" anime`,
+      `"${characterName}" anime character`,
+      `"${showTitle}" characters`
+    ];
+  }
+
+  generateRecentContentFallbacks(celebrityName, role) {
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    return [
+      `"${celebrityName}" 2024`,
+      `"${celebrityName}" recent`,
+      `"${showTitle}" cast`,
+      `"${celebrityName}" latest`,
+      `"${showTitle}" 2024`,
+      `"${celebrityName}" new`
+    ];
+  }
+
+  generateIndieActorFallbacks(celebrityName, role) {
+    return [
+      `"${celebrityName}" indie`,
+      `"${celebrityName}" film`,
+      `"${celebrityName}" actor`,
+      `"${celebrityName}" casting`,
+      `"${celebrityName}" behind scenes`,
+      `"${celebrityName}" set`
+    ];
+  }
+
+  generatePromotionalFallbacks(celebrityName, role) {
+    return [
+      `"${celebrityName}" red carpet`,
+      `"${celebrityName}" event`,
+      `"${celebrityName}" interview`,
+      `"${celebrityName}" premiere`,
+      `"${celebrityName}" appearance`,
+      `"${celebrityName}" photo shoot`
+    ];
+  }
+
+  generateOfficialPhotoFallbacks(celebrityName, role) {
+    return [
+      `"${celebrityName}" official`,
+      `"${celebrityName}" press kit`,
+      `"${celebrityName}" publicity`,
+      `"${celebrityName}" professional`,
+      `"${celebrityName}" studio`,
+      `"${celebrityName}" portrait`
+    ];
+  }
+
+  generateStandardFallbacks(celebrityName, role) {
+    const showTitle = role.title || role.name || 'Unknown';
+    
+    return [
+      `"${celebrityName}" actor photo`,
+      `"${celebrityName}" "${showTitle}" cast`,
+      `"${celebrityName}" headshot`,
+      `"${celebrityName}" promotional`,
+      `"${showTitle}" behind scenes`,
+      `"${celebrityName}" press photo`
     ];
   }
 
   /**
-   * ENHANCED: Generate medium-specific optimization
+   * ENHANCED: Determine search strategy based on role characteristics
    */
-  generateMediumSpecificTerms(role) {
-    const { character, title, medium } = role;
-    const terms = [];
-    const exclusions = this.exclusions;
-    const characterName = character || 'Unknown Character';
-    const showTitle = title || 'Unknown Title';
-
-    switch (medium) {
-      case 'live_action_movie':
-        terms.push(`"${characterName}" "${showTitle}" movie scene HD ${exclusions}`);
-        terms.push(`"${showTitle}" "${characterName}" film scene ${exclusions}`);
-        terms.push(`"${characterName}" character "${showTitle}" movie ${exclusions}`);
-        break;
-
-      case 'live_action_tv':
-        terms.push(`"${characterName}" "${showTitle}" tv series scene ${exclusions}`);
-        terms.push(`"${showTitle}" "${characterName}" episode scene ${exclusions}`);
-        terms.push(`"${characterName}" character "${showTitle}" series ${exclusions}`);
-        break;
-
-      case 'voice_anime':
-      case 'animation_tv':
-      case 'animation_movie':
-        terms.push(`"${characterName}" "${showTitle}" anime character ${exclusions}`);
-        terms.push(`"${showTitle}" "${characterName}" anime scene ${exclusions}`);
-        terms.push(`"${characterName}" character "${showTitle}" anime ${exclusions}`);
-        break;
-
-      case 'voice_cartoon':
-      case 'voice_movie':
-        terms.push(`"${characterName}" "${showTitle}" cartoon character ${exclusions}`);
-        terms.push(`"${showTitle}" "${characterName}" animated scene ${exclusions}`);
-        terms.push(`"${characterName}" character "${showTitle}" animation ${exclusions}`);
-        break;
-
-      case 'voice_game':
-        terms.push(`"${characterName}" "${showTitle}" game character ${exclusions}`);
-        terms.push(`"${showTitle}" "${characterName}" video game ${exclusions}`);
-        terms.push(`"${characterName}" character "${showTitle}" game ${exclusions}`);
-        break;
-
-      default:
-        terms.push(`"${characterName}" "${showTitle}" character scene ${exclusions}`);
-        terms.push(`"${showTitle}" "${characterName}" scene ${exclusions}`);
-        terms.push(`"${characterName}" character "${showTitle}" ${exclusions}`);
-        break;
+  determineSearchStrategy(role) {
+    const medium = (role.medium || '').toLowerCase();
+    const title = (role.title || '').toLowerCase();
+    const year = parseInt(role.year) || 0;
+    const note = (role.note || '').toLowerCase();
+    
+    // Voice/Animation roles - pure character focus
+    if (medium.includes('voice') || medium.includes('anime') || 
+        medium.includes('animation') || medium.includes('cartoon')) {
+      return 'character_images_only';
     }
-
-    return terms.filter(Boolean);
+    
+    // Breakout/trending roles - character with context
+    if (note.includes('breakout') || note.includes('trending') || 
+        note.includes('recent') || year >= 2022) {
+      return 'character_with_context';
+    }
+    
+    // Indie/low popularity - broad search
+    if (note.includes('indie') || role.popularity === 'low' || 
+        note.includes('festival') || note.includes('small')) {
+      return 'broad_search';
+    }
+    
+    // Fallback indicators
+    if (note.includes('fallback') || role.character === 'Research Required') {
+      return 'actor_headshots';
+    }
+    
+    // Recent content - promotional focus
+    if (year >= 2020 && role.popularity !== 'low') {
+      return 'promotional_photos';
+    }
+    
+    // Standard approach
+    return 'character_first';
   }
 
   /**
@@ -474,279 +461,211 @@ Answer:`;
   }
 
   /**
-   * ENHANCED: Generate fallback terms with CHARACTER-FIRST approach
+   * ENHANCED: Generate comprehensive fallback terms
    */
-  generateFallbackTerms(roles) {
+  generateEnhancedFallbackTerms(roles) {
     return roles.map(role => ({
       ...role,
+      finalSearchTerms: this.generateBasicTerms(role),
       searchTerms: {
-        character_images: [],
-        ai: [],
-        balanced: this.generateBalancedTerms(role, 'mixed'),
-        basic: this.generateBasicCharacterTerms(role),
-        all: [...this.generateBasicCharacterTerms(role)]
-      }
+        character_images: this.generateBasicTerms(role),
+        balanced: this.generateBasicTerms(role),
+        all: this.generateBasicTerms(role)
+      },
+      searchStrategy: 'fallback'
     }));
   }
 
   /**
-   * Generate basic character-focused terms
+   * Generate basic search terms for any role
    */
-  generateBasicCharacterTerms(role) {
+  generateBasicTerms(role) {
+    const celebrityName = this.extractCelebrityName(role);
+    const characterName = role.character || role.characterName || 'Unknown';
+    const showTitle = role.title || role.name || 'Unknown';
+    
     const terms = [];
-    const exclusions = this.exclusions;
-    const characterName = role.character || 'Unknown Character';
-    const showTitle = role.title || 'Unknown Title';
-
-    if (characterName !== 'Unknown Character' && showTitle !== 'Unknown Title') {
-      terms.push(`"${characterName}" "${showTitle}" character ${exclusions}`);
-      terms.push(`"${characterName}" "${showTitle}" scene ${exclusions}`);
-      terms.push(`"${showTitle}" "${characterName}" ${exclusions}`);
+    
+    if (characterName !== 'Unknown' && showTitle !== 'Unknown') {
+      terms.push(`"${characterName}" "${showTitle}"`);
+      terms.push(`"${characterName}"`);
+      terms.push(`"${showTitle}" "${characterName}"`);
     }
-
-    if (characterName !== 'Unknown Character') {
-      terms.push(`"${characterName}" character image ${exclusions}`);
+    
+    if (celebrityName !== 'ACTOR_NAME') {
+      terms.push(`"${celebrityName}" headshot`);
+      terms.push(`"${celebrityName}" actor`);
+      terms.push(`"${celebrityName}" photo`);
     }
-
-    if (showTitle !== 'Unknown Title') {
-      terms.push(`"${showTitle}" character scene ${exclusions}`);
-    }
-
-    return terms.filter(term => term.length > 10);
+    
+    return terms.length > 0 ? terms : [`"${celebrityName}" actor photo`];
   }
 
   /**
-   * Get best search terms (prioritizes CHARACTER-FIRST)
+   * ENHANCED: Create comprehensive fallback role
+   */
+  createEnhancedFallbackRole(role) {
+    const celebrityName = this.extractCelebrityName(role);
+    const basicTerms = this.generateBasicTerms(role);
+    
+    return {
+      ...role,
+      finalSearchTerms: basicTerms,
+      searchTerms: {
+        character_images: basicTerms,
+        balanced: basicTerms,
+        all: basicTerms
+      },
+      searchStrategy: 'fallback',
+      isMultiActorCharacter: false,
+      smartSearchApproach: 'basic'
+    };
+  }
+
+  /**
+   * Get best search terms (prioritizes finalSearchTerms)
    */
   getBestSearchTerms(role, maxTerms = 6) {
+    // Use finalSearchTerms if available (preferred)
+    if (role.finalSearchTerms && role.finalSearchTerms.length > 0) {
+      return role.finalSearchTerms.slice(0, maxTerms);
+    }
+    
     if (!role.searchTerms) {
-      const basic = this.generateBasicCharacterTerms(role);
-      const mediumSpecific = this.generateMediumSpecificTerms(role);
-      return [...basic, ...mediumSpecific].slice(0, maxTerms);
+      return this.generateBasicTerms(role).slice(0, maxTerms);
     }
 
-    const { character_images, ai, balanced, basic } = role.searchTerms;
+    const { character_images, balanced, all } = role.searchTerms;
     
-    // PRIORITIZE CHARACTER-FIRST terms
-    const characterFirstTerms = character_images || ai || [];
+    // Prioritize character_images
+    const characterTerms = character_images || [];
     const balancedTerms = balanced || [];
-    const basicTerms = (basic || []).slice(0, 2); // Limit fallback terms
+    const allTerms = all || [];
     
     const prioritizedTerms = [
-      ...characterFirstTerms,      // CHARACTER-FIRST (highest priority)
-      ...balancedTerms.slice(0, 2), // Some balanced terms
-      ...basicTerms                 // Fallback terms
+      ...characterTerms,
+      ...balancedTerms.filter(term => !characterTerms.includes(term)),
+      ...allTerms.filter(term => !characterTerms.includes(term) && !balancedTerms.includes(term))
     ];
     
-    const uniqueTerms = [...new Set(prioritizedTerms)];
-    return uniqueTerms.slice(0, maxTerms);
+    return prioritizedTerms.slice(0, maxTerms);
   }
 
   /**
-   * ENHANCED: OpenAI-powered CHARACTER-FIRST optimization (if available)
+   * Get optimization statistics
    */
-  async enhanceWithOpenAI(role) {
-    if (!this.hasOpenAI) return role;
-
-    try {
-      const characterName = role.character || 'Unknown Character';
-      const showTitle = role.title || 'Unknown Title';
-      const celebrityName = this.extractCelebrityName(role);
-      const medium = role.medium || 'unknown';
-
-      const prompt = `Generate 6 CLEAN CHARACTER-FIRST image search terms for finding images of "${characterName}" from "${showTitle}".
-
-STRATEGY: Simple, clean searches like a human would do manually.
-
-REQUIREMENTS:
-- Focus on "${characterName}" as the primary search element
-- Include "${showTitle}" for context
-- Keep terms SHORT and CLEAN (like manual Google searches)
-- ${medium.includes('voice') || medium.includes('anime') ? 'Pure character focus for anime/voice content' : 'Character-first but actor context OK'}
-- NO exclusions or negative terms (AI will filter content)
-- Make searches that would find content on fandom wikis, Reddit, Game Rant, etc.
-
-Example clean terms:
-- "Shoto Todoroki"
-- "Shoto Todoroki My Hero Academia"  
-- "My Hero Academia Shoto Todoroki"
-
-Return exactly 6 CLEAN search terms as JSON array:
-["term1", "term2", "term3", "term4", "term5", "term6"]`;
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at generating CHARACTER-FIRST image search terms that prioritize character names over actor names for better image targeting."
-          },
-          {
-            role: "user", 
-            content: prompt
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 400
-      });
-
-      const response = completion.choices[0].message.content;
-      const enhancedTerms = this.parseJSONResponse(response);
-      
-      if (Array.isArray(enhancedTerms) && enhancedTerms.length === 6) {
-        console.log(`🎯 OpenAI enhanced CHARACTER-FIRST terms for ${characterName}`);
-        
-        return {
-          ...role,
-          searchTerms: {
-            ...role.searchTerms,
-            character_images: enhancedTerms,
-            ai: enhancedTerms,
-            openai_enhanced: true
-          }
-        };
-      }
-      
-    } catch (error) {
-      console.log(`⚠️ OpenAI enhancement failed for ${role.character}: ${error.message}`);
-    }
-    
-    return role;
-  }
-
-  /**
-   * Test the CHARACTER-FIRST optimizer
-   */
-  async testOptimizer() {
-    const testRoles = [
-      {
-        character: "Shoto Todoroki",
-        title: "My Hero Academia", 
-        medium: "voice_anime",
-        year: "2016",
-        celebrity: "David Matranga",
-        actorName: "David Matranga"
-      },
-      {
-        character: "Captain Kirk",
-        title: "Star Trek",
-        medium: "live_action_tv",
-        year: "1966", 
-        celebrity: "William Shatner",
-        actorName: "William Shatner"
-      }
-    ];
-
-    try {
-      const optimized = await Promise.all(
-        testRoles.map(role => this.optimizeRoleForCharacterFirst(role))
-      );
-      
-      console.log('CHARACTER-FIRST optimizer test results:');
-      optimized.forEach((role, index) => {
-        console.log(`${index + 1}. ${role.character} (${role.searchStrategy}):`);
-        console.log(`   Character-first terms: ${role.searchTerms?.character_images?.length || 0}`);
-        console.log(`   Example: ${role.searchTerms?.character_images?.[0] || 'None'}`);
-      });
-      
-      const success = optimized.every(role => role.searchTerms?.character_images?.length === 6);
-      console.log(success ? '✅ CHARACTER-FIRST test successful' : '❌ CHARACTER-FIRST test failed');
-      return success;
-      
-    } catch (error) {
-      console.error('CHARACTER-FIRST optimizer test failed:', error.message);
-      return false;
-    }
-  }
-
-  /**
-   * ENHANCED: Parse JSON response handling markdown code blocks and partial responses
-   */
-  parseJSONResponse(response) {
-    try {
-      // Remove any leading/trailing whitespace
-      response = response.trim();
-      
-      // First try direct JSON parsing
-      return JSON.parse(response);
-    } catch (error) {
-      try {
-        // Try extracting from markdown code blocks
-        const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatch && jsonMatch[1]) {
-          return JSON.parse(jsonMatch[1].trim());
-        }
-        
-        // Try extracting any array pattern
-        const arrayMatch = response.match(/\[[\s\S]*?\]/);
-        if (arrayMatch) {
-          return JSON.parse(arrayMatch[0]);
-        }
-        
-        // Try to handle truncated JSON responses
-        const truncatedMatch = response.match(/\[[\s\S]*/);
-        if (truncatedMatch) {
-          let truncatedJson = truncatedMatch[0];
-          
-          // Try to close incomplete arrays/objects
-          if (!truncatedJson.endsWith(']') && !truncatedJson.endsWith('}')) {
-            // Count unclosed brackets and quotes
-            const openBrackets = (truncatedJson.match(/\[/g) || []).length;
-            const closeBrackets = (truncatedJson.match(/\]/g) || []).length;
-            const openBraces = (truncatedJson.match(/\{/g) || []).length;
-            const closeBraces = (truncatedJson.match(/\}/g) || []).length;
-            
-            // Add missing closing brackets
-            for (let i = 0; i < (openBraces - closeBraces); i++) {
-              truncatedJson += '}';
-            }
-            for (let i = 0; i < (openBrackets - closeBrackets); i++) {
-              truncatedJson += ']';
-            }
-            
-            try {
-              return JSON.parse(truncatedJson);
-            } catch (e) {
-              // If still invalid, try to extract just the completed items
-              console.log(`Attempting to extract partial data from truncated JSON`);
-            }
-          }
-        }
-        
-        throw new Error('No valid JSON found');
-      } catch (parseError) {
-        console.log(`⚠️ JSON parsing failed for response: ${response.substring(0, 200)}...`);
-        return null;
-      }
-    }
-  }
-  
   getOptimizationStats(roles) {
     if (!roles || !Array.isArray(roles)) return {};
 
     const stats = {
       totalRoles: roles.length,
-      characterFirstTerms: 0,
-      balancedTerms: 0,
-      fallbackTerms: 0,
-      strategies: {}
+      strategiesUsed: {},
+      multiActorCount: 0,
+      averageTermsPerRole: 0,
+      enhancedOptimization: true
     };
 
+    let totalTerms = 0;
+
     roles.forEach(role => {
-      if (role.searchTerms) {
-        stats.characterFirstTerms += role.searchTerms.character_images?.length || 0;
-        stats.balancedTerms += role.searchTerms.balanced?.length || 0;
-        stats.fallbackTerms += role.searchTerms.basic?.length || 0;
+      // Count strategies
+      if (role.searchStrategy) {
+        stats.strategiesUsed[role.searchStrategy] = (stats.strategiesUsed[role.searchStrategy] || 0) + 1;
       }
       
-      if (role.searchStrategy) {
-        stats.strategies[role.searchStrategy] = (stats.strategies[role.searchStrategy] || 0) + 1;
+      // Count multi-actor characters
+      if (role.isMultiActorCharacter) {
+        stats.multiActorCount++;
+      }
+      
+      // Count terms
+      if (role.finalSearchTerms) {
+        totalTerms += role.finalSearchTerms.length;
       }
     });
 
-    stats.characterFirstSuccessRate = Math.round((stats.characterFirstTerms / (roles.length * 6)) * 100);
+    stats.averageTermsPerRole = Math.round(totalTerms / roles.length);
+    stats.multiActorPercentage = Math.round((stats.multiActorCount / roles.length) * 100);
 
     return stats;
+  }
+
+  /**
+   * Test the enhanced optimizer
+   */
+  async testEnhancedOptimizer() {
+    const testRoles = [
+      {
+        character: "Shoto Todoroki",
+        title: "My Hero Academia", 
+        medium: "voice_anime_tv",
+        year: "2016",
+        celebrity: "David Matranga",
+        popularity: "high"
+      },
+      {
+        character: "Recent Character",
+        title: "New Show 2024",
+        medium: "live_action_tv",
+        year: "2024", 
+        celebrity: "Unknown Actor",
+        popularity: "medium",
+        note: "breakout role"
+      },
+      {
+        character: "Indie Character",
+        title: "Small Film",
+        medium: "live_action_movie",
+        year: "2023", 
+        celebrity: "Indie Actor",
+        popularity: "low",
+        note: "indie film"
+      }
+    ];
+
+    try {
+      const optimized = await Promise.all(
+        testRoles.map(role => this.optimizeRoleForUniversalSearch(role))
+      );
+      
+      console.log('Enhanced optimizer test results:');
+      optimized.forEach((role, index) => {
+        console.log(`${index + 1}. ${role.character} (${role.searchStrategy}):`);
+        console.log(`   Primary terms: ${role.finalSearchTerms?.length || 0}`);
+        console.log(`   Example: ${role.finalSearchTerms?.[0] || 'None'}`);
+        console.log(`   Multi-actor: ${role.isMultiActorCharacter || false}`);
+      });
+      
+      const success = optimized.every(role => role.finalSearchTerms?.length > 0);
+      console.log(success ? '✅ Enhanced optimizer test successful' : '❌ Enhanced optimizer test failed');
+      return success;
+      
+    } catch (error) {
+      console.error('Enhanced optimizer test failed:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * System status for enhanced optimizer
+   */
+  getSystemStatus() {
+    return {
+      openaiAPI: this.hasOpenAI,
+      enhancedOptimization: true,
+      universalStrategies: true,
+      multiActorDetection: true,
+      costOptimized: true,
+      fallbackSupport: true,
+      supportedStrategies: [
+        'character_images_only',
+        'character_with_context', 
+        'broad_search',
+        'actor_headshots',
+        'promotional_photos',
+        'character_first'
+      ]
+    };
   }
 }
 
