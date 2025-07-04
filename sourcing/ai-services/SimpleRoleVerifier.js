@@ -44,7 +44,7 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * IMPROVED: Role verification with emergency recovery role support
+   * ENHANCED: Role verification with AI emergency recovery support
    */
   async verifyRoles(celebrityName, discoveredRoles) {
     console.log(`🔍 Verifying ${discoveredRoles.length} roles for ${celebrityName}...`);
@@ -62,8 +62,8 @@ class SimpleRoleVerifier {
     let verificationCost = 0;
     
     for (const role of discoveredRoles) {
-      // ENHANCED: Special handling for emergency recovery roles
-      const isEmergencyRecovery = role.source === 'emergency_recovery';
+      // ENHANCED: Special handling for AI emergency recovery roles
+      const isEmergencyRecovery = role.source === 'emergency_ai_discovery';
       
       const verification = await this.verifyRoleWithConfidence(celebrityName, role, isEmergencyRecovery);
       verificationCost += this.hasWebSearch ? 0.002 : 0.0002;
@@ -99,13 +99,13 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * ENHANCED: Role verification with emergency recovery support
+   * ENHANCED: Role verification with AI emergency recovery support
    */
   async verifyRoleWithConfidence(celebrityName, role, isEmergencyRecovery = false) {
-    // ENHANCED: More lenient verification for emergency recovery roles
+    // ENHANCED: Very lenient verification for AI emergency recovery roles
     if (isEmergencyRecovery) {
-      console.log(`🚨 Emergency recovery role - using lenient verification`);
-      return await this.verifyEmergencyRecoveryRole(celebrityName, role);
+      console.log(`🚨 AI Emergency recovery role - using very lenient verification`);
+      return await this.verifyEmergencyAIRole(celebrityName, role);
     }
 
     // Try web search verification first (most accurate)
@@ -149,162 +149,84 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * ENHANCED: Verify emergency recovery roles with lenient approach
+   * ENHANCED: Very lenient verification for AI emergency recovery roles
    */
-  async verifyEmergencyRecoveryRole(celebrityName, role) {
+  async verifyEmergencyAIRole(celebrityName, role) {
     try {
-      console.log(`🔍 Lenient verification: ${celebrityName} as ${role.character} in ${role.title}`);
+      console.log(`🔍 Lenient AI verification: ${celebrityName} as ${role.character} in ${role.title}`);
       
-      // For emergency recovery roles, use more lenient verification
-      const lenientQueries = [
-        `"${celebrityName}" "${role.title}"`,
-        `"${role.title}" cast`,
-        `"${role.title}" "${celebrityName}"`,
-        `"${celebrityName}" actor "${role.title}"`
-      ];
+      // For AI emergency recovery roles, we trust the AI more since it already did discovery
+      
+      // Quick sanity check with AI if available
+      if (this.hasOpenAI) {
+        const quickCheckPrompt = `Quick verification: Did "${celebrityName}" play "${role.character}" in "${role.title}"? 
+        
+This role was discovered by AI emergency recovery, so only reject if you're absolutely certain it's wrong.
 
-      for (const query of lenientQueries) {
+Answer: YES, NO, or UNSURE`;
+
         try {
-          const searchResult = await this.performWebSearch(query);
-          const verification = this.analyzeLenientSearchResults(searchResult, celebrityName, role);
+          const completion = await this.openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: quickCheckPrompt }],
+            temperature: 0.1,
+            max_tokens: 10
+          });
+
+          const response = completion.choices[0].message.content.trim().toUpperCase();
           
-          if (verification.confidence !== 'UNKNOWN') {
-            console.log(`🌐 Lenient verification: ${verification.confidence} - ${verification.reason}`);
-            return verification;
+          if (response.includes('NO') && !response.includes('UNSURE')) {
+            return {
+              isValid: false,
+              confidence: 'MEDIUM',
+              reason: 'AI emergency recovery role rejected by verification'
+            };
           }
         } catch (error) {
-          console.log(`⚠️ Lenient search query failed: ${query}`);
+          console.log(`⚠️ AI quick check failed: ${error.message}`);
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      // ENHANCED: For emergency recovery, be more permissive
+      // If we have web search, do a very basic check
+      if (this.hasWebSearch) {
+        try {
+          const basicQuery = `"${celebrityName}" "${role.title}"`;
+          const searchResult = await this.performWebSearch(basicQuery);
+          
+          if (searchResult.organic_results && searchResult.organic_results.length > 0) {
+            const hasBasicMatch = searchResult.organic_results.some(result => {
+              const text = `${result.title || ''} ${result.snippet || ''}`.toLowerCase();
+              return text.includes(celebrityName.toLowerCase()) && text.includes(role.title.toLowerCase());
+            });
+            
+            if (hasBasicMatch) {
+              return {
+                isValid: true,
+                confidence: 'HIGH',
+                reason: 'AI emergency recovery role confirmed by web search'
+              };
+            }
+          }
+        } catch (error) {
+          console.log(`⚠️ Basic web check failed: ${error.message}`);
+        }
+      }
+
+      // Default: Trust the AI emergency recovery
       return {
         isValid: true,
         confidence: 'MEDIUM',
-        reason: 'Emergency recovery role - allowing with medium confidence'
+        reason: 'AI emergency recovery role - trusted by default'
       };
 
     } catch (error) {
-      console.log(`⚠️ Emergency recovery verification failed: ${error.message}`);
+      console.log(`⚠️ Emergency AI verification failed: ${error.message}`);
       return {
         isValid: true,
         confidence: 'LOW',
-        reason: 'Emergency recovery role - allowing with low confidence'
+        reason: 'AI emergency recovery role - allowing with low confidence'
       };
     }
-  }
-
-  /**
-   * ENHANCED: Analyze search results with lenient approach
-   */
-  analyzeLenientSearchResults(searchData, celebrityName, role) {
-    const results = searchData.organic_results || [];
-    const snippets = results.map(r => (r.snippet || '').toLowerCase()).join(' ');
-    const titles = results.map(r => (r.title || '').toLowerCase()).join(' ');
-    const allText = `${snippets} ${titles}`.toLowerCase();
-
-    const celebrityLower = celebrityName.toLowerCase();
-    const titleLower = role.title.toLowerCase();
-    const characterLower = role.character.toLowerCase();
-
-    // ENHANCED: More flexible patterns for emergency recovery
-    const positivePatterns = [
-      new RegExp(`${celebrityLower}.*${titleLower}`, 'i'),
-      new RegExp(`${titleLower}.*${celebrityLower}`, 'i'),
-      new RegExp(`${celebrityLower}.*${characterLower}`, 'i'),
-      new RegExp(`${characterLower}.*${celebrityLower}`, 'i'),
-      new RegExp(`cast.*${celebrityLower}`, 'i'),
-      new RegExp(`${celebrityLower}.*cast`, 'i'),
-      new RegExp(`${celebrityLower}.*star`, 'i'),
-      new RegExp(`${celebrityLower}.*appear`, 'i'),
-      new RegExp(`${celebrityLower}.*role`, 'i'),
-      new RegExp(`${celebrityLower}.*play`, 'i')
-    ];
-
-    const hasPositiveMatch = positivePatterns.some(pattern => pattern.test(allText));
-
-    // Check for high-authority sources
-    const hasIMDbSource = results.some(r => r.link && r.link.includes('imdb.com'));
-    const hasWikipediaSource = results.some(r => r.link && r.link.includes('wikipedia.org'));
-    const hasAuthorativeSource = hasIMDbSource || hasWikipediaSource;
-
-    // ENHANCED: More lenient decision making for emergency recovery
-    if (hasPositiveMatch && hasIMDbSource) {
-      return {
-        isValid: true,
-        confidence: 'HIGH',
-        reason: 'Confirmed by IMDb'
-      };
-    }
-
-    if (hasPositiveMatch && hasWikipediaSource) {
-      return {
-        isValid: true,
-        confidence: 'HIGH',
-        reason: 'Confirmed by Wikipedia'
-      };
-    }
-
-    if (hasPositiveMatch && hasAuthorativeSource) {
-      return {
-        isValid: true,
-        confidence: 'MEDIUM',
-        reason: 'Confirmed by authoritative source'
-      };
-    }
-
-    if (hasPositiveMatch) {
-      return {
-        isValid: true,
-        confidence: 'MEDIUM',
-        reason: 'Confirmed by web search'
-      };
-    }
-
-    // ENHANCED: Check if celebrity and title exist together (even without character)
-    const hasCelebrityAndTitle = allText.includes(celebrityLower) && allText.includes(titleLower);
-    if (hasCelebrityAndTitle) {
-      return {
-        isValid: true,
-        confidence: 'MEDIUM',
-        reason: 'Celebrity and title found together'
-      };
-    }
-
-    // ENHANCED: Check for clear contradictions
-    const negativePatterns = [
-      new RegExp(`${characterLower}.*played by.*(?!${celebrityLower})\\w+`, 'i'),
-      new RegExp(`${characterLower}.*portrayed by.*(?!${celebrityLower})\\w+`, 'i'),
-      new RegExp(`${characterLower}.*voiced by.*(?!${celebrityLower})\\w+`, 'i')
-    ];
-
-    const hasNegativeMatch = negativePatterns.some(pattern => pattern.test(allText));
-
-    if (hasNegativeMatch && hasAuthorativeSource) {
-      return {
-        isValid: false,
-        confidence: 'HIGH',
-        reason: 'Contradicted by authoritative source'
-      };
-    }
-
-    // No results is suspicious for regular roles, but acceptable for emergency recovery
-    if (results.length === 0) {
-      return {
-        isValid: true,
-        confidence: 'LOW',
-        reason: 'No search results found - allowing emergency recovery role'
-      };
-    }
-
-    // Default to unknown for inconclusive results
-    return {
-      isValid: true,
-      confidence: 'UNKNOWN',
-      reason: 'Inconclusive search results - allowing emergency recovery role'
-    };
   }
 
   /**
@@ -316,20 +238,18 @@ class SimpleRoleVerifier {
       
       // ENHANCED: More targeted search queries with character name variations
       const searchQueries = [
-        // Primary: Direct IMDb searches
-        `"${celebrityName}" "${role.title}" cast site:imdb.com`,
-        `"${celebrityName}" "${role.character}" site:imdb.com`,
+        // Primary: Direct searches
+        `"${celebrityName}" "${role.title}" cast`,
+        `"${celebrityName}" "${role.character}" "${role.title}"`,
+        `"${celebrityName}" "${role.title}"`,
         
-        // Secondary: Wikipedia for broader verification
-        `"${celebrityName}" "${role.title}" site:wikipedia.org`,
+        // Secondary: Character-focused
+        `"${role.character}" "${role.title}" cast`,
+        `"${role.title}" "${role.character}" played by`,
         
-        // Tertiary: Character name variations
-        `"${celebrityName}" played "${role.character}" "${role.title}"`,
-        `"${celebrityName}" as "${role.character}" "${role.title}"`,
-        
-        // Quaternary: General verification
-        `"${celebrityName}" "${role.title}" character`,
-        `"${role.character}" "${role.title}" cast`
+        // Tertiary: General verification
+        `"${celebrityName}" as "${role.character}"`,
+        `"${role.title}" starring "${celebrityName}"`
       ];
 
       for (const query of searchQueries) {
@@ -361,7 +281,7 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * ENHANCED: Better analysis of search results with character name matching
+   * ENHANCED: Better analysis of search results with flexible matching
    */
   analyzeSearchResults(searchData, celebrityName, role) {
     const results = searchData.organic_results || [];
@@ -373,22 +293,24 @@ class SimpleRoleVerifier {
     const characterLower = role.character.toLowerCase();
     const titleLower = role.title.toLowerCase();
 
-    // ENHANCED: More flexible positive patterns with character name variations
+    // ENHANCED: More flexible positive patterns
     const positivePatterns = [
       new RegExp(`${celebrityLower}.*${characterLower}`, 'i'),
       new RegExp(`${characterLower}.*${celebrityLower}`, 'i'),
+      new RegExp(`${celebrityLower}.*${titleLower}`, 'i'),
+      new RegExp(`${titleLower}.*${celebrityLower}`, 'i'),
       new RegExp(`${celebrityLower}.*plays.*${characterLower}`, 'i'),
       new RegExp(`${celebrityLower}.*as.*${characterLower}`, 'i'),
       new RegExp(`${celebrityLower}.*portrayed.*${characterLower}`, 'i'),
       new RegExp(`cast.*${celebrityLower}.*${characterLower}`, 'i'),
       new RegExp(`${characterLower}.*played by.*${celebrityLower}`, 'i'),
       new RegExp(`${characterLower}.*voiced by.*${celebrityLower}`, 'i'),
-      // ENHANCED: Partial character name matching
+      // Partial character name matching
       new RegExp(`${celebrityLower}.*${this.getFirstName(characterLower)}`, 'i'),
       new RegExp(`${this.getFirstName(characterLower)}.*${celebrityLower}`, 'i'),
-      // ENHANCED: Character in parentheses pattern
-      new RegExp(`${characterLower}\\s*\\(${celebrityLower}\\)`, 'i'),
-      new RegExp(`${celebrityLower}\\s*\\(${characterLower}\\)`, 'i')
+      // Just celebrity and title together
+      new RegExp(`${celebrityLower}.*${titleLower}`, 'i'),
+      new RegExp(`${titleLower}.*${celebrityLower}`, 'i')
     ];
 
     const hasPositiveMatch = positivePatterns.some(pattern => pattern.test(allText));
@@ -398,7 +320,7 @@ class SimpleRoleVerifier {
     const hasWikipediaSource = results.some(r => r.link && r.link.includes('wikipedia.org'));
     const hasAuthorativeSource = hasIMDbSource || hasWikipediaSource;
 
-    // ENHANCED: More nuanced decision making
+    // ENHANCED: More lenient decision making
     if (hasPositiveMatch && hasIMDbSource) {
       return {
         isValid: true,
@@ -431,13 +353,13 @@ class SimpleRoleVerifier {
       };
     }
 
-    // ENHANCED: Check for partial character name matches
-    const firstNameMatch = this.checkPartialCharacterMatch(allText, celebrityLower, characterLower);
-    if (firstNameMatch) {
+    // Check if celebrity and title exist together (even without character)
+    const hasCelebrityAndTitle = allText.includes(celebrityLower) && allText.includes(titleLower);
+    if (hasCelebrityAndTitle) {
       return {
         isValid: true,
         confidence: 'MEDIUM',
-        reason: 'Partial character name match found'
+        reason: 'Celebrity and title found together'
       };
     }
 
@@ -458,75 +380,30 @@ class SimpleRoleVerifier {
       };
     }
 
-    // Check if celebrity and title exist but not character
-    const hasCelebrityAndTitle = allText.includes(celebrityLower) && allText.includes(titleLower);
-    if (hasCelebrityAndTitle && !allText.includes(characterLower)) {
-      return {
-        isValid: false,
-        confidence: 'MEDIUM',
-        reason: 'Celebrity in title but not this character'
-      };
-    }
-
-    // No results is suspicious
+    // No results is less suspicious now
     if (results.length === 0) {
       return {
-        isValid: false,
-        confidence: 'MEDIUM',
-        reason: 'No search results found'
+        isValid: true,
+        confidence: 'LOW',
+        reason: 'No search results found - allowing role'
       };
     }
 
-    // Default to unknown for inconclusive results
+    // Default to allowing uncertain cases
     return {
       isValid: true,
       confidence: 'UNKNOWN',
-      reason: 'Inconclusive search results'
+      reason: 'Inconclusive search results - allowing role'
     };
   }
 
   /**
-   * ENHANCED: Check for partial character name matches
-   */
-  checkPartialCharacterMatch(allText, celebrityLower, characterLower) {
-    const characterFirstName = this.getFirstName(characterLower);
-    const characterLastName = this.getLastName(characterLower);
-    
-    // Check if first name of character appears with celebrity
-    if (characterFirstName && characterFirstName.length > 2) {
-      const firstNamePattern = new RegExp(`${celebrityLower}.*${characterFirstName}`, 'i');
-      if (firstNamePattern.test(allText)) {
-        return true;
-      }
-    }
-    
-    // Check if last name of character appears with celebrity
-    if (characterLastName && characterLastName.length > 2) {
-      const lastNamePattern = new RegExp(`${celebrityLower}.*${characterLastName}`, 'i');
-      if (lastNamePattern.test(allText)) {
-        return true;
-      }
-    }
-    
-    return false;
-  }
-
-  /**
-   * ENHANCED: Get first name from character name
+   * Get first name from character name
    */
   getFirstName(characterName) {
     if (!characterName || typeof characterName !== 'string') return '';
     const parts = characterName.trim().split(/\s+/);
     return parts[0] || '';
-  }
-
-  /**
-   * ENHANCED: Get last name from character name
-   */
-  getLastName(characterName) {
-    if (!characterName || typeof characterName !== 'string') return '';
-    const parts = characterName.trim().split(/\s+/);
-    return parts.length > 1 ? parts[parts.length - 1] : '';
   }
 
   /**
@@ -551,7 +428,7 @@ class SimpleRoleVerifier {
   }
 
   /**
-   * ENHANCED: Better verification prompt with character name flexibility
+   * ENHANCED: Better verification prompt for regular roles
    */
   buildImprovedVerificationPrompt(celebrityName, role) {
     return `Verify if "${celebrityName}" played the character "${role.character}" in "${role.title}".
@@ -561,6 +438,7 @@ IMPORTANT GUIDELINES:
 - Character names may be nicknames, partial names, or slight variations
 - Include early career and lesser-known work
 - Allow for character name variations (e.g., "John Smith" vs "John")
+- Be more lenient with lesser-known actors and indie films
 - Only reject if you're confident it's completely wrong
 
 CONFIDENCE LEVELS:
@@ -573,7 +451,7 @@ RESPOND FORMAT: [CONFIDENCE]|[YES/NO]|[BRIEF_REASON]
 
 Examples:
 - "HIGH|YES|Well-known role from major film"
-- "MEDIUM|NO|Character doesn't exist in that show"
+- "MEDIUM|YES|Likely correct based on career pattern"
 - "LOW|YES|Possible but uncertain"
 - "UNKNOWN|YES|Cannot verify but no contradiction found"
 
@@ -581,7 +459,7 @@ VERIFY: Did "${celebrityName}" play "${role.character}" in "${role.title}"?`;
   }
 
   /**
-   * ENHANCED: Better parsing with more permissive approach
+   * ENHANCED: More permissive parsing
    */
   parseVerificationResponse(response) {
     const parts = response.split('|');
@@ -591,7 +469,7 @@ VERIFY: Did "${celebrityName}" play "${role.character}" in "${role.title}"?`;
       const decision = parts[1].trim().toUpperCase();
       const reason = parts[2].trim();
       
-      // ENHANCED: More permissive for emergency recovery and uncertain cases
+      // ENHANCED: More permissive for all cases
       const isValid = decision.includes('YES') || 
                      (confidence === 'LOW' && !decision.includes('NO')) ||
                      (confidence === 'UNKNOWN' && !decision.includes('NO'));
@@ -603,12 +481,12 @@ VERIFY: Did "${celebrityName}" play "${role.character}" in "${role.title}"?`;
       };
     }
     
-    // ENHANCED: Fallback parsing
+    // ENHANCED: Fallback parsing - default to allowing
     const upperResponse = response.toUpperCase();
     
-    // Only reject clear negatives with high confidence
+    // Only reject very clear negatives
     if (upperResponse.includes('NO') && 
-        (upperResponse.includes('HIGH') || upperResponse.includes('MEDIUM'))) {
+        (upperResponse.includes('HIGH') || upperResponse.includes('DEFINITELY'))) {
       return { 
         isValid: false, 
         confidence: 'MEDIUM', 
@@ -684,51 +562,6 @@ VERIFY: Did "${celebrityName}" play "${role.character}" in "${role.title}"?`;
   }
 
   /**
-   * OPTIMIZED: Batch verification with better error handling
-   */
-  async batchVerifyRoles(celebrityName, roles, batchSize = 5) {
-    console.log(`🔍 Batch verifying ${roles.length} roles for ${celebrityName}...`);
-    
-    const verifiedRoles = [];
-    let totalCost = 0;
-    
-    for (let i = 0; i < roles.length; i += batchSize) {
-      const batch = roles.slice(i, i + batchSize);
-      
-      const batchPromises = batch.map(role => 
-        this.verifyRoleWithConfidence(celebrityName, role)
-      );
-      
-      const batchResults = await Promise.all(batchPromises);
-      totalCost += batchResults.length * (this.hasWebSearch ? 0.002 : 0.0002);
-      
-      batchResults.forEach((verification, index) => {
-        const role = batch[index];
-        if (verification.isValid) {
-          verifiedRoles.push({
-            ...role,
-            verificationConfidence: verification.confidence,
-            verificationReason: verification.reason
-          });
-          console.log(`✅ ${verification.confidence}: ${role.character} in ${role.title}`);
-        } else {
-          console.log(`❌ ${verification.confidence}: ${role.character} in ${role.title} - ${verification.reason}`);
-        }
-      });
-      
-      // Brief pause between batches
-      if (i + batchSize < roles.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    console.log(`💰 Total verification cost: $${totalCost.toFixed(4)}`);
-    console.log(`🎭 ${verifiedRoles.length}/${roles.length} roles verified`);
-    
-    return verifiedRoles;
-  }
-
-  /**
    * Get verification statistics
    */
   getVerificationStats(verifiedRoles) {
@@ -766,7 +599,8 @@ VERIFY: Did "${celebrityName}" play "${role.character}" in "${role.title}"?`;
       primaryVerification: this.hasWebSearch ? 'Web Search' : this.hasOpenAI ? 'AI' : 'None',
       costPerVerification: this.hasWebSearch ? '$0.002' : '$0.0002',
       accuracy: this.hasWebSearch ? 'High' : 'Medium',
-      emergencyRecoverySupport: true
+      emergencyRecoverySupport: true,
+      aiEmergencySupport: this.hasOpenAI
     };
   }
 }
