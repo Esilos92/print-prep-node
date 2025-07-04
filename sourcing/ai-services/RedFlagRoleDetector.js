@@ -3,7 +3,7 @@ const axios = require('axios');
 
 /**
  * ENHANCED Red Flag Emergency System
- * Detects AI hallucination and triggers emergency web search with character name extraction
+ * AI-Focused approach for reliable character extraction from IMDb/Wikipedia
  */
 class RedFlagRoleDetector {
   constructor() {
@@ -96,28 +96,30 @@ class RedFlagRoleDetector {
   }
 
   /**
-   * ENHANCED: Emergency filmography search with character name extraction
+   * ENHANCED: AI-Driven Emergency filmography search
    */
   async emergencyFilmographySearch(celebrityName) {
-    if (!this.hasWebSearch) {
-      console.log('⚠️ Emergency web search not available - no SerpAPI key');
+    if (!this.hasOpenAI) {
+      console.log('⚠️ Emergency search requires OpenAI for character extraction');
       return [];
     }
 
     try {
-      console.log(`🚨 EMERGENCY: Enhanced filmography search for ${celebrityName}`);
+      console.log(`🚨 EMERGENCY: AI-driven filmography search for ${celebrityName}`);
       
-      // Step 1: Find filmography sources
-      const filmographySources = await this.findFilmographySources(celebrityName);
+      // Step 1: AI discovers real filmography
+      const aiDiscoveredRoles = await this.aiDiscoverRealFilmography(celebrityName);
       
-      // Step 2: Extract titles from sources
-      const discoveredTitles = await this.extractTitlesFromSources(filmographySources, celebrityName);
+      // Step 2: Verify with web search if available
+      let verifiedRoles = [];
+      if (this.hasWebSearch && aiDiscoveredRoles.length > 0) {
+        verifiedRoles = await this.webVerifyAIRoles(celebrityName, aiDiscoveredRoles);
+      } else {
+        verifiedRoles = aiDiscoveredRoles;
+      }
       
-      // Step 3: For each title, find the character name
-      const rolesWithCharacters = await this.findCharacterNamesForTitles(discoveredTitles, celebrityName);
-      
-      console.log(`✅ Emergency search recovered ${rolesWithCharacters.length} roles with character names`);
-      return rolesWithCharacters;
+      console.log(`✅ Emergency search recovered ${verifiedRoles.length} roles with character names`);
+      return verifiedRoles;
 
     } catch (error) {
       console.error(`❌ Emergency filmography search failed: ${error.message}`);
@@ -126,514 +128,305 @@ class RedFlagRoleDetector {
   }
 
   /**
-   * ENHANCED: Find filmography sources (IMDb, Wikipedia)
+   * ENHANCED: AI discovers real filmography with character names
    */
-  async findFilmographySources(celebrityName) {
-    const searchQueries = [
-      `"${celebrityName}" filmography site:imdb.com`,
-      `"${celebrityName}" movies site:imdb.com`,
-      `"${celebrityName}" site:wikipedia.org filmography`,
-      `"${celebrityName}" actor site:imdb.com`,
-      `"${celebrityName}" actress site:imdb.com`
-    ];
-
-    const allSources = [];
-    
-    for (const query of searchQueries) {
-      try {
-        console.log(`🔍 Finding sources: ${query}`);
-        const searchResult = await this.performWebSearch(query);
-        
-        if (searchResult.organic_results && searchResult.organic_results.length > 0) {
-          // Filter for high-quality sources
-          const qualitySources = searchResult.organic_results.filter(result => {
-            const url = (result.link || '').toLowerCase();
-            const title = (result.title || '').toLowerCase();
-            
-            // Prefer IMDb actor pages and Wikipedia pages
-            return (url.includes('imdb.com/name/') || 
-                   url.includes('imdb.com/title/') ||
-                   (url.includes('wikipedia.org') && title.includes(celebrityName.toLowerCase())));
-          });
-          
-          allSources.push(...qualitySources);
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-      } catch (error) {
-        console.log(`⚠️ Source search failed: ${query} - ${error.message}`);
-      }
-    }
-
-    console.log(`📊 Found ${allSources.length} potential filmography sources`);
-    return allSources;
-  }
-
-  /**
-   * ENHANCED: Extract titles from filmography sources
-   */
-  async extractTitlesFromSources(sources, celebrityName) {
-    const discoveredTitles = [];
-    const seenTitles = new Set();
-    
-    for (const source of sources.slice(0, 5)) { // Limit to avoid rate limits
-      try {
-        const url = source.link;
-        const title = source.title || '';
-        
-        console.log(`📖 Extracting from: ${url}`);
-        
-        if (url.includes('imdb.com')) {
-          const imdbTitles = await this.extractFromIMDbPage(url, celebrityName);
-          imdbTitles.forEach(title => {
-            if (!seenTitles.has(title.toLowerCase())) {
-              seenTitles.add(title.toLowerCase());
-              discoveredTitles.push({
-                title: title,
-                source: 'imdb',
-                sourceUrl: url,
-                medium: 'live_action_movie' // Default, will be refined
-              });
-            }
-          });
-        } else if (url.includes('wikipedia.org')) {
-          const wikiTitles = await this.extractFromWikipediaPage(url, celebrityName);
-          wikiTitles.forEach(title => {
-            if (!seenTitles.has(title.toLowerCase())) {
-              seenTitles.add(title.toLowerCase());
-              discoveredTitles.push({
-                title: title,
-                source: 'wikipedia',
-                sourceUrl: url,
-                medium: 'live_action_movie' // Default, will be refined
-              });
-            }
-          });
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-      } catch (error) {
-        console.log(`⚠️ Failed to extract from ${source.link}: ${error.message}`);
-      }
-    }
-
-    console.log(`📝 Extracted ${discoveredTitles.length} unique titles`);
-    return discoveredTitles;
-  }
-
-  /**
-   * ENHANCED: Extract titles from IMDb pages
-   */
-  async extractFromIMDbPage(url, celebrityName) {
+  async aiDiscoverRealFilmography(celebrityName) {
     try {
-      // Search for IMDb titles that mention the celebrity
-      const imdbSearchQuery = `"${celebrityName}" site:imdb.com title`;
-      const searchResult = await this.performWebSearch(imdbSearchQuery);
-      
-      const titles = [];
-      
-      if (searchResult.organic_results) {
-        searchResult.organic_results.forEach(result => {
-          const title = result.title || '';
-          const url = result.link || '';
-          
-          // Extract title from IMDb page title formats
-          const titleMatch = title.match(/^(.+?)\s*\(\d{4}\)/); // "Movie Title (2022)"
-          if (titleMatch) {
-            const movieTitle = titleMatch[1].trim();
-            if (movieTitle && movieTitle.length > 1 && movieTitle.length < 100) {
-              titles.push(movieTitle);
-            }
-          }
-        });
-      }
+      const prompt = `You are an entertainment expert with access to IMDb and Wikipedia data. For "${celebrityName}", provide their REAL acting roles with exact character names.
 
-      return titles;
-      
-    } catch (error) {
-      console.log(`⚠️ IMDb extraction failed: ${error.message}`);
-      return [];
-    }
+🚨 CRITICAL: Only include roles you are 100% certain about. Do not invent or guess.
+
+DISCOVERY STRATEGY:
+1. Search your training data for this actor's verified filmography
+2. Include major roles, supporting roles, and notable appearances
+3. Use exact character names from official sources
+4. Include recent work and breakthrough roles
+
+REQUIREMENTS:
+- Use exact character names (not "Character" or "Unknown")
+- Include exact show/movie titles
+- Provide years when known
+- Include all types of acting (movies, TV, voice work)
+
+FORMAT: Return as JSON array
+[
+  {
+    "character": "Exact Character Name",
+    "title": "Exact Show/Movie Title",
+    "medium": "live_action_movie|live_action_tv|voice_anime_tv|voice_anime_movie|voice_cartoon|voice_game",
+    "year": "YYYY",
+    "popularity": "high|medium|low",
+    "source": "emergency_ai_discovery",
+    "confidence": "high"
   }
+]
 
-  /**
-   * ENHANCED: Extract titles from Wikipedia pages
-   */
-  async extractFromWikipediaPage(url, celebrityName) {
-    try {
-      // Search for Wikipedia filmography mentions
-      const wikiSearchQuery = `"${celebrityName}" filmography site:wikipedia.org`;
-      const searchResult = await this.performWebSearch(wikiSearchQuery);
-      
-      const titles = [];
-      
-      if (searchResult.organic_results) {
-        searchResult.organic_results.forEach(result => {
-          const snippet = result.snippet || '';
-          const title = result.title || '';
-          
-          // Extract titles from filmography snippets
-          const filmTitles = this.extractTitlesFromText(snippet);
-          titles.push(...filmTitles);
-        });
-      }
+🚨 VERIFICATION: Review each role before including. Only include roles you can verify from your training data.
 
-      return titles;
-      
-    } catch (error) {
-      console.log(`⚠️ Wikipedia extraction failed: ${error.message}`);
-      return [];
-    }
-  }
-
-  /**
-   * ENHANCED: Extract titles from text snippets
-   */
-  extractTitlesFromText(text) {
-    const titles = [];
-    
-    // Look for quoted titles
-    const quotedTitles = text.match(/"([^"]+)"/g);
-    if (quotedTitles) {
-      quotedTitles.forEach(match => {
-        const title = match.replace(/"/g, '').trim();
-        if (title.length > 2 && title.length < 100 && !title.includes('said') && !title.includes('told')) {
-          titles.push(title);
-        }
-      });
-    }
-    
-    // Look for italicized titles (common in Wikipedia)
-    const italicTitles = text.match(/\*([^*]+)\*/g);
-    if (italicTitles) {
-      italicTitles.forEach(match => {
-        const title = match.replace(/\*/g, '').trim();
-        if (title.length > 2 && title.length < 100) {
-          titles.push(title);
-        }
-      });
-    }
-    
-    return titles;
-  }
-
-  /**
-   * ENHANCED: Find character names for discovered titles
-   */
-  async findCharacterNamesForTitles(discoveredTitles, celebrityName) {
-    const rolesWithCharacters = [];
-    
-    for (const titleData of discoveredTitles.slice(0, 8)) { // Limit to avoid rate limits
-      try {
-        console.log(`🔍 Finding character for: ${celebrityName} in ${titleData.title}`);
-        
-        // Try multiple approaches to find character name
-        let characterName = null;
-        
-        // Approach 1: Direct cast search
-        characterName = await this.findCharacterFromCastSearch(celebrityName, titleData.title);
-        
-        // Approach 2: AI-assisted character extraction if web search fails
-        if (!characterName && this.hasOpenAI) {
-          characterName = await this.findCharacterWithAI(celebrityName, titleData.title);
-        }
-        
-        // Approach 3: Generic character search
-        if (!characterName) {
-          characterName = await this.findCharacterFromGenericSearch(celebrityName, titleData.title);
-        }
-        
-        if (characterName) {
-          rolesWithCharacters.push({
-            character: characterName,
-            title: titleData.title,
-            medium: this.determineMediumType(titleData.title),
-            year: 'unknown',
-            popularity: 'medium',
-            source: 'emergency_recovery',
-            recoveryMethod: 'web_search_with_character_extraction',
-            confidence: 'medium'
-          });
-          
-          console.log(`✅ Found: ${characterName} in ${titleData.title}`);
-        } else {
-          console.log(`❌ Could not find character for ${celebrityName} in ${titleData.title}`);
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 400));
-        
-      } catch (error) {
-        console.log(`⚠️ Character search failed for ${titleData.title}: ${error.message}`);
-      }
-    }
-
-    return rolesWithCharacters;
-  }
-
-  /**
-   * ENHANCED: Find character from cast search
-   */
-  async findCharacterFromCastSearch(celebrityName, movieTitle) {
-    try {
-      const castSearchQueries = [
-        `"${celebrityName}" "${movieTitle}" cast character`,
-        `"${celebrityName}" "${movieTitle}" plays`,
-        `"${celebrityName}" "${movieTitle}" role`,
-        `"${movieTitle}" cast "${celebrityName}"`,
-        `"${celebrityName}" as character "${movieTitle}"`
-      ];
-
-      for (const query of castSearchQueries) {
-        try {
-          console.log(`🎭 Cast search: ${query}`);
-          const searchResult = await this.performWebSearch(query);
-          
-          if (searchResult.organic_results && searchResult.organic_results.length > 0) {
-            const character = this.extractCharacterFromCastResults(searchResult.organic_results, celebrityName, movieTitle);
-            if (character) {
-              return character;
-            }
-          }
-        } catch (error) {
-          console.log(`⚠️ Cast search query failed: ${query}`);
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
-      return null;
-      
-    } catch (error) {
-      console.log(`⚠️ Cast search failed: ${error.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * ENHANCED: Extract character from cast search results
-   */
-  extractCharacterFromCastResults(results, celebrityName, movieTitle) {
-    const celebrityLower = celebrityName.toLowerCase();
-    
-    for (const result of results) {
-      const snippet = (result.snippet || '').toLowerCase();
-      const title = (result.title || '').toLowerCase();
-      const allText = `${snippet} ${title}`;
-      
-      // Pattern 1: "[Celebrity] as [Character]"
-      const asPattern = new RegExp(`${celebrityLower}\\s+as\\s+([\\w\\s]+?)(?:\\s|,|\\.|$)`, 'i');
-      const asMatch = allText.match(asPattern);
-      if (asMatch) {
-        const character = asMatch[1].trim();
-        if (this.isValidCharacterName(character)) {
-          return this.cleanCharacterName(character);
-        }
-      }
-      
-      // Pattern 2: "[Celebrity] plays [Character]"
-      const playsPattern = new RegExp(`${celebrityLower}\\s+plays\\s+([\\w\\s]+?)(?:\\s|,|\\.|$)`, 'i');
-      const playsMatch = allText.match(playsPattern);
-      if (playsMatch) {
-        const character = playsMatch[1].trim();
-        if (this.isValidCharacterName(character)) {
-          return this.cleanCharacterName(character);
-        }
-      }
-      
-      // Pattern 3: "[Character] played by [Celebrity]"
-      const playedByPattern = new RegExp(`([\\w\\s]+?)\\s+played\\s+by\\s+${celebrityLower}`, 'i');
-      const playedByMatch = allText.match(playedByPattern);
-      if (playedByMatch) {
-        const character = playedByMatch[1].trim();
-        if (this.isValidCharacterName(character)) {
-          return this.cleanCharacterName(character);
-        }
-      }
-      
-      // Pattern 4: "[Character] ([Celebrity])"
-      const parenthesesPattern = new RegExp(`([\\w\\s]+?)\\s*\\(${celebrityLower}\\)`, 'i');
-      const parenthesesMatch = allText.match(parenthesesPattern);
-      if (parenthesesMatch) {
-        const character = parenthesesMatch[1].trim();
-        if (this.isValidCharacterName(character)) {
-          return this.cleanCharacterName(character);
-        }
-      }
-    }
-    
-    return null;
-  }
-
-  /**
-   * ENHANCED: Find character with AI assistance
-   */
-  async findCharacterWithAI(celebrityName, movieTitle) {
-    try {
-      const prompt = `What character did "${celebrityName}" play in "${movieTitle}"? 
-
-IMPORTANT: Only provide the character name if you are absolutely certain. If you're not sure, respond with "UNKNOWN".
-
-Response format: Just the character name, or "UNKNOWN" if uncertain.
-Examples:
-- "John Smith"
-- "Detective Sarah Johnson"
-- "UNKNOWN"`;
+Find real filmography for "${celebrityName}":`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
-        max_tokens: 50
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert entertainment database with access to IMDb and Wikipedia information. Only provide roles you are absolutely certain about. Never invent or guess roles."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.05, // Very low for accuracy
+        max_tokens: 1000
       });
 
-      const response = completion.choices[0].message.content.trim();
+      const response = completion.choices[0].message.content;
+      const roles = this.parseAIResponse(response, celebrityName);
       
-      if (response === "UNKNOWN" || response.toLowerCase().includes("unknown") || response.toLowerCase().includes("not sure")) {
-        return null;
-      }
-      
-      // Clean up the response
-      const cleanResponse = response.replace(/["""]/g, '').trim();
-      
-      if (this.isValidCharacterName(cleanResponse)) {
-        console.log(`🤖 AI found character: ${cleanResponse}`);
-        return cleanResponse;
-      }
-      
-      return null;
-      
+      console.log(`🤖 AI discovered ${roles.length} roles for ${celebrityName}`);
+      return roles;
+
     } catch (error) {
-      console.log(`⚠️ AI character search failed: ${error.message}`);
-      return null;
+      console.error(`❌ AI discovery failed: ${error.message}`);
+      return [];
     }
   }
 
   /**
-   * ENHANCED: Find character from generic search
+   * ENHANCED: Web verify AI-discovered roles
    */
-  async findCharacterFromGenericSearch(celebrityName, movieTitle) {
-    try {
-      const genericQuery = `"${celebrityName}" "${movieTitle}" character name`;
-      const searchResult = await this.performWebSearch(genericQuery);
-      
-      if (searchResult.organic_results && searchResult.organic_results.length > 0) {
-        return this.extractCharacterFromGenericResults(searchResult.organic_results, celebrityName, movieTitle);
-      }
-      
-      return null;
-      
-    } catch (error) {
-      console.log(`⚠️ Generic character search failed: ${error.message}`);
-      return null;
-    }
-  }
+  async webVerifyAIRoles(celebrityName, aiRoles) {
+    if (!this.hasWebSearch) return aiRoles;
 
-  /**
-   * ENHANCED: Extract character from generic search results
-   */
-  extractCharacterFromGenericResults(results, celebrityName, movieTitle) {
-    const celebrityLower = celebrityName.toLowerCase();
+    const verifiedRoles = [];
     
-    for (const result of results) {
-      const snippet = (result.snippet || '').toLowerCase();
-      const title = (result.title || '').toLowerCase();
-      const allText = `${snippet} ${title}`;
-      
-      // Look for character names in context
-      const words = allText.split(/\s+/);
-      const celebrityIndex = words.findIndex(word => word.includes(celebrityLower.split(' ')[0]));
-      
-      if (celebrityIndex !== -1) {
-        // Look for capitalized names near the celebrity mention
-        const contextWords = words.slice(Math.max(0, celebrityIndex - 5), celebrityIndex + 5);
+    for (const role of aiRoles) {
+      try {
+        console.log(`🔍 Web verifying: ${role.character} in ${role.title}`);
         
-        for (const word of contextWords) {
-          if (word.length > 2 && word[0] === word[0].toUpperCase() && 
-              !word.includes(celebrityLower) && !word.includes(movieTitle.toLowerCase())) {
-            
-            // Check if this looks like a character name
-            if (this.isValidCharacterName(word)) {
-              return this.cleanCharacterName(word);
+        // Quick verification search
+        const verificationQueries = [
+          `"${celebrityName}" "${role.title}" cast`,
+          `"${celebrityName}" "${role.character}" "${role.title}"`,
+          `"${role.title}" "${celebrityName}"`
+        ];
+
+        let verified = false;
+        for (const query of verificationQueries) {
+          try {
+            const searchResult = await this.performWebSearch(query);
+            if (this.quickVerifyFromResults(searchResult, celebrityName, role)) {
+              verified = true;
+              break;
             }
+          } catch (error) {
+            console.log(`⚠️ Verification query failed: ${query}`);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        if (verified) {
+          verifiedRoles.push({
+            ...role,
+            verificationMethod: 'web_confirmed'
+          });
+          console.log(`✅ Verified: ${role.character} in ${role.title}`);
+        } else {
+          console.log(`❌ Could not verify: ${role.character} in ${role.title}`);
+        }
+
+      } catch (error) {
+        console.log(`⚠️ Verification failed for ${role.title}: ${error.message}`);
+      }
+    }
+
+    console.log(`📊 Web verification: ${verifiedRoles.length}/${aiRoles.length} roles confirmed`);
+    return verifiedRoles.length > 0 ? verifiedRoles : aiRoles; // Return AI roles if web verification fails
+  }
+
+  /**
+   * ENHANCED: Quick verification from search results
+   */
+  quickVerifyFromResults(searchResult, celebrityName, role) {
+    if (!searchResult.organic_results || searchResult.organic_results.length === 0) {
+      return false;
+    }
+
+    const results = searchResult.organic_results;
+    const allText = results.map(r => `${r.title || ''} ${r.snippet || ''}`).join(' ').toLowerCase();
+    
+    const celebrityLower = celebrityName.toLowerCase();
+    const titleLower = role.title.toLowerCase();
+    
+    // Look for celebrity and title together
+    const hasCelebrityAndTitle = allText.includes(celebrityLower) && allText.includes(titleLower);
+    
+    // Look for authoritative sources
+    const hasAuthoritativeSource = results.some(r => {
+      const url = (r.link || '').toLowerCase();
+      return url.includes('imdb.com') || url.includes('wikipedia.org');
+    });
+
+    return hasCelebrityAndTitle && hasAuthoritativeSource;
+  }
+
+  /**
+   * ENHANCED: Parse AI response with better error handling
+   */
+  parseAIResponse(response, celebrityName) {
+    try {
+      // Try to parse as JSON
+      let roles = this.parseJSONResponse(response);
+      
+      if (!roles || !Array.isArray(roles)) {
+        console.log(`⚠️ AI response not valid JSON, trying fallback parsing`);
+        roles = this.fallbackParseAIResponse(response, celebrityName);
+      }
+      
+      if (!roles || !Array.isArray(roles)) {
+        console.log(`❌ Could not parse AI response for ${celebrityName}`);
+        return [];
+      }
+
+      // Clean and validate roles
+      const cleanedRoles = roles
+        .filter(role => role.character && role.title)
+        .map(role => ({
+          character: this.cleanCharacterName(role.character),
+          title: this.cleanTitle(role.title),
+          medium: role.medium || 'live_action_movie',
+          year: role.year || 'unknown',
+          popularity: role.popularity || 'medium',
+          source: 'emergency_ai_discovery',
+          confidence: role.confidence || 'medium',
+          recoveryMethod: 'ai_filmography_search'
+        }))
+        .filter(role => this.isValidRole(role));
+
+      console.log(`🧹 Cleaned ${cleanedRoles.length} valid roles from AI response`);
+      return cleanedRoles;
+
+    } catch (error) {
+      console.error(`❌ Failed to parse AI response: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * ENHANCED: Fallback parsing for non-JSON AI responses
+   */
+  fallbackParseAIResponse(response, celebrityName) {
+    try {
+      const roles = [];
+      const lines = response.split('\n');
+      
+      for (const line of lines) {
+        // Look for patterns like "Character in Title (Year)"
+        const match = line.match(/([A-Z][a-zA-Z\s]+)\s+in\s+([A-Z][a-zA-Z\s:]+)(?:\s+\((\d{4})\))?/);
+        if (match) {
+          const character = match[1].trim();
+          const title = match[2].trim();
+          const year = match[3] || 'unknown';
+          
+          if (character.length > 1 && title.length > 1) {
+            roles.push({
+              character: character,
+              title: title,
+              medium: 'live_action_movie',
+              year: year,
+              popularity: 'medium',
+              source: 'emergency_ai_discovery',
+              confidence: 'medium'
+            });
           }
         }
       }
+      
+      return roles;
+      
+    } catch (error) {
+      console.error(`❌ Fallback parsing failed: ${error.message}`);
+      return [];
     }
-    
-    return null;
-  }
-
-  /**
-   * ENHANCED: Validate character name
-   */
-  isValidCharacterName(name) {
-    if (!name || typeof name !== 'string') return false;
-    
-    const cleanName = name.trim();
-    
-    // Basic validation
-    if (cleanName.length < 2 || cleanName.length > 50) return false;
-    
-    // Exclude common non-character words
-    const excludeWords = [
-      'actor', 'actress', 'character', 'role', 'film', 'movie', 'show', 'series',
-      'cast', 'starring', 'plays', 'played', 'portrays', 'portrayed', 'the', 'and',
-      'cast', 'crew', 'director', 'producer', 'writer', 'unknown', 'various'
-    ];
-    
-    const nameLower = cleanName.toLowerCase();
-    if (excludeWords.includes(nameLower)) return false;
-    
-    // Should contain at least one letter
-    if (!/[a-zA-Z]/.test(cleanName)) return false;
-    
-    // Should not be mostly numbers
-    if (/\d{3,}/.test(cleanName)) return false;
-    
-    return true;
   }
 
   /**
    * ENHANCED: Clean character name
    */
   cleanCharacterName(name) {
-    return name
-      .trim()
-      .replace(/["""]/g, '')
-      .replace(/\s+/g, ' ')
-      .replace(/\.$/, '')
-      .replace(/,$/, '')
-      .trim();
+    if (!name || typeof name !== 'string') return 'Unknown';
+    
+    let cleaned = name.trim();
+    
+    // Remove common prefixes
+    cleaned = cleaned.replace(/^(as|plays|played by|portrayed by|voiced by)\s+/i, '');
+    
+    // Remove quotes
+    cleaned = cleaned.replace(/["""]/g, '');
+    
+    // Remove trailing punctuation
+    cleaned = cleaned.replace(/[,.;:!?]+$/, '');
+    
+    // Capitalize properly
+    cleaned = cleaned.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+    
+    return cleaned;
   }
 
   /**
-   * ENHANCED: Determine medium type from title
+   * ENHANCED: Clean title
    */
-  determineMediumType(title) {
-    const titleLower = title.toLowerCase();
+  cleanTitle(title) {
+    if (!title || typeof title !== 'string') return 'Unknown';
     
-    // TV indicators
-    if (titleLower.includes('season') || titleLower.includes('episode') || 
-        titleLower.includes('series') || titleLower.includes('show')) {
-      return 'live_action_tv';
+    let cleaned = title.trim();
+    
+    // Remove quotes
+    cleaned = cleaned.replace(/["""]/g, '');
+    
+    // Remove trailing punctuation
+    cleaned = cleaned.replace(/[,.;:!?]+$/, '');
+    
+    // Clean up extra spaces
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    
+    return cleaned;
+  }
+
+  /**
+   * ENHANCED: Validate role
+   */
+  isValidRole(role) {
+    if (!role.character || !role.title) return false;
+    
+    // Character name validation
+    const character = role.character.toLowerCase();
+    if (character === 'unknown' || character === 'character' || character.length < 2) {
+      return false;
     }
     
-    // Movie indicators
-    if (titleLower.includes('film') || titleLower.includes('movie') || 
-        titleLower.includes('cinema')) {
-      return 'live_action_movie';
+    // Title validation
+    const title = role.title.toLowerCase();
+    if (title === 'unknown' || title.length < 2) {
+      return false;
     }
     
-    // Animation indicators
-    if (titleLower.includes('anime') || titleLower.includes('animation') || 
-        titleLower.includes('cartoon')) {
-      return 'voice_anime_tv';
+    // Avoid obvious AI hallucinations
+    const suspiciousPatterns = [
+      'example', 'sample', 'placeholder', 'test', 'demo'
+    ];
+    
+    for (const pattern of suspiciousPatterns) {
+      if (character.includes(pattern) || title.includes(pattern)) {
+        return false;
+      }
     }
     
-    // Default to movie
-    return 'live_action_movie';
+    return true;
   }
 
   /**
@@ -663,15 +456,38 @@ Examples:
       return JSON.parse(response);
     } catch (error) {
       try {
-        const jsonMatch = response.match(/\[[\s\S]*?\]/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
+        // Extract JSON from markdown code blocks
+        const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          return JSON.parse(jsonMatch[1]);
         }
-        return [];
+        
+        // Extract array pattern
+        const arrayMatch = response.match(/\[[\s\S]*?\]/);
+        if (arrayMatch) {
+          return JSON.parse(arrayMatch[0]);
+        }
+        
+        return null;
       } catch (parseError) {
-        return [];
+        console.log(`JSON parsing failed: ${response.substring(0, 200)}...`);
+        return null;
       }
     }
+  }
+
+  /**
+   * Get system status
+   */
+  getSystemStatus() {
+    return {
+      hasWebSearch: this.hasWebSearch,
+      hasOpenAI: this.hasOpenAI,
+      emergencyRecoveryMethod: this.hasOpenAI ? 'AI-Driven Discovery' : 'None',
+      characterExtractionMethod: this.hasOpenAI ? 'AI-Powered' : 'None',
+      webVerificationEnabled: this.hasWebSearch,
+      systemReady: this.hasOpenAI || this.hasWebSearch
+    };
   }
 }
 
