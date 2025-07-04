@@ -70,18 +70,30 @@ class RedFlagRoleDetector {
       });
     }
 
-    // Red Flag 3: Very low success rate (< 40%)
+    // Red Flag 3: Very low success rate for lesser-known actors
     const totalRoles = verifiedRoles.length + rejectedRoles.length;
     const successRate = totalRoles > 0 ? (verifiedRoles.length / totalRoles) * 100 : 0;
     
     console.log(`🔍 Success rate: ${Math.round(successRate)}% (${verifiedRoles.length}/${totalRoles})`);
     
-    if (successRate < 40 && totalRoles >= 3) { // Raised threshold
+    // LOWERED threshold for lesser-known actors
+    if (successRate < 50 && totalRoles >= 3) {
       redFlags.push({
         type: 'LOW_SUCCESS_RATE',
-        severity: 'MEDIUM',
+        severity: 'HIGH', // Raised severity for lesser-known actors
         successRate: Math.round(successRate),
-        description: `Only ${Math.round(successRate)}% verification success rate - AI struggling with this celebrity`,
+        description: `Only ${Math.round(successRate)}% verification success rate - likely lesser-known actor with AI hallucination`,
+        trigger: 'emergency_web_search'
+      });
+    }
+
+    // Red Flag 4: Any verification failures for very small filmographies
+    if (totalRoles <= 3 && rejectedRoles.length >= 2) {
+      redFlags.push({
+        type: 'SMALL_FILMOGRAPHY_FAILURES',
+        severity: 'HIGH',
+        count: rejectedRoles.length,
+        description: `${rejectedRoles.length} failures in small filmography - AI likely hallucinating for unknown actor`,
         trigger: 'emergency_web_search'
       });
     }
