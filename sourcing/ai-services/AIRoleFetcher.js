@@ -24,76 +24,157 @@ class AIRoleFetcher {
   }
 
   /**
-   * OPTIMIZED: Fetch most recognizable performances for cost-effective discovery
+   * ENHANCED: Universal role discovery for any celebrity level
    */
   async fetchRoles(celebrityName) {
     try {
-      console.log(`🎯 AI discovering most recognizable performances for: ${celebrityName}`);
+      console.log(`🎯 Universal discovery for: ${celebrityName}`);
       
-      // Single optimized discovery call
-      const roles = await this.performOptimizedDiscovery(celebrityName);
+      // Single comprehensive AI call for cost efficiency
+      const roles = await this.performUniversalDiscovery(celebrityName);
       
-      if (!roles || roles.length < 3) {
-        // Only fallback if primary fails
-        console.log(`⚠️ Primary discovery found ${roles?.length || 0} roles, trying fallback...`);
-        const fallbackRoles = await this.performPrimaryDiscovery(celebrityName);
-        return this.mergeRoles(roles, fallbackRoles);
+      if (!roles || roles.length < 2) {
+        console.log(`⚠️ Primary discovery found ${roles?.length || 0} roles, trying broad search...`);
+        const broadRoles = await this.performBroadDiscovery(celebrityName);
+        return this.mergeRoles(roles, broadRoles);
       }
 
-      // Process and optimize roles
+      // Process and optimize roles without extra AI calls
       const processedRoles = this.enhanceRoleData(roles);
-      const optimizedRoles = await this.optimizeByPopularity(processedRoles, celebrityName);
+      const optimizedRoles = this.optimizeByContentType(processedRoles);
       
-      console.log(`✅ AI discovered ${optimizedRoles.length} recognizable performances for ${celebrityName}`);
+      console.log(`✅ Universal discovery complete: ${optimizedRoles.length} roles for ${celebrityName}`);
       return optimizedRoles;
 
     } catch (error) {
-      console.error(`❌ Optimized AI role discovery failed for ${celebrityName}:`, error.message);
-      return this.createMinimalFallback(celebrityName);
+      console.error(`❌ Universal discovery failed for ${celebrityName}:`, error.message);
+      return this.createSmartFallback(celebrityName);
     }
   }
 
   /**
-   * OPTIMIZED: Cost-effective primary discovery with better prompt
+   * ENHANCED: Single AI call for universal discovery (cost-efficient)
    */
-  async performOptimizedDiscovery(celebrityName) {
+  async performUniversalDiscovery(celebrityName) {
     if (!this.hasOpenAI) return null;
 
     try {
-      const optimizedPrompt = `List the 5 most recognizable performances by "${celebrityName}", including both series regular roles and notable one-off appearances. Prioritize roles where the character/performance is memorable, widely discussed, or culturally significant.
+      const universalPrompt = `You are an entertainment expert. For "${celebrityName}", find their TOP 5 most popular/recognizable CHARACTER ROLES from any level of fame.
 
-Include major movie roles, significant TV series, and notable guest appearances (like acclaimed anthology episodes).
+DISCOVERY STRATEGY:
+1. If mainstream celebrity: Focus on their most iconic roles
+2. If emerging/breakout star: Focus heavily on their breakthrough performance + any supporting roles
+3. If niche/indie actor: Find their most notable work even if small-scale
+4. If voice actor: Focus on character roles people know them for
+5. If viral-to-actor: Focus ONLY on their acting roles, ignore viral content
 
-Return as JSON array:
-[{
-  "character": "Exact Character Name", 
-  "title": "Show/Movie Title",
-  "medium": "live_action_tv/live_action_movie/voice_anime_tv",
-  "year": "YYYY",
-  "popularity": "high/medium/low"
-}]`;
+SEARCH APPROACH:
+- Check recent breakout roles and trending performances
+- Include indie films, streaming shows, and animation that gained popularity
+- For voice actors: Focus on character images, not actor photos
+- Look for roles that audiences actually discuss or remember
+
+INCLUDE:
+- Named character roles (priority)
+- Breakout/trending performances
+- Popular indie/streaming content
+- Voice acting characters (for anime/animation)
+- Recent notable work gaining attention
+
+AVOID:
+- Hosting/presenting roles
+- Background/extra work
+- Social media content (focus on acting only)
+- Unreleased or unknown projects
+
+MEDIUM CLASSIFICATION:
+- live_action_tv: TV series/streaming shows
+- live_action_movie: Films (any budget level)
+- voice_anime_tv: Anime TV series
+- voice_anime_movie: Anime films
+- voice_cartoon: Western animation
+- voice_game: Video game characters
+
+Format as JSON array with EXACT character names:
+[
+  {
+    "character": "Exact Character Name",
+    "title": "Show/Movie Title", 
+    "medium": "live_action_tv",
+    "year": "YYYY",
+    "popularity": "high/medium/low",
+    "note": "breakout role" or "trending" or "popular indie" (if applicable)
+  }
+]
+
+Focus on what "${celebrityName}" is actually KNOWN for, regardless of fame level. Include recent work if they're a rising star.`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini", // Use mini to save costs
         messages: [
           {
             role: "system",
-            content: "You are an expert entertainment analyst. Focus on recognizable performances that audiences remember, regardless of whether they're series regular or one-off roles. Always use exact character names from official credits."
+            content: "You are an expert entertainment analyst. Focus on roles that people actually know the celebrity for, regardless of their fame level. Always use exact character names from official sources. For voice actors, prioritize character images over actor photos."
           },
           {
             role: "user", 
-            content: optimizedPrompt
+            content: universalPrompt
           }
         ],
-        temperature: 0.1, // Low temperature for consistency
-        max_tokens: 600
+        temperature: 0.1,
+        max_tokens: 800
       });
 
       const response = completion.choices[0].message.content;
       return this.parseAndValidateResponse(response, celebrityName);
       
     } catch (error) {
-      console.log(`Optimized discovery failed: ${error.message}`);
+      console.log(`Universal discovery failed: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * ENHANCED: Broad discovery for difficult cases
+   */
+  async performBroadDiscovery(celebrityName) {
+    if (!this.hasOpenAI) return null;
+
+    try {
+      const broadPrompt = `Find ANY notable acting work for "${celebrityName}" - include small roles, indie films, streaming content, voice work, or recent performances.
+
+Even if they're not famous, they likely have:
+- Student films that got attention
+- Indie/festival films
+- Streaming show appearances
+- Voice acting work
+- Recent breakout roles
+- Web series with following
+
+Return what you can find, even if limited:
+[{"character": "Character or Role", "title": "Project Title", "medium": "type", "year": "YYYY", "popularity": "low"}]`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o-mini", // Cost-efficient
+        messages: [
+          {
+            role: "system",
+            content: "You are researching lesser-known performers. Find any acting work, no matter how small or indie."
+          },
+          {
+            role: "user", 
+            content: broadPrompt
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 400
+      });
+
+      const response = completion.choices[0].message.content;
+      return this.parseAndValidateResponse(response, celebrityName);
+      
+    } catch (error) {
+      console.log(`Broad discovery failed: ${error.message}`);
       return null;
     }
   }
@@ -109,7 +190,7 @@ Return as JSON array:
       const checkPrompt = `Is "${celebrityName}" primarily known for voice acting in anime, animation, or video games? Answer YES or NO.`;
       
       const checkCompletion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: checkPrompt }],
         temperature: 0.1,
         max_tokens: 10
@@ -126,6 +207,8 @@ Return as JSON array:
 
       const voiceActorPrompt = `List the 5 most recognizable voice acting performances by "${celebrityName}" in anime, animation, or video games.
 
+Focus on CHARACTER IMAGES for search purposes - people know the characters, not the voice actor's face.
+
 Use exact character names from official sources.
 
 Return as JSON array:
@@ -138,11 +221,11 @@ Return as JSON array:
 }]`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are an expert on voice acting. Always use exact character names from official credits."
+            content: "You are an expert on voice acting. Always use exact character names from official credits. Remember - for voice actors, people recognize characters, not the actor's face."
           },
           {
             role: "user", 
@@ -203,41 +286,12 @@ Return as JSON array:
   }
 
   /**
-   * Broad discovery with multiple strategies
-   */
-  async performBroadDiscovery(celebrityName) {
-    const strategies = [
-      this.buildAlternativePrompt(celebrityName),
-      this.buildSimplifiedPrompt(celebrityName),
-      this.buildFallbackPrompt(celebrityName)
-    ];
-
-    for (const prompt of strategies) {
-      try {
-        let result = null;
-        
-        if (this.hasOpenAI) {
-          result = await this.queryOpenAI(celebrityName, prompt);
-        } else {
-          result = await this.queryClaudeAPI(celebrityName, prompt);
-        }
-        
-        if (result?.length > 0) return result;
-      } catch (error) {
-        console.log(`Strategy failed, trying next: ${error.message}`);
-      }
-    }
-    
-    return null;
-  }
-
-  /**
    * OpenAI query with error handling
    */
   async queryOpenAI(celebrityName, prompt) {
     try {
       const completion = await this.openai.chat.completions.create({
-        model: PROMPT_CONFIG.MODELS.PRIMARY,
+        model: "gpt-4o-mini", // Cost-efficient
         messages: [
           {
             role: "system",
@@ -248,7 +302,7 @@ Return as JSON array:
             content: prompt
           }
         ],
-        temperature: 0.1, // Lower temperature for consistency
+        temperature: 0.1,
         max_tokens: PROMPT_CONFIG.MAX_TOKENS.ROLE_FETCHING
       });
 
@@ -274,7 +328,7 @@ Return as JSON array:
       const requestBody = {
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: PROMPT_CONFIG.MAX_TOKENS.ROLE_FETCHING,
-        temperature: 0.1, // Lower temperature for consistency
+        temperature: 0.1,
         messages: [{
           role: 'user',
           content: prompt
@@ -321,7 +375,7 @@ Return as JSON array:
       
       if (this.hasOpenAI) {
         const completion = await this.openai.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-4o-mini",
           messages: [{ role: "user", content: prompt }],
           temperature: 0.1,
           max_tokens: 50
@@ -354,24 +408,7 @@ Return as JSON array:
   }
 
   /**
-   * Alternative prompt strategies
-   */
-  buildAlternativePrompt(celebrityName) {
-    return `List 5 most recognizable character roles for "${celebrityName}" with exact character names.
-
-Format: [{"character":"Name", "title":"Show/Movie", "medium":"type", "year":"YYYY", "popularity":"high"}]`;
-  }
-
-  buildSimplifiedPrompt(celebrityName) {
-    return `"${celebrityName}" top 5 character roles. JSON format: [{"character":"X", "title":"Y", "medium":"Z", "year":"YYYY"}]`;
-  }
-
-  buildFallbackPrompt(celebrityName) {
-    return `What are 3-5 main character roles "${celebrityName}" is known for? Include exact character names.`;
-  }
-
-  /**
-   * Enhance role data with better medium detection
+   * Enhanced role data processing
    */
   enhanceRoleData(roles) {
     if (!roles || !Array.isArray(roles)) return [];
@@ -385,11 +422,42 @@ Format: [{"character":"Name", "title":"Show/Movie", "medium":"type", "year":"YYY
       // Detect voice acting
       enhanced.isVoiceRole = this.isVoiceActing(enhanced.medium);
       
+      // Add search strategy hints
+      enhanced.searchStrategy = this.determineSearchStrategy(enhanced);
+      
       // Add metadata for image searching
       enhanced.searchTerm = `${role.character} ${role.title}`.trim();
       
       return enhanced;
     });
+  }
+
+  /**
+   * ENHANCED: Determine search strategy based on role type
+   */
+  determineSearchStrategy(role) {
+    const medium = (role.medium || '').toLowerCase();
+    const title = (role.title || '').toLowerCase();
+    const year = parseInt(role.year) || 0;
+    
+    // Voice/Animation roles - pure character focus
+    if (medium.includes('voice') || medium.includes('anime') || 
+        medium.includes('animation') || medium.includes('cartoon')) {
+      return 'character_images_only';
+    }
+    
+    // Recent/trending content - character + context
+    if (role.note?.includes('breakout') || role.note?.includes('trending') || year >= 2020) {
+      return 'character_with_context';
+    }
+    
+    // Indie/small productions - broader search needed
+    if (role.note?.includes('indie') || role.popularity === 'low') {
+      return 'broad_search';
+    }
+    
+    // Standard approach for established content
+    return 'character_first';
   }
 
   /**
@@ -440,6 +508,32 @@ Format: [{"character":"Name", "title":"Show/Movie", "medium":"type", "year":"YYY
   }
 
   /**
+   * ENHANCED: Content-type based optimization (no AI cost)
+   */
+  optimizeByContentType(roles) {
+    if (!roles || roles.length === 0) return [];
+
+    // Group by content type for better search strategies
+    const grouped = {
+      voice_roles: roles.filter(r => r.isVoiceRole),
+      recent_roles: roles.filter(r => parseInt(r.year) >= 2020),
+      breakout_roles: roles.filter(r => r.note?.includes('breakout')),
+      established_roles: roles.filter(r => r.popularity === 'high')
+    };
+
+    // Priority order: breakout > recent > established > voice
+    const prioritized = [
+      ...grouped.breakout_roles,
+      ...grouped.recent_roles.filter(r => !grouped.breakout_roles.includes(r)),
+      ...grouped.established_roles.filter(r => !grouped.recent_roles.includes(r) && !grouped.breakout_roles.includes(r)),
+      ...grouped.voice_roles.filter(r => !grouped.established_roles.includes(r) && !grouped.recent_roles.includes(r) && !grouped.breakout_roles.includes(r)),
+      ...roles.filter(r => !Object.values(grouped).some(group => group.includes(r)))
+    ];
+
+    return prioritized.slice(0, 5);
+  }
+
+  /**
    * Merge role arrays without duplicates
    */
   mergeRoles(existingRoles, newRoles) {
@@ -466,90 +560,6 @@ Format: [{"character":"Name", "title":"Show/Movie", "medium":"type", "year":"YYY
     });
     
     return merged;
-  }
-
-  /**
-   * Popularity-based ranking
-   */
-  async optimizeByPopularity(roles, celebrityName) {
-    if (!roles || roles.length === 0) return [];
-
-    try {
-      if (this.hasOpenAI) {
-        const enhancedRoles = await this.enhanceWithPopularityScoring(roles, celebrityName);
-        return this.sortByPopularity(enhancedRoles).slice(0, 5);
-      }
-      
-      return this.sortByPopularity(roles).slice(0, 5);
-      
-    } catch (error) {
-      console.log(`Popularity optimization failed: ${error.message}`);
-      return roles.slice(0, 5);
-    }
-  }
-
-  /**
-   * AI-driven popularity scoring
-   */
-  async enhanceWithPopularityScoring(roles, celebrityName) {
-    try {
-      const scoringPrompt = `Rate these roles for "${celebrityName}" by recognition/popularity (1-10):
-      
-${roles.map((role, i) => `${i+1}. ${role.character} in ${role.title}`).join('\n')}
-
-Return JSON: [{"index": 1, "popularityScore": 8}, {"index": 2, "popularityScore": 6}, ...]`;
-
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: scoringPrompt }],
-        temperature: 0.1,
-        max_tokens: 300
-      });
-
-      const response = completion.choices[0].message.content;
-      const scores = this.parseJSONResponse(response);
-      
-      if (Array.isArray(scores)) {
-        return roles.map((role, index) => {
-          const scoreData = scores.find(s => s.index === index + 1);
-          return {
-            ...role,
-            popularityScore: scoreData?.popularityScore || 5
-          };
-        });
-      }
-      
-      return roles;
-      
-    } catch (error) {
-      console.log(`Popularity scoring failed: ${error.message}`);
-      return roles;
-    }
-  }
-
-  /**
-   * Sort roles by popularity factors
-   */
-  sortByPopularity(roles) {
-    return roles.sort((a, b) => {
-      // Primary: popularity score
-      if (a.popularityScore && b.popularityScore) {
-        return b.popularityScore - a.popularityScore;
-      }
-      
-      // Secondary: popularity field
-      const popularityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
-      const aVal = popularityOrder[a.popularity] || 0;
-      const bVal = popularityOrder[b.popularity] || 0;
-      
-      if (aVal !== bVal) return bVal - aVal;
-      
-      // Tertiary: recent years
-      const aYear = parseInt(a.year) || 0;
-      const bYear = parseInt(b.year) || 0;
-      
-      return bYear - aYear;
-    });
   }
 
   /**
@@ -643,21 +653,36 @@ Return JSON: [{"index": 1, "popularityScore": 8}, {"index": 2, "popularityScore"
       medium: role.medium || 'live_action_movie',
       year: role.year || 'unknown',
       popularity: role.popularity || 'medium',
+      note: role.note || '',
       searchTerm: `${role.character} ${role.title}`.trim()
     };
   }
 
   /**
-   * Minimal fallback when all methods fail
+   * ENHANCED: Smart fallback for difficult cases
    */
-  createMinimalFallback(celebrityName) {
-    return [{
-      character: 'Research Required',
-      title: `${celebrityName} Roles`,
-      medium: 'unknown',
-      year: 'unknown',
-      popularity: 'unknown'
-    }];
+  createSmartFallback(celebrityName) {
+    // Create multiple fallback strategies
+    return [
+      {
+        character: `${celebrityName} Character`,
+        title: `${celebrityName} Acting Work`,
+        medium: 'unknown',
+        year: 'unknown',
+        popularity: 'unknown',
+        searchStrategy: 'actor_headshots',
+        note: 'fallback_search'
+      },
+      {
+        character: 'Recent Role',
+        title: `${celebrityName} Recent Work`,
+        medium: 'unknown',
+        year: '2023',
+        popularity: 'unknown',
+        searchStrategy: 'promotional_photos',
+        note: 'fallback_search'
+      }
+    ];
   }
 
   /**
@@ -667,7 +692,7 @@ Return JSON: [{"index": 1, "popularityScore": 8}, {"index": 2, "popularityScore"
     if (this.hasOpenAI) {
       try {
         await this.openai.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-4o-mini",
           messages: [{ role: "user", content: "Test" }],
           max_tokens: 5
         });
@@ -683,9 +708,10 @@ Return JSON: [{"index": 1, "popularityScore": 8}, {"index": 2, "popularityScore"
     return {
       openaiAPI: this.hasOpenAI,
       claudeAPI: !!process.env.ANTHROPIC_API_KEY,
-      primaryEngine: this.hasOpenAI ? 'OpenAI GPT-4o' : 'Claude API',
-      optimizationLevel: 'Enhanced for Image Discovery',
-      multiStageDiscovery: true,
+      primaryEngine: this.hasOpenAI ? 'OpenAI GPT-4o-mini' : 'Claude API',
+      optimizationLevel: 'Universal Discovery - All Fame Levels',
+      costOptimized: true,
+      universalSupport: true,
       voiceActorSupport: true
     };
   }
