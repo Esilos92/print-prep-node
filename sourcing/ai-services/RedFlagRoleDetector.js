@@ -221,50 +221,64 @@ class RedFlagRoleDetector {
   }
 
   /**
-   * Parse web results to extract actual roles
+   * ENHANCED: Parse web results to extract actual roles
    */
   async parseWebResultsForRoles(celebrityName, webResults) {
+    console.log(`🔍 Parsing web results for ${celebrityName}...`);
+    
+    // Try manual parsing first (more reliable)
+    const manualRoles = this.manualParseWebResults(webResults);
+    
+    if (manualRoles.length > 0) {
+      console.log(`✅ Manual parsing found ${manualRoles.length} roles`);
+      return manualRoles;
+    }
+    
+    // Fallback to AI parsing if manual fails
     if (!this.hasOpenAI) {
-      return this.manualParseWebResults(webResults);
+      console.log(`⚠️ No roles found and no AI available`);
+      return [];
     }
 
     try {
+      console.log(`🤖 Trying AI parsing of web results...`);
+      
       // Combine all web snippets and titles
       const webContent = webResults.map(result => {
         return `${result.title || ''} ${result.snippet || ''}`;
-      }).join('\n').substring(0, 3000); // Limit content length
+      }).join('\n').substring(0, 4000); // Increased content length
 
-      const parsePrompt = `Extract the actual acting roles for "${celebrityName}" from these web search results:
+      const parsePrompt = `Extract actual acting roles for "${celebrityName}" from these web search results:
 
 ${webContent}
 
 INSTRUCTIONS:
-- Only extract roles that are clearly stated in the text
-- Look for character names and show/movie titles
-- Include horror films, TV shows, voice acting, any acting work
-- Do NOT invent or guess roles
-- If a role is mentioned but character name is unclear, use "Character" as placeholder
+- Look for ANY mention of acting roles, movies, TV shows, voice work
+- Extract character names if mentioned, otherwise use "Character"
+- Look for titles like "Terrifier", "The Loud House", or any film/TV show
+- Include years if mentioned
+- Look for patterns like "appeared in", "starred in", "cast in", "voice of"
 
-Format as JSON array:
+Format as JSON array (return empty array if no roles found):
 [
   {
     "character": "Character Name (or 'Character' if unclear)",
-    "title": "Show/Movie Title",
-    "medium": "live_action_movie/live_action_tv/voice_cartoon/unknown",
-    "year": "YYYY (if mentioned)",
+    "title": "Movie/Show Title",
+    "medium": "live_action_movie/live_action_tv/voice_cartoon",
+    "year": "YYYY (if mentioned, otherwise 'unknown')",
     "popularity": "low",
-    "source": "web_search"
+    "source": "ai_web_parse"
   }
 ]
 
-If no clear roles found, return empty array: []`;
+If no acting roles are mentioned in the text, return: []`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are parsing web search results to extract factual acting roles. Only extract roles that are clearly stated in the text. Do not invent or guess."
+            content: "You are parsing web search results to extract factual acting roles. Look for any mention of films, TV shows, or voice work. Be thorough but only extract what's actually mentioned."
           },
           {
             role: "user",
@@ -272,7 +286,7 @@ If no clear roles found, return empty array: []`;
           }
         ],
         temperature: 0.1,
-        max_tokens: 500
+        max_tokens: 600
       });
 
       const response = completion.choices[0].message.content;
@@ -283,48 +297,275 @@ If no clear roles found, return empty array: []`;
         return parsedRoles;
       }
 
+      console.log(`⚠️ AI parsing found no roles`);
       return [];
 
     } catch (error) {
       console.log(`⚠️ AI parsing of web results failed: ${error.message}`);
-      return this.manualParseWebResults(webResults);
+      return [];
     }
   }
 
   /**
-   * Manual parsing of web results as fallback
+   * ENHANCED: Manual parsing of web results as primary method
    */
   manualParseWebResults(webResults) {
+    console.log(`🔍 Manual parsing ${webResults.length} web results...`);
     const roles = [];
+    const seenRoles = new Set();
     
     webResults.forEach(result => {
       const text = `${result.title || ''} ${result.snippet || ''}`.toLowerCase();
+      const url = (result.link || '').toLowerCase();
       
-      // Look for common patterns
-      if (text.includes('terrifier') && text.includes('cast')) {
-        roles.push({
-          character: 'Character',
-          title: 'Terrifier',
-          medium: 'live_action_movie',
-          year: '2016',
-          popularity: 'low',
-          source: 'manual_parse'
+      // Look for IMDb patterns
+      if (url.includes('imdb.com')) {
+        console.log(`🎬 Found IMDb result: ${result.title}`);
+        
+        // Extract from IMDb titles and snippets
+        const imdbRoles = this.extractFromIMDbContent(text, result.title, result.snippet);
+        imdbRoles.forEach(role => {
+          const roleKey = `${role.character}_${role.title}`;
+          if (!seenRoles.has(roleKey)) {
+            roles.push(role);
+            seenRoles.add(roleKey);
+          }
         });
       }
       
-      if (text.includes('loud house') && text.includes('voice')) {
-        roles.push({
-          character: 'Character',
-          title: 'The Loud House',
-          medium: 'voice_cartoon',
-          year: 'unknown',
-          popularity: 'medium',
-          source: 'manual_parse'
+      // Look for Wikipedia patterns
+      if (url.includes('wikipedia.org')) {
+        console.log(`📚 Found Wikipedia result: ${result.title}`);
+        
+        const wikiRoles = this.extractFromWikipediaContent(text, result.title, result.snippet);
+        wikiRoles.forEach(role => {
+          const roleKey = `${role.character}_${role.title}`;
+          if (!seenRoles.has(roleKey)) {
+            roles.push(role);
+            seenRoles.add(roleKey);
+          }
+        });
+      }
+      
+      // Look for general film/TV patterns
+      const generalRoles = this.extractFromGeneralContent(text, result.title, result.snippet);
+      generalRoles.forEach(role => {
+        const roleKey = `${role.character}_${role.title}`;
+        if (!seenRoles.has(roleKey)) {
+          roles.push(role);
+          seenRoles.add(roleKey);
+        }
+      });
+    });
+    
+    console.log(`🎭 Manual parsing extracted ${roles.length} roles`);
+    return roles;
+  }
+
+  /**
+   * NEW: Extract roles from IMDb content
+   */
+  extractFromIMDbContent(text, title, snippet) {
+    const roles = [];
+    
+    // Common IMDb patterns
+    const patterns = [
+      /actress.*known for (.+)/i,
+      /actor.*known for (.+)/i,
+      /filmography.*includes (.+)/i,
+      /appeared in (.+)/i,
+      /starred in (.+)/i,
+      /cast.*in (.+)/i
+    ];
+    
+    patterns.forEach(pattern => {
+      const match = text.match(pattern);
+      if (match) {
+        const content = match[1];
+        // Extract movie/show titles
+        const titles = content.split(/[,;]/).map(t => t.trim()).filter(t => t.length > 2);
+        titles.forEach(movieTitle => {
+          if (movieTitle.length > 2 && movieTitle.length < 50) {
+            roles.push({
+              character: 'Character',
+              title: this.cleanTitle(movieTitle),
+              medium: 'live_action_movie',
+              year: 'unknown',
+              popularity: 'low',
+              source: 'imdb_manual'
+            });
+          }
+        });
+      }
+    });
+    
+    // Look for specific movie titles in text
+    const moviePatterns = [
+      /terrifier/i,
+      /horror/i,
+      /film/i,
+      /movie/i
+    ];
+    
+    moviePatterns.forEach(pattern => {
+      if (pattern.test(text)) {
+        if (text.includes('terrifier')) {
+          roles.push({
+            character: 'Character',
+            title: 'Terrifier',
+            medium: 'live_action_movie',
+            year: '2016',
+            popularity: 'low',
+            source: 'manual_terrifier'
+          });
+        }
+      }
+    });
+    
+    return roles;
+  }
+
+  /**
+   * NEW: Extract roles from Wikipedia content
+   */
+  extractFromWikipediaContent(text, title, snippet) {
+    const roles = [];
+    
+    // Wikipedia patterns
+    const patterns = [
+      /actress.*appeared in (.+)/i,
+      /actor.*appeared in (.+)/i,
+      /filmography (.+)/i,
+      /career.*includes (.+)/i
+    ];
+    
+    patterns.forEach(pattern => {
+      const match = text.match(pattern);
+      if (match) {
+        const content = match[1];
+        const titles = content.split(/[,;]/).map(t => t.trim()).filter(t => t.length > 2);
+        titles.forEach(movieTitle => {
+          if (movieTitle.length > 2 && movieTitle.length < 50) {
+            roles.push({
+              character: 'Character',
+              title: this.cleanTitle(movieTitle),
+              medium: 'live_action_movie',
+              year: 'unknown',
+              popularity: 'low',
+              source: 'wikipedia_manual'
+            });
+          }
         });
       }
     });
     
     return roles;
+  }
+
+  /**
+   * NEW: Extract roles from general content using generic patterns
+   */
+  extractFromGeneralContent(text, title, snippet) {
+    const roles = [];
+    
+    // Generic film/TV patterns
+    const mediaPatterns = [
+      /appeared in (.+)/i,
+      /starred in (.+)/i,
+      /cast in (.+)/i,
+      /role in (.+)/i,
+      /acted in (.+)/i,
+      /featured in (.+)/i,
+      /performance in (.+)/i
+    ];
+    
+    mediaPatterns.forEach(pattern => {
+      const match = text.match(pattern);
+      if (match) {
+        const content = match[1];
+        // Extract potential titles (words that could be movie/show titles)
+        const potentialTitles = content.split(/[,;]/).map(t => t.trim()).filter(t => t.length > 2);
+        potentialTitles.forEach(potentialTitle => {
+          if (this.looksLikeTitle(potentialTitle)) {
+            roles.push({
+              character: 'Character',
+              title: this.cleanTitle(potentialTitle),
+              medium: this.guessMedium(potentialTitle),
+              year: this.extractYear(text) || 'unknown',
+              popularity: 'low',
+              source: 'general_pattern'
+            });
+          }
+        });
+      }
+    });
+    
+    return roles;
+  }
+
+  /**
+   * NEW: Check if text looks like a movie/show title
+   */
+  looksLikeTitle(text) {
+    // Filter out obvious non-titles
+    const nonTitles = ['the', 'and', 'or', 'but', 'with', 'for', 'in', 'on', 'at', 'to', 'from'];
+    const words = text.toLowerCase().split(' ');
+    
+    // Too short or too long
+    if (text.length < 3 || text.length > 40) return false;
+    
+    // All common words
+    if (words.every(word => nonTitles.includes(word))) return false;
+    
+    // Contains numbers (likely not a title)
+    if (/^\d+$/.test(text.trim())) return false;
+    
+    // Looks like a sentence (has too many common words)
+    const commonWordCount = words.filter(word => nonTitles.includes(word)).length;
+    if (commonWordCount > words.length / 2) return false;
+    
+    return true;
+  }
+
+  /**
+   * NEW: Guess medium type from title
+   */
+  guessMedium(title) {
+    const titleLower = title.toLowerCase();
+    
+    // TV indicators
+    if (titleLower.includes('series') || titleLower.includes('show') || titleLower.includes('season')) {
+      return 'live_action_tv';
+    }
+    
+    // Animation indicators
+    if (titleLower.includes('cartoon') || titleLower.includes('animated') || titleLower.includes('anime')) {
+      return 'voice_cartoon';
+    }
+    
+    // Default to movie
+    return 'live_action_movie';
+  }
+
+  /**
+   * NEW: Extract year from text
+   */
+  extractYear(text) {
+    const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+    return yearMatch ? yearMatch[0] : null;
+  }
+
+  /**
+   * NEW: Clean extracted titles
+   */
+  cleanTitle(title) {
+    return title
+      .replace(/[^\w\s-]/g, '') // Remove special chars
+      .replace(/\s+/g, ' ') // Clean spaces
+      .trim()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 
   /**
