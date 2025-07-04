@@ -1,3 +1,6 @@
+const OpenAI = require('openai');
+const axios = require('axios');
+
 /**
  * RED FLAG EMERGENCY SYSTEM
  * Detects when AI is hallucinating roles and triggers emergency web search
