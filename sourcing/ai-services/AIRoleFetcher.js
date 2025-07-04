@@ -59,7 +59,7 @@ class AIRoleFetcher {
     if (!this.hasOpenAI) return null;
 
     try {
-      const universalPrompt = `You are an entertainment expert. For "${celebrityName}", find their TOP 5 most popular/recognizable CHARACTER ROLES from any level of fame.
+      const universalPrompt = `You are an entertainment expert. For "${celebrityName}", find their TOP 5 most popular/recognizable NAMED CHARACTER ROLES from any level of fame.
 
 DISCOVERY STRATEGY:
 1. If mainstream celebrity: Focus on their most iconic roles
@@ -150,6 +150,7 @@ Even if they're not famous, they likely have:
 - Voice acting work
 - Recent breakout roles
 - Web series with following
+- Generic roles like "Narrator", "Host", "Announcer"
 
 Return what you can find, even if limited:
 [{"character": "Character or Role", "title": "Project Title", "medium": "type", "year": "YYYY", "popularity": "low"}]`;
