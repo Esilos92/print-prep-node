@@ -30,16 +30,19 @@ class RedFlagRoleDetector {
    * MAIN: Detect red flags in verification results
    */
   detectRedFlags(celebrityName, verifiedRoles, rejectedRoles) {
-    console.log(`🚨 Analyzing verification results for red flags...`);
+    console.log(`🔍 Red flag analysis: ${verifiedRoles.length} verified, ${rejectedRoles.length} rejected`);
     
     const redFlags = [];
     
     // Red Flag 1: Too many rejections with "Celebrity in title but not this character"
-    const fakeCharacterRejections = rejectedRoles.filter(r => 
-      r.rejectionReason && r.rejectionReason.includes('Celebrity in title but not this character')
-    );
+    const fakeCharacterRejections = rejectedRoles.filter(r => {
+      const reason = r.rejectionReason || r.verificationReason || '';
+      return reason.includes('Celebrity in title but not this character');
+    });
     
-    if (fakeCharacterRejections.length >= 3) {
+    console.log(`🔍 Fake character rejections: ${fakeCharacterRejections.length}`);
+    
+    if (fakeCharacterRejections.length >= 2) { // Lowered threshold
       redFlags.push({
         type: 'AI_HALLUCINATION',
         severity: 'HIGH',
@@ -50,25 +53,30 @@ class RedFlagRoleDetector {
     }
 
     // Red Flag 2: Too many "No search results found" (AI inventing titles)
-    const noResultsRejections = rejectedRoles.filter(r => 
-      r.rejectionReason && r.rejectionReason.includes('No search results found')
-    );
+    const noResultsRejections = rejectedRoles.filter(r => {
+      const reason = r.rejectionReason || r.verificationReason || '';
+      return reason.includes('No search results found');
+    });
+    
+    console.log(`🔍 No results rejections: ${noResultsRejections.length}`);
     
     if (noResultsRejections.length >= 2) {
       redFlags.push({
         type: 'FAKE_TITLES',
-        severity: 'MEDIUM',
+        severity: 'HIGH', // Raised severity
         count: noResultsRejections.length,
         description: `${noResultsRejections.length} non-existent titles detected - AI inventing shows/movies`,
         trigger: 'emergency_web_search'
       });
     }
 
-    // Red Flag 3: Very low success rate (< 30%)
+    // Red Flag 3: Very low success rate (< 40%)
     const totalRoles = verifiedRoles.length + rejectedRoles.length;
     const successRate = totalRoles > 0 ? (verifiedRoles.length / totalRoles) * 100 : 0;
     
-    if (successRate < 30 && totalRoles >= 3) {
+    console.log(`🔍 Success rate: ${Math.round(successRate)}% (${verifiedRoles.length}/${totalRoles})`);
+    
+    if (successRate < 40 && totalRoles >= 3) { // Raised threshold
       redFlags.push({
         type: 'LOW_SUCCESS_RATE',
         severity: 'MEDIUM',
@@ -82,7 +90,9 @@ class RedFlagRoleDetector {
     const titleCounts = {};
     rejectedRoles.forEach(role => {
       const title = role.title;
-      titleCounts[title] = (titleCounts[title] || 0) + 1;
+      if (title) {
+        titleCounts[title] = (titleCounts[title] || 0) + 1;
+      }
     });
     
     const repeatedTitles = Object.entries(titleCounts).filter(([title, count]) => count > 1);
@@ -96,9 +106,16 @@ class RedFlagRoleDetector {
       });
     }
 
+    console.log(`🔍 Red flags detected: ${redFlags.length}`);
+    redFlags.forEach(flag => {
+      console.log(`   - ${flag.type} (${flag.severity}): ${flag.description}`);
+    });
+
     // Determine if emergency action needed
     const highSeverityFlags = redFlags.filter(flag => flag.severity === 'HIGH');
     const triggerEmergency = highSeverityFlags.length > 0 || redFlags.length >= 2;
+    
+    console.log(`🔍 Emergency trigger: ${triggerEmergency} (${highSeverityFlags.length} high severity, ${redFlags.length} total)`);
 
     return {
       hasRedFlags: redFlags.length > 0,
