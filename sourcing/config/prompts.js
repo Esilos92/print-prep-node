@@ -14,7 +14,7 @@ INCLUDE:
 - Named character roles with strong visual presence
 - Cult horror, viral hits, genre favorites, and indie standouts
 - Roles fans would recognize from posters, trailers, scenes, or fan-favorite moments — even if the project was niche or cult
-- Live-action and animated work from 2010 onward (unless earlier roles are definitive)
+- Live-action and animated work
 
 AVOID:
 - Hosting or presenting roles
