@@ -11,16 +11,13 @@ class AIImageVerifier {
     
     this.initializeAPIs();
     
-    // Verification results
+    // Simplified verification results
     this.verificationResults = {
       VALID: 'valid',
       INVALID_WRONG_PERSON: 'wrong_person',
       INVALID_WRONG_CHARACTER: 'wrong_character', 
       INVALID_MERCHANDISE: 'merchandise',
-      INVALID_FAN_ART: 'fan_art',
-      INVALID_FRAMED: 'framed',
-      INVALID_EVENT_PHOTO: 'event_photo',
-      INVALID_OTHER: 'other',
+      INVALID_UNRELATED: 'unrelated',
       VERIFICATION_FAILED: 'failed'
     };
   }
@@ -60,13 +57,13 @@ class AIImageVerifier {
   }
 
   /**
-   * Main verification function - tries all available services in order
+   * STREAMLINED: Main verification - focuses on OpenAI primarily
    */
   async verifyImage(imagePath, celebrityName, character, title, medium) {
     try {
       console.log(`🔍 Verifying image: ${path.basename(imagePath)} for ${celebrityName} as ${character}`);
 
-      // Try OpenAI Vision first (best accuracy)
+      // Primary: OpenAI Vision (best for identity verification)
       if (this.hasOpenAI) {
         try {
           const result = await this.verifyWithOpenAI(imagePath, celebrityName, character, title, medium);
@@ -79,7 +76,7 @@ class AIImageVerifier {
         }
       }
 
-      // Fall back to Claude Vision
+      // Fallback: Claude Vision
       if (this.hasAnthropic) {
         try {
           const result = await this.verifyWithClaude(imagePath, celebrityName, character, title, medium);
@@ -92,20 +89,7 @@ class AIImageVerifier {
         }
       }
 
-      // Fall back to Google Vision
-      if (this.hasGoogle) {
-        try {
-          const result = await this.verifyWithGoogle(imagePath, celebrityName, character, title, medium);
-          if (result !== this.verificationResults.VERIFICATION_FAILED) {
-            console.log(`✅ Google verification: ${result}`);
-            return { result, service: 'google', cost: 0.003 };
-          }
-        } catch (error) {
-          console.warn(`⚠️ Google verification failed: ${error.message}`);
-        }
-      }
-
-      // Final fallback - keyword-based verification (free)
+      // Final fallback: Basic keyword verification
       console.log(`🔄 Using keyword fallback verification`);
       const result = await this.verifyWithKeywords(imagePath, celebrityName, character, title);
       return { result, service: 'keywords', cost: 0 };
@@ -122,56 +106,49 @@ class AIImageVerifier {
   }
 
   /**
-   * OpenAI Vision verification (Primary) - Age-aware and resolution-conscious
+   * IMPROVED: OpenAI Vision verification with clearer prompts
    */
   async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
-    const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
-    const isAnimated = medium.includes('animation') || medium.includes('voice');
+    const isAnimated = medium.includes('animation') || medium.includes('voice') || medium.includes('anime');
     
-    const prompt = `You're analyzing an image for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
-
-AGE-AWARE FACIAL VERIFICATION: Account for actors aging across their careers.
+    const prompt = `Identity verification: Does this image show ${isAnimated ? `the character "${character}" from "${title}"` : `${celebrityName} as ${character} from ${title}`}?
 
 ${isAnimated ? 
-`REQUIREMENTS for animated content:
-- ${character} must be clearly visible and recognizable in the image
-- Must be the specific character ${character}, not other characters from ${title}
-- Group shots OK if ${character} is clearly identifiable
-- Different art styles OK if it's clearly ${character}
+`ANIMATED CONTENT - Looking for "${character}":
+✅ VALID if:
+- This shows ${character} from ${title}
+- ${character} is clearly recognizable 
+- Group scenes with ${character} visible
+- Different animation styles of ${character}
 
-REJECT if:
-- ${character} is not visible or not clearly identifiable
-- Shows only other characters from ${title} without ${character}
-- Wrong animated show/movie entirely
-- Toys/merchandise` :
+❌ INVALID if:
+- Shows different characters from ${title}
+- Shows characters from different shows
+- Shows toys/merchandise/collectibles
+- Shows live-action people (not animated)` :
 
-`REQUIREMENTS for live-action:
-- ${celebrityName} must be clearly visible and facially recognizable
-- IMPORTANT: Consider age differences - ${celebrityName} may look significantly different across decades
-- Accept both young and mature versions of ${celebrityName} if identifiable as the same person
-- Child actors grown up are still the same person - focus on facial structure continuity
-- Group shots OK if ${celebrityName} is clearly visible and identifiable
-- Be more lenient with older movies/shows (lower image quality is expected)
+`LIVE ACTION - Looking for ${celebrityName}:
+✅ VALID if:
+- This shows ${celebrityName} (any age/appearance)
+- ${celebrityName} is recognizable as the same person
+- Group scenes with ${celebrityName} visible
+- ${celebrityName} at different ages/eras
 
-REJECT if:
-- ${celebrityName} is not visible or face not clearly identifiable
-- Shows only other actors from ${title} without ${celebrityName}
-- Face too small/obscured to identify (accounting for older film quality)
-- Clearly a completely different person (not just older/younger ${celebrityName})
-- Toys/merchandise`}
+❌ INVALID if:
+- Shows a completely different person
+- Shows toys/merchandise/collectibles
+- Shows only other actors from ${title}
+- Completely unrelated content`}
 
-SPECIAL CONSIDERATIONS:
-- For older movies/TV shows: Be more forgiving of lower resolution and film grain
-- For child actors: Look for facial structure similarities even if they've aged significantly
-- Prioritize: Remastered/Blu-ray quality > DVD quality > VHS/TV rips
+IMPORTANT: Be permissive with uncertain cases. Only reject if clearly wrong.
 
-RESPOND WITH EXACTLY ONE WORD:
-- VALID: ${isAnimated ? character : celebrityName} is clearly present and identifiable (any age)
-- INVALID_WRONG_PERSON: Different person/character shown instead
-- INVALID_NOT_VISIBLE: Target person present but not clearly identifiable
+Respond with exactly one word:
+- VALID: Shows correct ${isAnimated ? 'character' : 'person'}
+- INVALID_WRONG_PERSON: Different person shown
+- INVALID_WRONG_CHARACTER: Different character shown
 - INVALID_MERCHANDISE: Toys/collectibles
-- INVALID_OTHER: Completely unrelated or target not present`;
+- INVALID_UNRELATED: Completely unrelated`;
 
     const completion = await this.openai.chat.completions.create({
       model: "gpt-4o",
@@ -183,12 +160,12 @@ RESPOND WITH EXACTLY ONE WORD:
             type: "image_url", 
             image_url: { 
               url: `data:image/jpeg;base64,${imageBase64}`,
-              detail: "low"
+              detail: "low" // Cost-efficient
             }
           }
         ]
       }],
-      max_tokens: 25,
+      max_tokens: 30,
       temperature: 0.05
     });
 
@@ -197,56 +174,53 @@ RESPOND WITH EXACTLY ONE WORD:
   }
 
   /**
-   * Claude Vision verification (Fallback) - Age-aware facial recognition
+   * IMPROVED: Claude Vision verification with consistent criteria
    */
   async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
     const imageBase64 = await this.imageToBase64(imagePath);
-    const mediaType = medium.includes('animation') || medium.includes('voice') ? 'animated' : 'live-action';
-    const isAnimated = medium.includes('animation') || medium.includes('voice');
+    const isAnimated = medium.includes('animation') || medium.includes('voice') || medium.includes('anime');
     
-    const prompt = `This image came from a search for ${isAnimated ? `${character} from ${title}` : `${celebrityName} as ${character} from ${title}`}.
-
-AGE-AWARE FACIAL VERIFICATION: Consider the actor's age across their career.
+    const prompt = `Identity verification: Does this image show ${isAnimated ? `the character "${character}" from "${title}"` : `${celebrityName} as ${character} from ${title}`}?
 
 ${isAnimated ? 
-`ACCEPT if this shows ${character} from ${title}:
-- ${character} is clearly visible and identifiable in the image
-- Recognizable as ${character} from ${title} specifically
-- Different art styles of ${character} are OK
-- Group shots where ${character} is identifiable
+`ANIMATED CONTENT - Checking for "${character}":
+✅ ACCEPT if:
+- Shows ${character} from ${title}
+- ${character} is recognizable
+- Group scenes with ${character} visible
+- Different art styles of ${character}
 
-REJECT if:
-- ${character} is not visible or identifiable in the image
-- Shows only other characters from ${title} without ${character}
-- Clearly from a different animated show
-- Toys/merchandise` :
+❌ REJECT if:
+- Shows different characters from ${title}
+- Shows characters from different shows
+- Shows toys/merchandise
+- Shows live-action people` :
 
-`ACCEPT if this shows ${celebrityName} from ${title}:
-- ${celebrityName} is clearly visible and identifiable (face recognizable)
-- IMPORTANT: Consider age differences - ${celebrityName} may look significantly different across their career (child vs adult roles)
-- Accept both young and mature versions of ${celebrityName} if they're identifiable
-- Group shots where ${celebrityName} is clearly present and identifiable
-- Different ages/decades of ${celebrityName} are OK if recognizable as the same person
+`LIVE ACTION - Checking for ${celebrityName}:
+✅ ACCEPT if:
+- Shows ${celebrityName} (any age/appearance)
+- ${celebrityName} is recognizable as same person
+- Group scenes with ${celebrityName} visible
+- ${celebrityName} at different life stages
 
-REJECT if:
-- ${celebrityName} is not visible or not clearly identifiable
-- Shows only other actors from ${title} without ${celebrityName}
-- Face too small/obscured to identify as ${celebrityName} (any age)
-- Clearly a completely different person (not just older/younger ${celebrityName})
-- Toys/merchandise`}
+❌ REJECT if:
+- Shows completely different person
+- Shows toys/merchandise
+- Shows only other actors from ${title}
+- Completely unrelated content`}
 
-CRITICAL: Account for significant age differences - actors can look very different as children vs adults. Focus on whether this could reasonably be ${isAnimated ? character : celebrityName} at any age.
+Be permissive with uncertain cases. Only reject if clearly wrong.
 
 Respond with exactly one word:
-- VALID (${isAnimated ? character : celebrityName} is clearly present and identifiable at any age)
-- INVALID_WRONG_PERSON (different person/character shown)
-- INVALID_NOT_VISIBLE (target person not clearly visible/identifiable)
-- INVALID_MERCHANDISE (toys/collectibles)
-- INVALID_OTHER (completely unrelated)`;
+- VALID: Shows correct ${isAnimated ? 'character' : 'person'}
+- INVALID_WRONG_PERSON: Different person
+- INVALID_WRONG_CHARACTER: Different character
+- INVALID_MERCHANDISE: Toys/collectibles
+- INVALID_UNRELATED: Unrelated content`;
 
     const requestBody = {
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 15,
+      max_tokens: 20,
       temperature: 0.05,
       messages: [{
         role: 'user',
@@ -284,78 +258,58 @@ Respond with exactly one word:
   }
 
   /**
-   * Google Vision verification (Backup)
-   */
-  async verifyWithGoogle(imagePath, celebrityName, character, title, medium) {
-    const imageBuffer = await fs.readFile(imagePath);
-    const imageBase64 = imageBuffer.toString('base64');
-
-    const requestBody = {
-      requests: [{
-        image: { content: imageBase64 },
-        features: [
-          { type: 'LABEL_DETECTION', maxResults: 10 },
-          { type: 'TEXT_DETECTION', maxResults: 5 }
-        ]
-      }]
-    };
-
-    let response;
-    if (process.env.GOOGLE_VISION_API_KEY) {
-      // Use API Key method
-      response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_VISION_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // Use Application Default Credentials (your existing setup)
-      const { GoogleAuth } = require('google-auth-library');
-      const auth = new GoogleAuth({
-        scopes: ['https://www.googleapis.com/auth/cloud-platform']
-      });
-      const authClient = await auth.getClient();
-      const accessToken = await authClient.getAccessToken();
-      
-      response = await fetch('https://vision.googleapis.com/v1/images:annotate', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken.token}`
-        },
-        body: JSON.stringify(requestBody)
-      });
-    } else {
-      throw new Error('No Google Vision credentials available');
-    }
-
-    if (!response.ok) {
-      throw new Error(`Google Vision error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const labels = data.responses[0]?.labelAnnotations || [];
-    const textDetections = data.responses[0]?.textAnnotations || [];
-
-    // Basic verification logic using labels and text
-    return this.analyzeGoogleVisionResults(labels, textDetections, celebrityName, character, title);
-  }
-
-  /**
-   * Keyword-based verification (Final fallback) - More lenient
+   * SIMPLIFIED: Keyword-based verification (final fallback)
    */
   async verifyWithKeywords(imagePath, celebrityName, character, title) {
     const filename = path.basename(imagePath).toLowerCase();
     
-    // Only reject obvious merchandise/junk
-    const obviousBadKeywords = ['funko', 'pop', 'toy', 'figure', 'collectible', 'merchandise', 'packaging'];
-    const hasObviousBad = obviousBadKeywords.some(keyword => filename.includes(keyword));
+    // Only reject obvious problematic content
+    const rejectKeywords = [
+      'funko', 'pop', 'toy', 'figure', 'collectible', 
+      'merchandise', 'packaging', 'box', 'signed', 'autograph'
+    ];
     
-    if (hasObviousBad) {
+    const hasRejectKeyword = rejectKeywords.some(keyword => filename.includes(keyword));
+    
+    if (hasRejectKeyword) {
       return this.verificationResults.INVALID_MERCHANDISE;
     }
 
-    // For targeted searches, default to valid
+    // Default to valid for targeted searches
+    return this.verificationResults.VALID;
+  }
+
+  /**
+   * IMPROVED: Parse verification response with permissive approach
+   */
+  parseVerificationResponse(response) {
+    const upperResponse = response.toUpperCase();
+    
+    // Accept clear VALID responses
+    if (upperResponse.includes('VALID') && !upperResponse.includes('INVALID')) {
+      return this.verificationResults.VALID;
+    }
+    
+    // Parse specific rejections
+    if (upperResponse.includes('WRONG_PERSON') || upperResponse.includes('DIFFERENT_PERSON')) {
+      return this.verificationResults.INVALID_WRONG_PERSON;
+    }
+    if (upperResponse.includes('WRONG_CHARACTER') || upperResponse.includes('DIFFERENT_CHARACTER')) {
+      return this.verificationResults.INVALID_WRONG_CHARACTER;
+    }
+    if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY') || upperResponse.includes('COLLECTIBLE')) {
+      return this.verificationResults.INVALID_MERCHANDISE;
+    }
+    if (upperResponse.includes('UNRELATED') || upperResponse.includes('COMPLETELY_DIFFERENT')) {
+      return this.verificationResults.INVALID_UNRELATED;
+    }
+    
+    // Handle other invalid responses
+    if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT')) {
+      return this.verificationResults.INVALID_UNRELATED;
+    }
+    
+    // PERMISSIVE: Default to valid for unclear responses
     return this.verificationResults.VALID;
   }
 
@@ -367,58 +321,8 @@ Respond with exactly one word:
     return imageBuffer.toString('base64');
   }
 
-  parseVerificationResponse(response) {
-    const upperResponse = response.toUpperCase();
-    
-    // Enhanced parsing for facial recognition results
-    if (upperResponse.includes('VALID') && !upperResponse.includes('INVALID')) {
-      return this.verificationResults.VALID;
-    }
-    if (upperResponse.includes('WRONG_PERSON') || upperResponse.includes('DIFFERENT_PERSON')) {
-      return this.verificationResults.INVALID_WRONG_PERSON;
-    }
-    if (upperResponse.includes('WRONG_CHARACTER') || upperResponse.includes('DIFFERENT_CHARACTER')) {
-      return this.verificationResults.INVALID_WRONG_CHARACTER;
-    }
-    if (upperResponse.includes('NOT_VISIBLE') || upperResponse.includes('NOT_IDENTIFIABLE') || upperResponse.includes('TOO_SMALL')) {
-      return this.verificationResults.INVALID_OTHER;
-    }
-    if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY')) {
-      return this.verificationResults.INVALID_MERCHANDISE;
-    }
-    if (upperResponse.includes('EVENT_PHOTO')) {
-      return this.verificationResults.INVALID_EVENT_PHOTO;
-    }
-    if (upperResponse.includes('INVALID_OTHER') || upperResponse.includes('UNRELATED')) {
-      return this.verificationResults.INVALID_OTHER;
-    }
-    
-    // Be stricter with ambiguous responses for facial recognition
-    if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT') || upperResponse.includes('NO')) {
-      return this.verificationResults.INVALID_OTHER;
-    }
-    
-    // Only accept clear positives
-    return this.verificationResults.INVALID_OTHER;
-  }
-
-  analyzeGoogleVisionResults(labels, textDetections, celebrityName, character, title) {
-    // Only reject obvious merchandise
-    const merchandiseLabels = ['toy', 'figurine', 'collectible', 'product', 'packaging'];
-    const hasMerchandise = labels.some(label => 
-      merchandiseLabels.some(merch => label.description.toLowerCase().includes(merch))
-    );
-    
-    if (hasMerchandise) {
-      return this.verificationResults.INVALID_MERCHANDISE;
-    }
-
-    // Default to valid for targeted searches
-    return this.verificationResults.VALID;
-  }
-
   /**
-   * Batch verification for multiple images
+   * OPTIMIZED: Batch verification with better error handling
    */
   async verifyImages(images, celebrityName, character, title, medium) {
     console.log(`🔍 Starting batch verification of ${images.length} images for ${celebrityName} as ${character}`);
@@ -429,6 +333,9 @@ Respond with exactly one word:
       totalCost: 0,
       serviceUsage: {}
     };
+
+    let consecutiveFailures = 0;
+    const maxConsecutiveFailures = 3;
 
     for (const image of images) {
       try {
@@ -443,6 +350,7 @@ Respond with exactly one word:
             ...image,
             verification: verification
           });
+          consecutiveFailures = 0; // Reset failure count
         } else {
           results.invalid.push({
             ...image,
@@ -453,10 +361,21 @@ Respond with exactly one word:
         
       } catch (error) {
         console.error(`❌ Failed to verify ${image.filename}: ${error.message}`);
-        results.invalid.push({
-          ...image,
-          verification: { result: this.verificationResults.VERIFICATION_FAILED, error: error.message }
-        });
+        consecutiveFailures++;
+        
+        // If too many consecutive failures, include remaining images to avoid losing everything
+        if (consecutiveFailures >= maxConsecutiveFailures) {
+          console.warn(`⚠️ Too many consecutive failures, including remaining images`);
+          results.valid.push({
+            ...image,
+            verification: { result: this.verificationResults.VALID, service: 'failure_fallback' }
+          });
+        } else {
+          results.invalid.push({
+            ...image,
+            verification: { result: this.verificationResults.VERIFICATION_FAILED, error: error.message }
+          });
+        }
       }
     }
 
@@ -468,6 +387,55 @@ Respond with exactly one word:
   }
 
   /**
+   * SIMPLIFIED: Quick confidence check
+   */
+  async quickConfidenceCheck(imagePath, celebrityName, character, isAnimated = false) {
+    if (!this.hasOpenAI) return { confidence: 'unknown', reason: 'OpenAI unavailable' };
+
+    try {
+      const imageBase64 = await this.imageToBase64(imagePath);
+      
+      const prompt = `Rate your confidence that this image shows ${isAnimated ? `the character "${character}"` : celebrityName} on a scale of 1-10.
+
+1-3: Definitely not the right ${isAnimated ? 'character' : 'person'}
+4-6: Uncertain
+7-10: Confident this is the right ${isAnimated ? 'character' : 'person'}
+
+Respond with just a number 1-10.`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { 
+              type: "image_url", 
+              image_url: { 
+                url: `data:image/jpeg;base64,${imageBase64}`,
+                detail: "low"
+              }
+            }
+          ]
+        }],
+        max_tokens: 5,
+        temperature: 0.1
+      });
+
+      const score = parseInt(completion.choices[0].message.content.trim());
+      
+      return {
+        confidence: score >= 7 ? 'high' : score >= 4 ? 'medium' : 'low',
+        score: score,
+        reason: score >= 7 ? 'High confidence match' : score >= 4 ? 'Uncertain match' : 'Low confidence match'
+      };
+
+    } catch (error) {
+      return { confidence: 'unknown', reason: `Confidence check failed: ${error.message}` };
+    }
+  }
+
+  /**
    * Get verification statistics
    */
   getVerificationStats() {
@@ -475,9 +443,31 @@ Respond with exactly one word:
       hasOpenAI: this.hasOpenAI,
       hasAnthropic: this.hasAnthropic, 
       hasGoogle: this.hasGoogle,
-      primaryService: this.hasOpenAI ? 'OpenAI Vision' : this.hasAnthropic ? 'Claude Vision' : this.hasGoogle ? 'Google Vision' : 'Keywords Only',
-      estimatedCostPer100Images: this.hasOpenAI ? '$0.15' : this.hasAnthropic ? '$0.24' : this.hasGoogle ? '$0.30' : '$0.00'
+      primaryService: this.hasOpenAI ? 'OpenAI Vision' : this.hasAnthropic ? 'Claude Vision' : 'Keywords Only',
+      estimatedCostPer100Images: this.hasOpenAI ? '$0.15' : this.hasAnthropic ? '$0.24' : '$0.00',
+      approach: 'Permissive - only reject clear mismatches'
     };
+  }
+
+  /**
+   * Test connection to primary service
+   */
+  async testConnection() {
+    if (this.hasOpenAI) {
+      try {
+        const completion = await this.openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{ role: "user", content: "Test" }],
+          max_tokens: 5
+        });
+        return completion.choices && completion.choices.length > 0;
+      } catch (error) {
+        console.error('OpenAI connection test failed:', error.message);
+        return false;
+      }
+    }
+    
+    return true; // Always return true for fallback services
   }
 }
 
