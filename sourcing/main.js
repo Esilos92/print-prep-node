@@ -1,6 +1,7 @@
 const AIRoleFetcher = require('./ai-services/AIRoleFetcher.js');
 const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
 const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js');
+const RedFlagRoleDetector = require('./ai-services/RedFlagRoleDetector.js'); // NEW
 const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
 
 class CelebrityRoleOrchestrator {
@@ -8,6 +9,7 @@ class CelebrityRoleOrchestrator {
     this.roleFetcher = new AIRoleFetcher();
     this.searchOptimizer = new SearchOptimizer();
     this.roleVerifier = new SimpleRoleVerifier();
+    this.redFlagDetector = new RedFlagRoleDetector(); // NEW
     this.cache = new Map();
   }
 
@@ -38,13 +40,44 @@ class CelebrityRoleOrchestrator {
       console.log(`🔍 Verifying ${rolesWithValidatedNames.length} discovered roles...`);
       const verifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, rolesWithValidatedNames);
       
+      // NEW: Red flag detection for AI hallucinations
+      const rejectedRoles = rolesWithValidatedNames.filter(role => 
+        !verifiedRoles.some(verified => verified.character === role.character && verified.title === role.title)
+      );
+      
+      const redFlagResult = this.redFlagDetector.detectRedFlags(celebrityName, verifiedRoles, rejectedRoles);
+      
+      if (redFlagResult.triggerEmergency) {
+        console.log(`🚨 RED FLAGS DETECTED: ${redFlagResult.redFlags.length} issues found`);
+        console.log(`🌐 Triggering emergency web search for actual filmography...`);
+        
+        // Emergency web search for actual roles
+        const emergencyRoles = await this.redFlagDetector.emergencyFilmographySearch(celebrityName);
+        
+        if (emergencyRoles && emergencyRoles.length > 0) {
+          console.log(`✅ Emergency search found ${emergencyRoles.length} actual roles`);
+          
+          // Merge emergency results with any verified roles
+          const combinedRoles = [...verifiedRoles, ...emergencyRoles];
+          const finalVerifiedRoles = await this.roleVerifier.verifyRoles(celebrityName, combinedRoles);
+          
+          console.log(`🎯 Emergency recovery: ${finalVerifiedRoles.length} total verified roles`);
+          
+          if (finalVerifiedRoles.length > verifiedRoles.length) {
+            console.log(`✅ Emergency search recovered ${finalVerifiedRoles.length - verifiedRoles.length} additional roles`);
+            // Continue with emergency results
+            return await this.processWithEmergencyResults(celebrityName, finalVerifiedRoles, redFlagResult);
+          }
+        }
+      }
+      
       if (verifiedRoles.length === 0) {
         throw new Error(`No valid roles found for ${celebrityName} after verification`);
       }
 
       if (verifiedRoles.length < rolesWithValidatedNames.length) {
         const rejectedCount = rolesWithValidatedNames.length - verifiedRoles.length;
-        console.log(`❌ Rejected ${rejectedCount} invalid roles - saved ~$${(rejectedCount * 0.18).toFixed(2)} in wasted searches`);
+        console.log(`❌ Rejected ${rejectedCount} invalid roles - saved ~${(rejectedCount * 0.18).toFixed(2)} in wasted searches`);
       }
 
       // Step 4: Add celebrity metadata and analyze roles
@@ -190,6 +223,52 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     }
     
     return rolesWithStrategies;
+  }
+
+  /**
+   * NEW: Process results after emergency web search
+   */
+  async processWithEmergencyResults(celebrityName, emergencyVerifiedRoles, redFlagResult) {
+    try {
+      console.log(`🚨 Processing emergency results for ${celebrityName}`);
+      
+      // Add metadata to emergency results
+      const rolesWithMetadata = emergencyVerifiedRoles.map(role => ({ 
+        ...role,
+        celebrity: celebrityName,
+        actorName: celebrityName,
+        characterProminent: this.analyzeCharacterProminence(role, celebrityName),
+        searchPriority: this.calculateSearchPriority(role, celebrityName),
+        emergencyRecovered: true
+      }));
+
+      // Optimize search terms
+      const optimizedRoles = await this.searchOptimizer.optimizeSearchTerms(rolesWithMetadata);
+      const rolesWithStrategies = await this.addSmartSearchStrategies(optimizedRoles, celebrityName);
+      
+      // Generate results with emergency context
+      const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithStrategies);
+      const finalResults = this.processOptimizedResults(celebrityName, rolesWithStrategies, optimizationStats);
+      
+      // Add emergency context to results
+      finalResults.emergencyRecovery = {
+        triggered: true,
+        redFlags: redFlagResult.redFlags,
+        analysis: redFlagResult.analysis,
+        recoveredRoles: emergencyVerifiedRoles.length,
+        emergencyMethod: 'web_search_filmography'
+      };
+      
+      // Cache results
+      this.cache.set(celebrityName, finalResults);
+      
+      console.log(`✅ Emergency recovery complete: ${finalResults.roles.length} roles for ${celebrityName}`);
+      return finalResults;
+      
+    } catch (error) {
+      console.error(`❌ Emergency processing failed: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
