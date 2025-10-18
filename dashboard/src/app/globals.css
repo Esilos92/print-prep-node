@@ -341,6 +341,25 @@ body {
   flex-shrink: 0;
 }
 
+/* Custom horizontal scrollbar for job history */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 16px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.8);
+}
+
 /* Utility Classes */
 .font-cyber {
   font-family: 'Orbitron', monospace;
