@@ -166,10 +166,15 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
         </div>
 
         {/* RIGHT COLUMN - 65% with HORIZONTAL SCROLL */}
-        <div style={{ width: '65%', paddingLeft: '16px' }}>
+        <div style={{ width: '65%', paddingLeft: '16px', display: 'flex', flexDirection: 'column' }}>
           
           {/* Horizontal scrolling job cards */}
-          <div style={{ height: '100%', overflowX: 'auto', overflowY: 'hidden' }}>
+          <div style={{ 
+            flex: 1, 
+            overflowX: 'auto', 
+            overflowY: 'hidden',
+            paddingTop: '16px'
+          }}>
             {jobs.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-slate-500 font-ui">
                 No missions logged
@@ -181,7 +186,8 @@ export default function JobHistory({ jobs }: JobHistoryProps) {
                   flexDirection: 'row', 
                   gap: '16px',
                   paddingBottom: '16px',
-                  minHeight: '100%'
+                  minHeight: '100%',
+                  width: 'fit-content'
                 }}
               >
                 {jobs.map((job, index) => (
