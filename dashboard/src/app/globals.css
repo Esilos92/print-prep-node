@@ -343,7 +343,7 @@ body {
 
 /* Custom horizontal scrollbar for job history */
 .custom-scrollbar::-webkit-scrollbar {
-  height: 16px;
+  height: 24px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -352,12 +352,12 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.7);
   border-radius: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.8);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* Utility Classes */
