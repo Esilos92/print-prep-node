@@ -14,27 +14,55 @@ class ImageHelpers {
   }
   
   /**
-   * Check if image meets minimum resolution requirements
+   * Scale factor sharp will apply when fitting this image into a print format.
+   * Greater than 1 means the image would have to be ENLARGED to fill the sheet.
+   */
+  static fitScale(width, height, format) {
+    const config = require('./config');
+    const target = config.print.formats[format];
+    if (!target || !width || !height) return Infinity;
+    return Math.min(target.width / width, target.height / height);
+  }
+
+  /**
+   * Real detail per printed inch, once the image is fitted to the format.
+   *
+   * Downscaling keeps full 300 DPI. Enlarging divides the available detail:
+   * a 1200x1500 source fitted to an 8x10 sheet is doubled in size, so it
+   * carries 150 DPI of actual information no matter what the file says.
+   */
+  static effectiveDpi(width, height, format) {
+    const config = require('./config');
+    const scale = ImageHelpers.fitScale(width, height, format);
+    if (!Number.isFinite(scale)) return 0;
+    return Math.round(config.print.targetDpi / Math.max(1, scale));
+  }
+
+  /**
+   * Check if image can be printed at this format without falling below the
+   * configured DPI floor.
    */
   static meetsResolution(width, height, format) {
     const config = require('./config');
-    const minDims = config.image.minDimensions[format];
-    
-    return width >= minDims.width && height >= minDims.height;
+    return ImageHelpers.effectiveDpi(width, height, format) >= config.print.minDpi;
   }
-  
+
   /**
-   * Determine best print format for image
+   * Print formats this image genuinely supports, largest sheet first.
+   * Returns [] when the image is too small to print well at any size, which
+   * is a rejection rather than an invitation to upscale it.
    */
   static getBestFormat(width, height) {
-    if (ImageHelpers.meetsResolution(width, height, '11x17')) {
-      return ['11x17', '8x10'];
-    } else if (ImageHelpers.meetsResolution(width, height, '8x10')) {
-      return ['8x10'];
-    }
-    return [];
+    const config = require('./config');
+    return Object.keys(config.print.formats)
+      .filter(format => ImageHelpers.meetsResolution(width, height, format))
+      .sort((a, b) => {
+        const fa = config.print.formats[a];
+        const fb = config.print.formats[b];
+        return (fb.width * fb.height) - (fa.width * fa.height);
+      });
   }
-  
+
   /**
    * Generate simple hash for deduplication
    */
@@ -241,6 +269,8 @@ class ImageHelpers {
 module.exports = {
   getOrientation: ImageHelpers.getOrientation.bind(ImageHelpers),
   meetsResolution: ImageHelpers.meetsResolution.bind(ImageHelpers),
+  effectiveDpi: ImageHelpers.effectiveDpi.bind(ImageHelpers),
+  fitScale: ImageHelpers.fitScale.bind(ImageHelpers),
   getBestFormat: ImageHelpers.getBestFormat.bind(ImageHelpers),
   generateSimpleHash: ImageHelpers.generateSimpleHash.bind(ImageHelpers),
   calculateSimilarity: ImageHelpers.calculateSimilarity.bind(ImageHelpers),

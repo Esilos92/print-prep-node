@@ -3,7 +3,7 @@ const imghash = require('imghash');
 const fs = require('fs').promises;
 const config = require('../utils/config');
 const logger = require('../utils/logger');
-const { getBestFormat, calculateSimilarity } = require('../utils/helpers');
+const { getBestFormat, calculateSimilarity, effectiveDpi } = require('../utils/helpers');
 
 class ImageValidator {
   
@@ -15,10 +15,20 @@ class ImageValidator {
       'sample', 'comp'
     ];
     
+    // Unambiguous fan-made markers — rejected for every kind of role.
     this.fanArtKeywords = [
       'fanart', 'fan art', 'deviantart', 'tumblr', 'pinterest',
-      'reddit', 'concept art', 'artwork', 'drawing', 'sketch', 
-      'illustration', 'poster design'
+      'reddit', 'concept art', 'poster design'
+    ];
+
+    /**
+     * Generic art words. These only indicate fan work for live action; for an
+     * animated role the official studio images ARE artwork, and the fetcher
+     * explicitly searches for "official artwork" and "official art". Applying
+     * these to voice roles rejected exactly the images that were wanted.
+     */
+    this.liveActionOnlyArtKeywords = [
+      'artwork', 'drawing', 'sketch', 'illustration'
     ];
     
     this.bannedDomains = [
@@ -111,7 +121,7 @@ class ImageValidator {
     }
     
     // Check fan art
-    const fanArtCheck = this.checkFanArt(image);
+    const fanArtCheck = this.checkFanArt(image, roleInfo);
     if (!fanArtCheck.isValid) {
       return fanArtCheck;
     }
@@ -172,12 +182,16 @@ class ImageValidator {
   /**
    * FIXED: Check for fan art content - REMOVED fandom.com from blocking
    */
-  checkFanArt(image) {
+  checkFanArt(image, roleInfo = {}) {
     const filename = (image.filename || '').toLowerCase();
     const url = (image.sourceUrl || '').toLowerCase();
     const title = (image.title || '').toLowerCase();
-    
-    for (const keyword of this.fanArtKeywords) {
+
+    const keywords = roleInfo.isVoiceRole
+      ? this.fanArtKeywords
+      : [...this.fanArtKeywords, ...this.liveActionOnlyArtKeywords];
+
+    for (const keyword of keywords) {
       if (filename.includes(keyword) || url.includes(keyword) || title.includes(keyword)) {
         return {
           isValid: false,
@@ -251,22 +265,20 @@ class ImageValidator {
       const width = metadata.width;
       const height = metadata.height;
       
-      // FIXED: Use ENV settings with proper fallbacks
-      const minWidth = parseInt(process.env.MIN_WIDTH_8X10) || 800;
-      const minHeight = parseInt(process.env.MIN_HEIGHT_8X10) || 600;
-      
-      // FIXED: Check minimum resolution - both width AND height must meet minimums
-      // This was the bug: 1400x700 failed because 700 < 800, but ENV is 800x600
+      // Candidate floor, NOT the print size. Print suitability is decided
+      // below by getBestFormat, which measures real DPI.
+      const minWidth = config.search.minWidth;
+      const minHeight = config.search.minHeight;
+
       if (width < minWidth || height < minHeight) {
         return {
           isValid: false,
           reason: `Resolution too low: ${width}x${height} (requires ${minWidth}x${minHeight})`
         };
       }
-      
-      // Check file size (avoid tiny files)
+
       const stats = await fs.stat(image.filepath);
-      if (stats.size < 50000) { // Less than 50KB
+      if (stats.size < config.search.minFileSizeBytes) {
         return {
           isValid: false,
           reason: 'File size too small (likely thumbnail or corrupted)'
@@ -286,7 +298,8 @@ class ImageValidator {
       if (formats.length === 0) {
         return {
           isValid: false,
-          reason: `No suitable print formats for ${width}x${height}`
+          reason: `Not printable: ${width}x${height} yields ${effectiveDpi(width, height, '8x10')} DPI ` +
+                  `at 8x10, below the ${config.print.minDpi} DPI floor`
         };
       }
       

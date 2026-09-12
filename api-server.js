@@ -6,6 +6,7 @@ const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
+const { PREFIX: PROGRESS_PREFIX } = require('./utils/progress');
 
 const app = express();
 app.use(cors());
@@ -107,6 +108,8 @@ class JobTracker {
     this.roles = []; // 🎯 FIX #2: Real roles array instead of null
     this.imagesProcessed = 0;
     this.imagesValidated = 0;
+    this.imagesPrintable = 0;
+    this.problems = [];
     this.totalImagesAcrossRoles = 0; // 🎯 FIX #4: Cumulative tracking
     this.startTime = new Date();
     this.endTime = null;
@@ -177,11 +180,29 @@ class JobTracker {
 // API ENDPOINTS
 
 // 1. Start new celebrity job
+/**
+ * A celebrity name reaches the filesystem: the CLI builds its working
+ * directory from it, and that directory is later removed recursively. Names
+ * are people's names, so an allowlist costs nothing and closes the traversal.
+ */
+const CELEBRITY_NAME = /^[\p{L}\p{M}0-9 .'\-]{1,80}$/u;
+
+function invalidCelebrityName(value) {
+  if (!value || typeof value !== 'string' || !value.trim()) {
+    return 'Celebrity name is required';
+  }
+  if (!CELEBRITY_NAME.test(value.trim())) {
+    return 'Celebrity name may only contain letters, numbers, spaces, apostrophes, hyphens and periods';
+  }
+  return null;
+}
+
 app.post('/api/jobs', async (req, res) => {
   const { celebrity } = req.body;
-  
-  if (!celebrity || !celebrity.trim()) {
-    return res.status(400).json({ error: 'Celebrity name is required' });
+
+  const nameError = invalidCelebrityName(celebrity);
+  if (nameError) {
+    return res.status(400).json({ error: nameError });
   }
 
   // Generate unique job ID
@@ -193,7 +214,7 @@ app.post('/api/jobs', async (req, res) => {
 
   try {
     // Start the background process (your existing CLI)
-    const childProcess = spawn('node', ['index.js', celebrity], {
+    const childProcess = spawn('node', ['index.js', celebrity.trim()], {
       cwd: __dirname, // ~/print-prep-node directory
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -302,21 +323,28 @@ app.delete('/api/jobs/:jobId', (req, res) => {
 });
 
 // PROGRESS MONITORING
-function monitorJobProgress(job, process) {
-  // Parse stdout for progress indicators
-  process.stdout.on('data', (data) => {
-    const output = data.toString();
-    parseProgressFromOutput(job, output);
+function monitorJobProgress(job, childProcess) {
+  // Chunks can split mid-line, so buffer until a newline before parsing.
+  let stdoutBuffer = '';
+
+  childProcess.stdout.on('data', (data) => {
+    stdoutBuffer += data.toString();
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop();
+    if (lines.length > 0) {
+      parseProgressFromOutput(job, lines.join('\n'));
+    }
   });
 
-  // Parse stderr for errors
-  process.stderr.on('data', (data) => {
-    const output = data.toString();
-    job.addLog(`Error output: ${output}`);
+  childProcess.stderr.on('data', (data) => {
+    job.addLog(`Error output: ${data.toString().trim()}`);
   });
 
-  // Handle process completion
-  process.on('close', (code) => {
+  childProcess.on('close', (code) => {
+    if (stdoutBuffer.trim()) {
+      parseProgressFromOutput(job, stdoutBuffer);
+      stdoutBuffer = '';
+    }
     if (code === 0) {
       // Success - look for output file
       handleJobCompletion(job);
@@ -325,158 +353,92 @@ function monitorJobProgress(job, process) {
     }
   });
 
-  process.on('error', (error) => {
+  childProcess.on('error', (error) => {
     job.error(`Process error: ${error.message}`);
   });
 }
 
-// 🎯 ENHANCED: Parse YOUR EXACT backend output patterns for progress
+/**
+ * Consume child output.
+ *
+ * Progress comes from structured @@EVENT lines emitted by utils/progress.js.
+ * The previous implementation recovered everything by regex-matching human log
+ * text; by the time it was audited, nine of its twelve progress patterns and
+ * all three of its role patterns no longer matched anything the pipeline
+ * printed, so the dashboard reported zero roles and zero validated images for
+ * jobs that had in fact succeeded.
+ *
+ * The Google Drive regex is kept deliberately, as a backstop for the one value
+ * whose loss would strand a finished package.
+ */
 function parseProgressFromOutput(job, output) {
-  job.addLog(`Output: ${output.trim()}`);
+  for (const line of output.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
 
-  // 🎯 FIX #5: Extract Google Drive download link from output
-  const googleDriveLinkMatch = output.match(/✅ Upload complete: (https:\/\/drive\.google\.com\/[^\s]+)/i);
-  if (googleDriveLinkMatch) {
-    job.downloadLink = googleDriveLinkMatch[1];
-    job.addLog(`Google Drive link captured: ${job.downloadLink}`);
-  }
+    if (trimmed.startsWith(PROGRESS_PREFIX)) {
+      applyEvent(job, trimmed.slice(PROGRESS_PREFIX.length).trim());
+      continue;
+    }
 
-  // 🎯 FIX #2: Extract REAL role names from backend output
-  const roleExtractionPatterns = [
-    // Pattern: "🖼️ AI-FIRST fetching for Ryan Reynolds in Deadpool..."
-    /🖼️\s*AI-FIRST fetching for\s*(.+?)\s*in\s*(.+?)\.\.\./i,
-    // Pattern: "✅ AI SELECTED: 15 high-quality images" (after a role context)
-    /✅\s*AI SELECTED.*for\s*(.+?)\s*in\s*(.+)/i,
-    // Pattern: "🔍 SMART Search: "Wade Wilson" "Deadpool""
-    /🔍\s*SMART Search:.*["'](.+?)["'].*["'](.+?)["']/i
-  ];
+    job.addLog(trimmed);
 
-  for (const pattern of roleExtractionPatterns) {
-    const match = output.match(pattern);
-    if (match) {
-      const character = match[1]?.trim();
-      const title = match[2]?.trim();
-      if (character && title) {
-        const roleName = `${character} (${title})`;
-        if (!job.roles.includes(roleName)) {
-          job.roles.push(roleName);
-          job.addLog(`Discovered role: ${roleName}`);
-        }
+    // Backstop only: the download link is the deliverable.
+    if (!job.downloadLink) {
+      const link = trimmed.match(/(https:\/\/drive\.google\.com\/[^\s]+)/i);
+      if (link) {
+        job.downloadLink = link[1];
+        job.addLog(`Google Drive link captured: ${job.downloadLink}`);
       }
     }
   }
+}
 
-  // 🎯 FIX #4: Track CUMULATIVE image counts across all roles
-  const imagesFoundMatch = output.match(/📸 Found (\d+) images for AI to evaluate/i);
-  if (imagesFoundMatch) {
-    const newImages = parseInt(imagesFoundMatch[1]);
-    job.imagesProcessed += newImages; // Cumulative addition
-    job.addLog(`Found ${newImages} more images (total: ${job.imagesProcessed})`);
+function applyEvent(job, payload) {
+  let event;
+  try {
+    event = JSON.parse(payload);
+  } catch {
+    job.addLog(`Unparseable progress event: ${payload.slice(0, 200)}`);
+    return;
   }
 
-  const imagesDownloadedMatch = output.match(/📥 Downloaded (\d+) images for AI evaluation/i);
-  if (imagesDownloadedMatch) {
-    const downloadedImages = parseInt(imagesDownloadedMatch[1]);
-    job.imagesProcessed = Math.max(job.imagesProcessed, downloadedImages); // Use max to avoid regression
-    job.addLog(`Downloaded ${downloadedImages} images`);
-  }
+  switch (event.type) {
+    case 'phase':
+      job.updateProgress(event.progress, event.label || event.phase);
+      if (event.phase && job.currentPhaseForGBot !== event.phase) {
+        job.currentPhaseForGBot = event.phase;
+        job.gBotPhaseChange = event.phase;
+      }
+      break;
 
-  const aiSelectedMatch = output.match(/✅ AI SELECTED: (\d+) high-quality images/i);
-  if (aiSelectedMatch) {
-    const validatedImages = parseInt(aiSelectedMatch[1]);
-    job.totalImagesAcrossRoles += validatedImages; // 🎯 FIX #4: Cumulative validation
-    job.imagesValidated = job.totalImagesAcrossRoles;
-    job.addLog(`AI validated ${validatedImages} more images (total validated: ${job.imagesValidated})`);
-  }
-
-  // 🎯 ENHANCED: Better progress patterns with phase detection for GBot
-  const progressPatterns = [
-    { 
-      pattern: /🎬 Starting CHARACTER-FIRST image search for:/i, 
-      progress: 5, 
-      phase: 'Initializing CHARACTER-FIRST search...',
-      gBotPhase: 'filmography_scan'
-    },
-    { 
-      pattern: /🔍 Verifying.*roles for/i, 
-      progress: 15, 
-      phase: 'Verifying discovered roles...',
-      gBotPhase: 'performance_analysis'
-    },
-    { 
-      pattern: /✅.*roles verified as real/i, 
-      progress: 25, 
-      phase: 'Role verification complete',
-      gBotPhase: 'performance_analysis'
-    },
-    { 
-      pattern: /🔍 Generating CHARACTER-FIRST search terms/i, 
-      progress: 35, 
-      phase: 'Optimizing search strategies...',
-      gBotPhase: 'search_protocol'
-    },
-    { 
-      pattern: /✅ CHARACTER-FIRST optimization/i, 
-      progress: 45, 
-      phase: 'Search optimization complete',
-      gBotPhase: 'search_protocol'
-    },
-    { 
-      pattern: /🖼️ AI-FIRST fetching for.*in/i, 
-      progress: 55, 
-      phase: 'Starting image search...',
-      gBotPhase: 'image_download'
-    },
-    { 
-      pattern: /🔍 SMART Search:/i, 
-      progress: 65, 
-      phase: 'Executing smart searches...',
-      gBotPhase: 'image_download'
-    },
-    { 
-      pattern: /📸 Found.*images for AI to evaluate/i, 
-      progress: 75, 
-      phase: 'Images found, preparing for AI...',
-      gBotPhase: 'image_download'
-    },
-    { 
-      pattern: /📥 Downloaded.*images for AI evaluation/i, 
-      progress: 85, 
-      phase: 'Images downloaded, AI analyzing...',
-      gBotPhase: 'ai_validation'
-    },
-    { 
-      pattern: /🤖 AI taking over/i, 
-      progress: 90, 
-      phase: 'AI validation in progress...',
-      gBotPhase: 'ai_validation'
-    },
-    { 
-      pattern: /✅ AI SELECTED:.*high-quality images/i, 
-      progress: 95, 
-      phase: 'AI validation complete',
-      gBotPhase: 'ai_validation'
-    },
-    { 
-      pattern: /✅.*processing complete.*optimized roles/i, 
-      progress: 98, 
-      phase: 'Finalizing package...',
-      gBotPhase: 'file_compilation'
-    }
-  ];
-
-  // Update progress based on YOUR exact patterns
-  for (const { pattern, progress, phase, gBotPhase } of progressPatterns) {
-    if (pattern.test(output)) {
-      job.updateProgress(progress, phase);
-      
-      // 🎯 FIX #1: Mark phase changes for GBot announcements
-      if (gBotPhase && job.currentPhaseForGBot !== gBotPhase) {
-        job.currentPhaseForGBot = gBotPhase;
-        job.gBotPhaseChange = gBotPhase; // Flag for frontend to detect
+    case 'role': {
+      const roleName = `${event.character} (${event.title})`;
+      if (!job.roles.includes(roleName)) {
+        job.roles.push(roleName);
+        job.addLog(`Discovered role: ${roleName}`);
       }
       break;
     }
+
+    case 'counts':
+      if (Number.isFinite(event.downloaded)) job.imagesProcessed = event.downloaded;
+      if (Number.isFinite(event.verified)) job.imagesValidated = event.verified;
+      if (Number.isFinite(event.printable)) job.imagesPrintable = event.printable;
+      break;
+
+    case 'download':
+      job.downloadLink = event.url;
+      job.addLog(`Google Drive link captured: ${event.url}`);
+      break;
+
+    case 'problem':
+      job.problems.push(event.message);
+      job.addLog(`Problem: ${event.message}`);
+      break;
+
+    default:
+      job.addLog(`Unknown progress event type: ${event.type}`);
   }
 }
 
@@ -622,4 +584,4 @@ loadPersistedData().then(() => {
   process.exit(1);
 });
 
-module.exports = { app, activeJobs, completedJobs };
+module.exports = { app, activeJobs, completedJobs, JobTracker, parseProgressFromOutput, monitorJobProgress };

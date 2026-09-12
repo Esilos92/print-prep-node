@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
 const fs = require('fs').promises;
 const path = require('path');
+const config = require('../../utils/config');
 
 class AIImageVerifier {
   constructor() {
@@ -18,8 +19,15 @@ class AIImageVerifier {
       INVALID_WRONG_CHARACTER: 'wrong_character', 
       INVALID_MERCHANDISE: 'merchandise',
       INVALID_UNRELATED: 'unrelated',
-      VERIFICATION_FAILED: 'failed'
+      INVALID_LOW_CONFIDENCE: 'low_confidence',
+      VERIFICATION_FAILED: 'failed',
+      UNVERIFIED: 'unverified'
     };
+
+    // Only this verdict lets an image through. Everything else — including
+    // "we could not tell" — is a rejection. An autograph print of the wrong
+    // person is worse than one fewer print.
+    this.acceptOnly = this.verificationResults.VALID;
   }
 
   initializeAPIs() {
@@ -57,186 +65,176 @@ class AIImageVerifier {
   }
 
   /**
-   * STREAMLINED: Main verification - focuses on OpenAI primarily
+   * Verify one candidate image.
+   *
+   * `context.referencePath`, when supplied, is a confirmed portrait of the
+   * celebrity. With it the model is asked to compare two faces; without it
+   * the model has to recognise the name unaided, which is markedly less
+   * reliable for anyone short of A-list — i.e. most convention signers.
    */
-  async verifyImage(imagePath, celebrityName, character, title, medium) {
-    try {
-      console.log(`🔍 Verifying image: ${path.basename(imagePath)} for ${celebrityName} as ${character}`);
+  async verifyImage(imagePath, context) {
+    const { celebrityName, character, title, medium, referencePath } = context;
 
-      // Primary: OpenAI Vision (best for identity verification)
+    try {
       if (this.hasOpenAI) {
         try {
-          const result = await this.verifyWithOpenAI(imagePath, celebrityName, character, title, medium);
-          if (result !== this.verificationResults.VERIFICATION_FAILED) {
-            console.log(`✅ OpenAI verification: ${result}`);
-            return { result, service: 'openai', cost: 0.0015 };
+          const verdict = await this.verifyWithOpenAI(imagePath, context);
+          if (verdict.result !== this.verificationResults.VERIFICATION_FAILED) {
+            return { ...verdict, service: 'openai', cost: 0.0045 };
           }
         } catch (error) {
-          console.warn(`⚠️ OpenAI verification failed: ${error.message}`);
+          console.warn(`⚠️ OpenAI verification error: ${error.message}`);
         }
       }
 
-      // Fallback: Claude Vision
       if (this.hasAnthropic) {
         try {
-          const result = await this.verifyWithClaude(imagePath, celebrityName, character, title, medium);
-          if (result !== this.verificationResults.VERIFICATION_FAILED) {
-            console.log(`✅ Claude verification: ${result}`);
-            return { result, service: 'claude', cost: 0.0024 };
+          const verdict = await this.verifyWithClaude(imagePath, context);
+          if (verdict.result !== this.verificationResults.VERIFICATION_FAILED) {
+            return { ...verdict, service: 'claude', cost: 0.006 };
           }
         } catch (error) {
-          console.warn(`⚠️ Claude verification failed: ${error.message}`);
+          console.warn(`⚠️ Claude verification error: ${error.message}`);
         }
       }
 
-      // Final fallback: Basic keyword verification
-      console.log(`🔄 Using keyword fallback verification`);
-      const result = await this.verifyWithKeywords(imagePath, celebrityName, character, title);
-      return { result, service: 'keywords', cost: 0 };
+      /**
+       * No vision service could reach a verdict. The filename check below
+       * catches obvious merchandise, but it cannot confirm identity, so its
+       * best case is UNVERIFIED — which does not pass.
+       */
+      const keywordResult = await this.verifyWithKeywords(imagePath);
+      return { ...keywordResult, service: 'keywords', cost: 0 };
 
     } catch (error) {
-      console.error(`❌ All verification methods failed: ${error.message}`);
-      return { 
-        result: this.verificationResults.VERIFICATION_FAILED, 
-        service: 'none', 
+      console.error(`❌ Verification failed for ${path.basename(imagePath)}: ${error.message}`);
+      return {
+        result: this.verificationResults.VERIFICATION_FAILED,
+        service: 'none',
         cost: 0,
-        error: error.message 
+        confidence: 0,
+        error: error.message
       };
     }
   }
 
   /**
-   * IMPROVED: OpenAI Vision verification with clearer prompts
+   * Build the verification prompt.
+   *
+   * The instruction is deliberately the opposite of permissive: an uncertain
+   * match is a rejection. The previous wording ("Be permissive with uncertain
+   * cases. Only reject if clearly wrong.") is how co-stars, lookalikes and
+   * crowd shots ended up in finished print packages.
    */
-  async verifyWithOpenAI(imagePath, celebrityName, character, title, medium) {
-    const imageBase64 = await this.imageToBase64(imagePath);
-    const isAnimated = medium.includes('animation') || medium.includes('voice') || medium.includes('anime');
-    
-    const prompt = `Identity verification: Does this image show ${isAnimated ? `the character "${character}" from "${title}"` : `${celebrityName} as ${character} from ${title}`}?
+  buildPrompt({ celebrityName, character, title, medium }, hasReference) {
+    const isAnimated = (medium || '').includes('animation')
+      || (medium || '').includes('voice')
+      || (medium || '').includes('anime');
 
-${isAnimated ? 
-`ANIMATED CONTENT - Looking for "${character}":
-✅ VALID if:
-- This shows ${character} from ${title}
-- ${character} is clearly recognizable 
-- Group scenes with ${character} visible
-- Different animation styles of ${character}
+    if (isAnimated) {
+      return `You are checking images for an autograph print run.
 
-❌ INVALID if:
-- Shows different characters from ${title}
-- Shows characters from different shows
-- Shows toys/merchandise/collectibles
-- Shows live-action people (not animated)` :
+TARGET: the character "${character}" from "${title}".
 
-`LIVE ACTION - Looking for ${celebrityName}:
-✅ VALID if:
-- This shows ${celebrityName} (any age/appearance)
-- ${celebrityName} is recognizable as the same person
-- Group scenes with ${celebrityName} visible
-- ${celebrityName} at different ages/eras
+Answer VALID only if ${character} is clearly and identifiably depicted.
 
-❌ INVALID if:
-- Shows a completely different person
-- Shows toys/merchandise/collectibles
-- Shows only other actors from ${title}
-- Completely unrelated content`}
+Reject:
+- a different character, even from ${title}
+- a character from another production
+- toys, figures, packaging or other merchandise
+- live-action photographs
+- fan art, when you can tell
+- images so small, blurry or obstructed that you cannot be sure
 
-IMPORTANT: Be permissive with uncertain cases. Only reject if clearly wrong.
+If you are not confident, reject. An uncertain match is a rejection.
 
-Respond with exactly one word:
-- VALID: Shows correct ${isAnimated ? 'character' : 'person'}
-- INVALID_WRONG_PERSON: Different person shown
-- INVALID_WRONG_CHARACTER: Different character shown
-- INVALID_MERCHANDISE: Toys/collectibles
-- INVALID_UNRELATED: Completely unrelated`;
+Reply with exactly: VERDICT|CONFIDENCE
+VERDICT is one of VALID, INVALID_WRONG_CHARACTER, INVALID_MERCHANDISE, INVALID_UNRELATED.
+CONFIDENCE is an integer 1-10 for how sure you are of that verdict.
+Example: VALID|8`;
+    }
 
-    const completion = await this.openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { 
-            type: "image_url", 
-            image_url: { 
-              url: `data:image/jpeg;base64,${imageBase64}`,
-              detail: "low" // Cost-efficient
-            }
-          }
-        ]
-      }],
-      max_tokens: 30,
-      temperature: 0.05
-    });
+    const subject = hasReference
+      ? `The FIRST image is a confirmed photograph of ${celebrityName}.
+The SECOND image is the candidate.
 
-    const response = completion.choices[0].message.content.trim();
-    return this.parseVerificationResponse(response);
+Answer VALID only if the person in the second image is the same person as in the first.
+Compare facial structure, not clothing, styling, age or image quality — the same
+person may appear at different ages and in character makeup.`
+      : `TARGET: ${celebrityName}${character && character !== 'Unknown' ? `, as ${character} in ${title}` : ''}.
+
+Answer VALID only if ${celebrityName} is clearly and identifiably the person shown.`;
+
+    return `You are checking images for an autograph print run. Getting the wrong
+person into a print package is a costly error.
+
+${subject}
+
+Reject:
+- a different person, including co-stars and lookalikes
+- a group shot where you cannot confidently pick out the target
+- toys, figures, packaging or other merchandise
+- images so small, blurry or obstructed that you cannot be sure
+
+If you are not confident it is the right person, reject. An uncertain match is a rejection.
+
+Reply with exactly: VERDICT|CONFIDENCE
+VERDICT is one of VALID, INVALID_WRONG_PERSON, INVALID_MERCHANDISE, INVALID_UNRELATED.
+CONFIDENCE is an integer 1-10 for how sure you are of that verdict.
+Example: VALID|8`;
   }
 
-  /**
-   * IMPROVED: Claude Vision verification with consistent criteria
-   */
-  async verifyWithClaude(imagePath, celebrityName, character, title, medium) {
-    const imageBase64 = await this.imageToBase64(imagePath);
-    const isAnimated = medium.includes('animation') || medium.includes('voice') || medium.includes('anime');
-    
-    const prompt = `Identity verification: Does this image show ${isAnimated ? `the character "${character}" from "${title}"` : `${celebrityName} as ${character} from ${title}`}?
+  async verifyWithOpenAI(imagePath, context) {
+    const hasReference = !!context.referencePath;
+    const detail = config.verification.visionDetail;
 
-${isAnimated ? 
-`ANIMATED CONTENT - Checking for "${character}":
-✅ ACCEPT if:
-- Shows ${character} from ${title}
-- ${character} is recognizable
-- Group scenes with ${character} visible
-- Different art styles of ${character}
+    const content = [{ type: 'text', text: this.buildPrompt(context, hasReference) }];
 
-❌ REJECT if:
-- Shows different characters from ${title}
-- Shows characters from different shows
-- Shows toys/merchandise
-- Shows live-action people` :
+    if (hasReference) {
+      content.push({
+        type: 'image_url',
+        image_url: { url: `data:image/jpeg;base64,${await this.imageToBase64(context.referencePath)}`, detail }
+      });
+    }
 
-`LIVE ACTION - Checking for ${celebrityName}:
-✅ ACCEPT if:
-- Shows ${celebrityName} (any age/appearance)
-- ${celebrityName} is recognizable as same person
-- Group scenes with ${celebrityName} visible
-- ${celebrityName} at different life stages
+    content.push({
+      type: 'image_url',
+      image_url: { url: `data:image/jpeg;base64,${await this.imageToBase64(imagePath)}`, detail }
+    });
 
-❌ REJECT if:
-- Shows completely different person
-- Shows toys/merchandise
-- Shows only other actors from ${title}
-- Completely unrelated content`}
+    const completion = await this.openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content }],
+      max_tokens: 10,
+      temperature: 0
+    });
 
-Be permissive with uncertain cases. Only reject if clearly wrong.
+    return this.parseVerificationResponse(completion.choices[0].message.content);
+  }
 
-Respond with exactly one word:
-- VALID: Shows correct ${isAnimated ? 'character' : 'person'}
-- INVALID_WRONG_PERSON: Different person
-- INVALID_WRONG_CHARACTER: Different character
-- INVALID_MERCHANDISE: Toys/collectibles
-- INVALID_UNRELATED: Unrelated content`;
+  async verifyWithClaude(imagePath, context) {
+    const hasReference = !!context.referencePath;
+    const content = [{ type: 'text', text: this.buildPrompt(context, hasReference) }];
 
-    const requestBody = {
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 20,
-      temperature: 0.05,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: 'image/jpeg',
-              data: imageBase64
-            }
-          }
-        ]
-      }]
-    };
+    if (hasReference) {
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: await this.imageToBase64(context.referencePath)
+        }
+      });
+    }
+
+    content.push({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: 'image/jpeg',
+        data: await this.imageToBase64(imagePath)
+      }
+    });
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -245,72 +243,71 @@ Respond with exactly one word:
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        // Overridable because per-image verification is a high-volume call and
+        // a cheaper model may be the right trade for a given roster.
+        model: process.env.ANTHROPIC_VERIFY_MODEL || 'claude-opus-5',
+        max_tokens: 10,
+        temperature: 0,
+        messages: [{ role: 'user', content }]
+      })
     });
 
     if (!response.ok) {
-      throw new Error(`Claude API error: ${response.status}`);
+      // Surface the status. A retired model id or a bad key used to be
+      // swallowed here and silently degraded the run to no verification.
+      const body = await response.text().catch(() => '');
+      throw new Error(`Claude API ${response.status}: ${body.slice(0, 200)}`);
     }
 
     const data = await response.json();
-    const result = data.content[0].text.trim();
-    return this.parseVerificationResponse(result);
+    return this.parseVerificationResponse(data.content[0].text);
   }
 
   /**
-   * SIMPLIFIED: Keyword-based verification (final fallback)
+   * Filename-only check. Can rule an image OUT, can never rule one IN.
    */
-  async verifyWithKeywords(imagePath, celebrityName, character, title) {
+  async verifyWithKeywords(imagePath) {
     const filename = path.basename(imagePath).toLowerCase();
-    
-    // Only reject obvious problematic content
+
     const rejectKeywords = [
-      'funko', 'pop', 'toy', 'figure', 'collectible', 
-      'merchandise', 'packaging', 'box', 'signed', 'autograph'
+      'funko', 'toy', 'figure', 'collectible',
+      'merchandise', 'packaging', 'signed', 'autograph'
     ];
-    
-    const hasRejectKeyword = rejectKeywords.some(keyword => filename.includes(keyword));
-    
-    if (hasRejectKeyword) {
-      return this.verificationResults.INVALID_MERCHANDISE;
+
+    if (rejectKeywords.some(keyword => filename.includes(keyword))) {
+      return { result: this.verificationResults.INVALID_MERCHANDISE, confidence: 5 };
     }
 
-    // Default to valid for targeted searches
-    return this.verificationResults.VALID;
+    return { result: this.verificationResults.UNVERIFIED, confidence: 0 };
   }
 
   /**
-   * IMPROVED: Parse verification response with permissive approach
+   * Parse "VERDICT|CONFIDENCE". Anything unparseable is a failure, not a pass.
    */
   parseVerificationResponse(response) {
-    const upperResponse = response.toUpperCase();
-    
-    // Accept clear VALID responses
-    if (upperResponse.includes('VALID') && !upperResponse.includes('INVALID')) {
-      return this.verificationResults.VALID;
+    const text = (response || '').trim().toUpperCase();
+
+    const [verdictPart, confidencePart] = text.split('|').map(part => (part || '').trim());
+    const parsedConfidence = parseInt(confidencePart, 10);
+    const confidence = Number.isFinite(parsedConfidence) ? parsedConfidence : 0;
+
+    const verdict = (() => {
+      if (verdictPart === 'VALID') return this.verificationResults.VALID;
+      if (verdictPart.includes('WRONG_PERSON')) return this.verificationResults.INVALID_WRONG_PERSON;
+      if (verdictPart.includes('WRONG_CHARACTER')) return this.verificationResults.INVALID_WRONG_CHARACTER;
+      if (verdictPart.includes('MERCHANDISE')) return this.verificationResults.INVALID_MERCHANDISE;
+      if (verdictPart.includes('UNRELATED')) return this.verificationResults.INVALID_UNRELATED;
+      if (verdictPart.includes('INVALID')) return this.verificationResults.INVALID_UNRELATED;
+      return this.verificationResults.VERIFICATION_FAILED;
+    })();
+
+    // A pass the model is unsure about does not pass.
+    if (verdict === this.verificationResults.VALID && confidence < config.verification.minConfidence) {
+      return { result: this.verificationResults.INVALID_LOW_CONFIDENCE, confidence };
     }
-    
-    // Parse specific rejections
-    if (upperResponse.includes('WRONG_PERSON') || upperResponse.includes('DIFFERENT_PERSON')) {
-      return this.verificationResults.INVALID_WRONG_PERSON;
-    }
-    if (upperResponse.includes('WRONG_CHARACTER') || upperResponse.includes('DIFFERENT_CHARACTER')) {
-      return this.verificationResults.INVALID_WRONG_CHARACTER;
-    }
-    if (upperResponse.includes('MERCHANDISE') || upperResponse.includes('TOY') || upperResponse.includes('COLLECTIBLE')) {
-      return this.verificationResults.INVALID_MERCHANDISE;
-    }
-    if (upperResponse.includes('UNRELATED') || upperResponse.includes('COMPLETELY_DIFFERENT')) {
-      return this.verificationResults.INVALID_UNRELATED;
-    }
-    
-    // Handle other invalid responses
-    if (upperResponse.includes('INVALID') || upperResponse.includes('REJECT')) {
-      return this.verificationResults.INVALID_UNRELATED;
-    }
-    
-    // PERMISSIVE: Default to valid for unclear responses
-    return this.verificationResults.VALID;
+
+    return { result: verdict, confidence };
   }
 
   /**
@@ -322,66 +319,72 @@ Respond with exactly one word:
   }
 
   /**
-   * OPTIMIZED: Batch verification with better error handling
+   * Verify a batch of candidates for one role.
+   *
+   * There is deliberately no "too many failures, let the rest through"
+   * escape hatch. That path existed to avoid losing a whole batch, but it
+   * triggers precisely when verification is broken — an expired key, a
+   * retired model — and silently shipped unverified images as verified.
+   * A failed batch should look like a failed batch.
    */
-  async verifyImages(images, celebrityName, character, title, medium) {
-    console.log(`🔍 Starting batch verification of ${images.length} images for ${celebrityName} as ${character}`);
-    
-    const results = {
-      valid: [],
-      invalid: [],
-      totalCost: 0,
-      serviceUsage: {}
-    };
+  async verifyImages(images, celebrityName, character, title, medium, referencePath = null) {
+    console.log(`🔍 Verifying ${images.length} images for ${celebrityName} as ${character}`);
 
-    let consecutiveFailures = 0;
-    const maxConsecutiveFailures = 3;
+    if (referencePath) {
+      console.log(`🪪 Comparing against reference portrait of ${celebrityName}`);
+    } else if (this.hasOpenAI || this.hasAnthropic) {
+      console.log(`ℹ️ No reference portrait — falling back to unaided recognition of ${celebrityName}`);
+    }
+
+    if (!this.hasOpenAI && !this.hasAnthropic) {
+      console.error(
+        '❌ No vision service configured (OPENAI_API_KEY / ANTHROPIC_API_KEY). ' +
+        'Identity cannot be checked, so no image can be confirmed as the right person.'
+      );
+    }
+
+    const results = { valid: [], invalid: [], totalCost: 0, serviceUsage: {}, verdictCounts: {} };
+    const context = { celebrityName, character, title, medium, referencePath };
 
     for (const image of images) {
+      let verification;
+
       try {
-        const verification = await this.verifyImage(image.filepath, celebrityName, character, title, medium);
-        
-        // Track costs and service usage
-        results.totalCost += verification.cost;
-        results.serviceUsage[verification.service] = (results.serviceUsage[verification.service] || 0) + 1;
-        
-        if (verification.result === this.verificationResults.VALID) {
-          results.valid.push({
-            ...image,
-            verification: verification
-          });
-          consecutiveFailures = 0; // Reset failure count
-        } else {
-          results.invalid.push({
-            ...image,
-            verification: verification,
-            reason: verification.result
-          });
-        }
-        
+        verification = await this.verifyImage(image.filepath, context);
       } catch (error) {
-        console.error(`❌ Failed to verify ${image.filename}: ${error.message}`);
-        consecutiveFailures++;
-        
-        // If too many consecutive failures, include remaining images to avoid losing everything
-        if (consecutiveFailures >= maxConsecutiveFailures) {
-          console.warn(`⚠️ Too many consecutive failures, including remaining images`);
-          results.valid.push({
-            ...image,
-            verification: { result: this.verificationResults.VALID, service: 'failure_fallback' }
-          });
-        } else {
-          results.invalid.push({
-            ...image,
-            verification: { result: this.verificationResults.VERIFICATION_FAILED, error: error.message }
-          });
-        }
+        verification = {
+          result: this.verificationResults.VERIFICATION_FAILED,
+          service: 'none',
+          cost: 0,
+          confidence: 0,
+          error: error.message
+        };
+      }
+
+      results.totalCost += verification.cost || 0;
+      results.serviceUsage[verification.service] = (results.serviceUsage[verification.service] || 0) + 1;
+      results.verdictCounts[verification.result] = (results.verdictCounts[verification.result] || 0) + 1;
+
+      if (verification.result === this.acceptOnly) {
+        results.valid.push({ ...image, verification });
+      } else {
+        results.invalid.push({ ...image, verification, reason: verification.result });
       }
     }
 
-    console.log(`✅ Verification complete: ${results.valid.length}/${images.length} valid images`);
+    console.log(`✅ AI SELECTED: ${results.valid.length} of ${images.length} images`);
+    console.log(`📊 Verdicts:`, results.verdictCounts);
     console.log(`💰 Total verification cost: $${results.totalCost.toFixed(4)}`);
-    console.log(`📊 Service usage:`, results.serviceUsage);
+
+    const unresolved = (results.verdictCounts[this.verificationResults.VERIFICATION_FAILED] || 0)
+      + (results.verdictCounts[this.verificationResults.UNVERIFIED] || 0);
+
+    if (unresolved > 0) {
+      console.warn(
+        `⚠️ ${unresolved} image(s) could not be checked and were rejected. ` +
+        `If this is most of the batch, verification is misconfigured — check the API keys above.`
+      );
+    }
 
     return results;
   }
@@ -413,7 +416,7 @@ Respond with just a number 1-10.`;
               type: "image_url", 
               image_url: { 
                 url: `data:image/jpeg;base64,${imageBase64}`,
-                detail: "low"
+                detail: config.verification.visionDetail
               }
             }
           ]
@@ -445,7 +448,7 @@ Respond with just a number 1-10.`;
       hasGoogle: this.hasGoogle,
       primaryService: this.hasOpenAI ? 'OpenAI Vision' : this.hasAnthropic ? 'Claude Vision' : 'Keywords Only',
       estimatedCostPer100Images: this.hasOpenAI ? '$0.15' : this.hasAnthropic ? '$0.24' : '$0.00',
-      approach: 'Permissive - only reject clear mismatches'
+      approach: `Strict - accept only a confident match (>= ${config.verification.minConfidence}/10)`
     };
   }
 
