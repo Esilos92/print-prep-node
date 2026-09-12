@@ -16,8 +16,21 @@ class AIFirstImageFetcher {
     
     // ENHANCED: More comprehensive blocked domains
     this.blockedDomains = [
+      // Watermarked stock
       'gettyimages.com', 'shutterstock.com', 'alamy.com', 'istockphoto.com',
-      'dreamstime.com', 'depositphotos.com', 'stockphoto.com', 'bigstockphoto.com'
+      'dreamstime.com', 'depositphotos.com', 'stockphoto.com', 'bigstockphoto.com',
+      // Retail and auction: these serve product photography, which for older
+      // titles means VHS sleeves and DVD cases rather than stills.
+      'ebay.com', 'ebayimg.com', 'amazon.com', 'ssl-images-amazon.com',
+      'media-amazon.com', 'etsy.com', 'walmart.com', 'mercari.com',
+      'alibaba.com', 'aliexpress.com', 'discogs.com'
+    ];
+
+    // Product-photo markers in titles and URLs.
+    this.packagingExclusions = [
+      'vhs', 'dvd', 'blu-ray', 'bluray', 'laserdisc', 'box set', 'boxset',
+      'box art', 'cover art', 'slipcover', 'steelbook', 'for sale',
+      'buy now', 'listing', 'auction', 'sealed', 'shrink wrap'
     ];
     
     /**
@@ -335,7 +348,7 @@ class AIFirstImageFetcher {
       const params = {
         api_key: config.api.serpApiKey,
         engine: 'google_images',
-        q: query,
+        q: this.withExclusions(query),
         num: Math.min(maxResults, 100),
         ijn: 0,
         safe: 'active',
@@ -378,6 +391,17 @@ class AIFirstImageFetcher {
     }
   }
   
+  /**
+   * Append negative terms so retail listings never enter the candidate pool.
+   */
+  withExclusions(query) {
+    const exclusions = config.search.excludeTerms
+      .map(term => (term.includes(' ') ? `-"${term}"` : `-${term}`))
+      .join(' ');
+
+    return exclusions ? `${query} ${exclusions}` : query;
+  }
+
   /**
    * ENHANCED: Calculate quality score for initial ranking
    */
@@ -441,6 +465,13 @@ class AIFirstImageFetcher {
       
       // ENHANCED: Block autograph indicators
       for (const exclusion of this.autographExclusions) {
+        if (title.includes(exclusion) || url.includes(exclusion)) {
+          return false;
+        }
+      }
+
+      // Block home-video packaging and retail listings before download.
+      for (const exclusion of this.packagingExclusions) {
         if (title.includes(exclusion) || url.includes(exclusion)) {
           return false;
         }

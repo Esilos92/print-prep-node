@@ -48,7 +48,20 @@ const config = {
     minWidth: int(process.env.MIN_SEARCH_WIDTH, 900),
     minHeight: int(process.env.MIN_SEARCH_HEIGHT, 900),
     minFileSizeBytes: int(process.env.MIN_FILE_SIZE_BYTES, 50 * 1024),
-    maxAspectRatio: float(process.env.MAX_ASPECT_RATIO, 2.5)
+    maxAspectRatio: float(process.env.MAX_ASPECT_RATIO, 2.5),
+
+    /**
+     * Terms excluded from every image query.
+     *
+     * For a pre-2000 title, a large share of what exists online is retail
+     * listings — VHS sleeves, DVD cases, eBay auctions — and photographs of
+     * that packaging were reaching the finished print packages. Excluding
+     * them at the search engine is far cheaper than paying for a vision call
+     * to reject each one afterwards.
+     */
+    excludeTerms: (process.env.SEARCH_EXCLUDE_TERMS
+      || 'vhs,dvd,bluray,blu-ray,ebay,amazon,etsy,boxset,box set,for sale,poster for sale,laserdisc'
+    ).split(',').map(t => t.trim()).filter(Boolean)
   },
 
   print: {

@@ -126,6 +126,31 @@ class AIImageVerifier {
    * cases. Only reject if clearly wrong.") is how co-stars, lookalikes and
    * crowd shots ended up in finished print packages.
    */
+  /**
+   * Product-photography rejections, named explicitly.
+   *
+   * "Toys/collectibles" did not cover a photograph of a VHS sleeve or a DVD
+   * case, so home-video packaging fell straight through the category meant to
+   * catch it — and because such a cover genuinely does show the actor in
+   * character, it was never "clearly wrong" either. For a pre-2000 film,
+   * retail listings are a large share of what exists online, so this has to
+   * be named rather than implied.
+   */
+  get packagingRejections() {
+    return `- VHS tapes, DVD or Blu-ray cases, box art, cover sleeves, discs
+- photographs of any retail packaging, spine, or shrink-wrap
+- eBay, Amazon, Etsy or marketplace listing photos
+- posters, lobby cards or standees photographed for sale
+- screenshots of a storefront or auction page`;
+  }
+
+  get packagingCaveat() {
+    return `Packaging is a hard reject even when the artwork on it clearly shows the
+right person, and even if you are confident about the identity. The artwork
+being correct is not enough — the photograph is of a product, and a product
+photo cannot be sold as an autograph print.`;
+  }
+
   buildPrompt({ celebrityName, character, title, medium }, hasReference) {
     const isAnimated = (medium || '').includes('animation')
       || (medium || '').includes('voice')
@@ -141,10 +166,13 @@ Answer VALID only if ${character} is clearly and identifiably depicted.
 Reject:
 - a different character, even from ${title}
 - a character from another production
-- toys, figures, packaging or other merchandise
+- toys, figures, statues or other merchandise
 - live-action photographs
 - fan art, when you can tell
 - images so small, blurry or obstructed that you cannot be sure
+${this.packagingRejections}
+
+${this.packagingCaveat}
 
 If you are not confident, reject. An uncertain match is a rejection.
 
@@ -173,8 +201,11 @@ ${subject}
 Reject:
 - a different person, including co-stars and lookalikes
 - a group shot where you cannot confidently pick out the target
-- toys, figures, packaging or other merchandise
+- toys, figures, statues or other merchandise
 - images so small, blurry or obstructed that you cannot be sure
+${this.packagingRejections}
+
+${this.packagingCaveat}
 
 If you are not confident it is the right person, reject. An uncertain match is a rejection.
 
