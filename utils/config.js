@@ -55,12 +55,18 @@ const config = {
      *
      * For a pre-2000 title, a large share of what exists online is retail
      * listings — VHS sleeves, DVD cases, eBay auctions — and photographs of
-     * that packaging were reaching the finished print packages. Excluding
-     * them at the search engine is far cheaper than paying for a vision call
-     * to reject each one afterwards.
+     * that packaging were reaching the finished print packages.
+     *
+     * Kept deliberately narrow. A negative term here matches the whole page,
+     * not the image, so excluding "dvd" would also drop a Wikipedia or IMDb
+     * page that happens to mention a DVD release — which for an older title
+     * is most of the pages carrying good stills. Broad markers like dvd,
+     * blu-ray and amazon are filtered instead at download time against the
+     * image's own title and URL (fetchImages.packagingExclusions), where
+     * matching is precise. Only high-precision terms belong here.
      */
     excludeTerms: (process.env.SEARCH_EXCLUDE_TERMS
-      || 'vhs,dvd,bluray,blu-ray,ebay,amazon,etsy,boxset,box set,for sale,poster for sale,laserdisc'
+      || 'ebay,etsy,for sale,boxset,box set,laserdisc'
     ).split(',').map(t => t.trim()).filter(Boolean)
   },
 

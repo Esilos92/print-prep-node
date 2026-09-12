@@ -185,7 +185,7 @@ class JobTracker {
  * directory from it, and that directory is later removed recursively. Names
  * are people's names, so an allowlist costs nothing and closes the traversal.
  */
-const CELEBRITY_NAME = /^[\p{L}\p{M}0-9 .'\-]{1,80}$/u;
+const CELEBRITY_NAME = /^[\p{L}\p{M}0-9 .,'\-]{1,80}$/u;
 
 function invalidCelebrityName(value) {
   if (!value || typeof value !== 'string' || !value.trim()) {
