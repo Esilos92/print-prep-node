@@ -46,9 +46,11 @@ function requireApiKey(req, res, next) {
  * never notices, tight enough that a loop cannot drain SerpApi, OpenAI and
  * Drive quota unattended.
  */
+const MAX_JOBS_PER_HOUR = parseInt(process.env.MAX_JOBS_PER_HOUR, 10) || 30;
+
 const jobLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: parseInt(process.env.MAX_JOBS_PER_HOUR, 10) || 30,
+  limit: MAX_JOBS_PER_HOUR,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many jobs started from this address. Try again later.' }
@@ -652,7 +654,7 @@ function start() {
       console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
       console.log(`🔧 Health check: http://localhost:${PORT}/api/health`);
       console.log(`🔒 API key: ${API_KEY ? 'required' : 'NOT SET — endpoints are open to anyone who can reach this port'}`);
-      console.log(`🚦 Limits: ${MAX_CONCURRENT_JOBS} concurrent job(s), ${jobLimiter.limit ?? ''} jobs/hour per address`);
+      console.log(`🚦 Limits: ${MAX_CONCURRENT_JOBS} concurrent job(s), ${MAX_JOBS_PER_HOUR} jobs/hour per address`);
       console.log(`💾 Persistent storage: ${JOBS_DATA_FILE}, ${DOWNLOAD_LINKS_FILE}`);
     });
   }).catch(error => {

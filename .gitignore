@@ -65,3 +65,10 @@ temp/
 
 # Role discovery cache
 .cache/
+
+# Runtime job state
+jobs_data.json
+download_links.json
+
+# TypeScript incremental build info
+dashboard/tsconfig.tsbuildinfo
