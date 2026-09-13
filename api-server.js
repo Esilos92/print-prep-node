@@ -571,17 +571,36 @@ app.get('/api/health', async (req, res) => {
 // Start the API server
 const PORT = process.env.API_PORT || 4000;
 
-// 🎯 NEW: Load persisted data before starting server
-loadPersistedData().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
-    console.log(`📊 Dashboard should connect to: http://159.223.131.137:${PORT}`);
-    console.log(`🔧 Health check: http://159.223.131.137:${PORT}/api/health`);
-    console.log(`💾 Persistent storage: ${JOBS_DATA_FILE}, ${DOWNLOAD_LINKS_FILE}`);
+/**
+ * Start listening. Called only when this file is run directly.
+ *
+ * Binding happened at require time before, so importing the module for any
+ * reason — a test, a script reusing JobTracker — started a second server and
+ * died with EADDRINUSE against the running instance.
+ */
+function start() {
+  return loadPersistedData().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
+      console.log(`🔧 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`💾 Persistent storage: ${JOBS_DATA_FILE}, ${DOWNLOAD_LINKS_FILE}`);
+    });
+  }).catch(error => {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   });
-}).catch(error => {
-  console.error('❌ Failed to start server:', error);
-  process.exit(1);
-});
+}
 
-module.exports = { app, activeJobs, completedJobs, JobTracker, parseProgressFromOutput, monitorJobProgress };
+if (require.main === module) {
+  start();
+}
+
+module.exports = {
+  app,
+  start,
+  activeJobs,
+  completedJobs,
+  JobTracker,
+  parseProgressFromOutput,
+  monitorJobProgress
+};
