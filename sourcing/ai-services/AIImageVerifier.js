@@ -279,7 +279,6 @@ Example: VALID|8`;
         // a cheaper model may be the right trade for a given roster.
         model: process.env.ANTHROPIC_VERIFY_MODEL || 'claude-opus-5',
         max_tokens: 10,
-        temperature: 0,
         messages: [{ role: 'user', content }]
       })
     });
