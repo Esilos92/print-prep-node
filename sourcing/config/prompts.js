@@ -8,7 +8,26 @@ const PROMPTS = {
   /**
    * SIMPLE: Basic role discovery - trust OpenAI
    */
-  FETCH_ROLES: (actorName) => `List the 5 most notable acting roles for "${actorName}".
+  /**
+   * Role discovery.
+   *
+   * The distinctness rules are the point of this prompt. Asking for "the 5
+   * most notable acting ROLES" is answered correctly by naming one character
+   * across four sequels — Murtaugh in Lethal Weapon 1-4 really is four
+   * acting roles — which yields four near-identical image sets and one
+   * sellable product instead of five.
+   *
+   * `count` is deliberately over-requested: duplicates are stripped in code
+   * afterwards, so asking for extras leaves enough survivors.
+   */
+  FETCH_ROLES: (actorName, count = 8) => `List the ${count} most notable acting roles for "${actorName}".
+
+HARD RULES — these matter more than fame:
+- Every entry must be a DIFFERENT character.
+- Never list the same character twice, even across sequels or seasons.
+- At most ONE entry per film series or franchise. If an actor is known for a
+  series, pick its single best-known instalment and move on.
+- Prefer a spread across different decades, genres and formats.
 
 Include any type of acting work:
 - Movies (big budget, indie, horror, etc.)
@@ -22,7 +41,8 @@ Format as JSON:
 [
   {
     "character": "Exact Character Name",
-    "title": "Show/Movie Title", 
+    "title": "Show/Movie Title",
+    "franchise": "Series or franchise name, or null if standalone",
     "medium": "live_action_movie",
     "year": "YYYY",
     "popularity": "high"

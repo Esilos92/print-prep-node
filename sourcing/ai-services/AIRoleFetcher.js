@@ -55,28 +55,19 @@ class AIRoleFetcher {
     if (!this.hasOpenAI) return null;
 
     try {
-      // FIXED: Simple, clear prompt
-      const simplePrompt = `List the 5 most notable acting roles for "${celebrityName}". Include any level of fame - main roles, supporting roles, voice acting, recent work, indie films, etc.
-
-Use exact character names from official sources.
-
-Format as JSON:
-[
-  {
-    "character": "Exact Character Name",
-    "title": "Show/Movie Title", 
-    "medium": "live_action_movie",
-    "year": "YYYY",
-    "popularity": "high"
-  }
-]`;
+      /**
+       * Use the shared prompt. This used to be an inline copy that had drifted
+       * from PROMPTS.FETCH_ROLES, so the central prompts file was dead code
+       * and edits to it silently did nothing.
+       */
+      const simplePrompt = PROMPTS.FETCH_ROLES(celebrityName, 8);
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are an entertainment expert. Always use exact character names from official sources. Include roles from any level of production - major films, indie films, TV shows, voice acting, etc."
+            content: "You are an entertainment expert. Always use exact character names from official sources. Every role you list must be a different character, and no two may come from the same film series or franchise."
           },
           {
             role: "user", 
@@ -105,15 +96,18 @@ Format as JSON:
     try {
       const broadPrompt = `Find ANY notable acting work for "${celebrityName}" - include small roles, indie films, streaming content, voice work, or recent performances.
 
+Each entry must be a DIFFERENT character, and no two entries may come from the
+same film series or franchise.
+
 Return what you can find:
-[{"character": "Character Name", "title": "Project Title", "medium": "live_action_movie", "year": "YYYY", "popularity": "medium"}]`;
+[{"character": "Character Name", "title": "Project Title", "franchise": "Series name or null", "medium": "live_action_movie", "year": "YYYY", "popularity": "medium"}]`;
 
       const completion = await this.openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are researching performers. Find any acting work, no matter how small."
+            content: "You are researching performers. Find any acting work, no matter how small. Never list the same character or franchise twice."
           },
           {
             role: "user", 
@@ -144,10 +138,12 @@ Return what you can find:
         throw new Error('No valid roles extracted from AI response');
       }
 
-      const validRoles = parsed
-        .filter(role => role.character && role.title)
-        .map(role => this.normalizeRole(role))
-        .slice(0, 8);
+      const validRoles = this.enforceDistinctRoles(
+        parsed
+          .filter(role => role.character && role.title)
+          .map(role => this.normalizeRole(role)),
+        celebrityName
+      ).slice(0, 5);
 
       return validRoles;
       
@@ -183,6 +179,71 @@ Return what you can find:
         return null;
       }
     }
+  }
+
+  /**
+   * Collapse a role list to distinct characters and one entry per franchise.
+   *
+   * The prompt asks for this, but a prompt is a request, not a guarantee —
+   * and the failure is expensive and silent: four Lethal Weapon entries
+   * become four near-identical image sets sold as four products. Entries
+   * arrive best-known first, so keeping the first occurrence keeps the
+   * strongest instalment.
+   */
+  enforceDistinctRoles(roles, celebrityName) {
+    const seenCharacters = new Set();
+    const seenFranchises = new Set();
+    const kept = [];
+
+    for (const role of roles) {
+      const characterKey = this.normalizeKey(role.character);
+      if (!characterKey) continue;
+
+      if (seenCharacters.has(characterKey)) {
+        console.log(`  ↩︎ Dropped duplicate character: ${role.character} (${role.title})`);
+        continue;
+      }
+
+      const franchiseKey = this.franchiseKey(role);
+      if (franchiseKey && seenFranchises.has(franchiseKey)) {
+        console.log(`  ↩︎ Dropped same-franchise entry: ${role.character} (${role.title})`);
+        continue;
+      }
+
+      seenCharacters.add(characterKey);
+      if (franchiseKey) seenFranchises.add(franchiseKey);
+      kept.push(role);
+    }
+
+    if (kept.length < roles.length) {
+      console.log(`🎭 ${roles.length} roles -> ${kept.length} distinct for ${celebrityName}`);
+    }
+
+    return kept;
+  }
+
+  normalizeKey(value) {
+    return (value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Reduce a title to the series it belongs to, so sequels collide:
+   * "Lethal Weapon 4" and "Lethal Weapon II" both key to "lethal weapon".
+   */
+  franchiseKey(role) {
+    if (role.franchise) return this.normalizeKey(role.franchise);
+
+    const base = (role.title || '')
+      .replace(/[:\u2013\u2014-].*$/, '')                      // drop subtitles
+      .replace(/\b(part|chapter|vol|volume|season)\b.*$/i, '')  // drop "Part Two"
+      .replace(/\b[0-9]+\b\s*$/, '')                           // trailing digits
+      .replace(/\b(i{1,3}|iv|v|vi{1,3}|ix|x)\b\s*$/i, '');      // roman numerals
+
+    return this.normalizeKey(base);
   }
 
   /**

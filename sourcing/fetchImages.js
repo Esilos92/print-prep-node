@@ -3,25 +3,46 @@ const fs = require('fs').promises;
 const path = require('path');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
+const progress = require('../utils/progress');
 const AIImageVerifier = require('./ai-services/AIImageVerifier');
+const ReferencePortrait = require('./ai-services/ReferencePortrait');
 
 class AIFirstImageFetcher {
   
   constructor() {
     // Initialize AI verifier - this is our smart filter
     this.aiVerifier = new AIImageVerifier();
+    this.referencePortrait = new ReferencePortrait();
     
     // ENHANCED: More comprehensive blocked domains
     this.blockedDomains = [
+      // Watermarked stock
       'gettyimages.com', 'shutterstock.com', 'alamy.com', 'istockphoto.com',
-      'dreamstime.com', 'depositphotos.com', 'stockphoto.com', 'bigstockphoto.com'
+      'dreamstime.com', 'depositphotos.com', 'stockphoto.com', 'bigstockphoto.com',
+      // Retail and auction: these serve product photography, which for older
+      // titles means VHS sleeves and DVD cases rather than stills.
+      'ebay.com', 'ebayimg.com', 'amazon.com', 'ssl-images-amazon.com',
+      'media-amazon.com', 'etsy.com', 'walmart.com', 'mercari.com',
+      'alibaba.com', 'aliexpress.com', 'discogs.com'
+    ];
+
+    // Product-photo markers in titles and URLs.
+    this.packagingExclusions = [
+      'vhs', 'dvd', 'blu-ray', 'bluray', 'laserdisc', 'box set', 'boxset',
+      'box art', 'cover art', 'slipcover', 'steelbook', 'for sale',
+      'buy now', 'listing', 'auction', 'sealed', 'shrink wrap'
     ];
     
-    // ENHANCED: Higher resolution requirements for print quality
+    /**
+     * Floor for a candidate worth downloading. This used to read
+     * MIN_WIDTH_8X10 / MIN_HEIGHT_8X10 — the finished PRINT size — which at
+     * the shipped values demanded every web image be at least 2400x3000 and
+     * rejected almost everything. Print suitability is decided later, on
+     * measured pixels, by helpers.getBestFormat.
+     */
     this.minResolution = {
-      width: parseInt(process.env.MIN_WIDTH_8X10) || 800,  // Increased from 600
-      height: parseInt(process.env.MIN_HEIGHT_8X10) || 600, // Increased from 400
-      totalPixels: (parseInt(process.env.MIN_WIDTH_8X10) || 800) * (parseInt(process.env.MIN_HEIGHT_8X10) || 600)
+      width: config.search.minWidth,
+      height: config.search.minHeight
     };
     
     // ENHANCED: Strict autograph and quality exclusions
@@ -80,6 +101,7 @@ class AIFirstImageFetcher {
         role
       );
       
+      progress.counts({ downloaded: downloadedImages.length });
       logger.info(`📥 Downloaded ${downloadedImages.length} images for AI evaluation`);
       
       // AI VERIFICATION
@@ -87,32 +109,52 @@ class AIFirstImageFetcher {
       
       if (enableAIVerification) {
         logger.info(`🤖 AI taking over - intelligent quality selection...`);
+
+        // A confirmed portrait turns "is this <name>?" into "are these the
+        // same person?", which is a much more reliable question to ask.
+        let referencePath = null;
+        if (config.verification.useReferenceImage) {
+          referencePath = await fetcher.referencePortrait.getPortrait(
+            celebrityName,
+            path.join(workDir, 'reference')
+          );
+        }
+
         try {
           const verificationResults = await fetcher.aiVerifier.verifyImages(
             downloadedImages,
             celebrityName,
             role.character || role.characterName || 'Unknown',
             role.title || role.name,
-            role.medium || role.media_type || 'unknown'
+            role.medium || role.media_type || 'unknown',
+            referencePath
           );
-          
+
           const finalValidImages = verificationResults.valid;
-          
-          logger.info(`✅ AI SELECTED: ${finalValidImages.length} premium images`);
+
+          logger.info(`✅ AI SELECTED: ${finalValidImages.length} verified images`);
           logger.info(`💰 AI decision cost: $${verificationResults.totalCost.toFixed(4)}`);
-          
-          // Clean up what AI rejected
+
           await fetcher.cleanupRejectedImages(verificationResults.invalid);
-          
+
           return finalValidImages;
-          
+
         } catch (verificationError) {
-          logger.warn(`⚠️ AI verification failed: ${verificationError.message}`);
-          logger.info(`📦 Returning ${downloadedImages.length} pre-filtered images`);
-          return downloadedImages;
+          /**
+           * Previously this returned every downloaded image unverified, which
+           * is how a broken verifier turned into wrong-person prints. If
+           * identity cannot be checked, nothing from this role is trustworthy.
+           */
+          logger.error(`❌ AI verification failed for ${role.name}: ${verificationError.message}`);
+          logger.error(`   Dropping ${downloadedImages.length} unverified image(s) rather than shipping them.`);
+          await fetcher.cleanupRejectedImages(downloadedImages);
+          return [];
         }
       } else {
-        logger.info(`📦 AI verification disabled, returning ${downloadedImages.length} quality-filtered images`);
+        logger.warn(
+          `⚠️ AI verification disabled (ENABLE_AI_VERIFICATION=false) — ` +
+          `returning ${downloadedImages.length} images with no identity check`
+        );
         return downloadedImages;
       }
       
@@ -132,6 +174,21 @@ class AIFirstImageFetcher {
     const characterName = role.character || role.characterName || 'Unknown';
     const showTitle = role.title || role.name || 'Unknown';
     const searchStrategy = role.searchStrategy || 'character_first';
+
+    /**
+     * Prefer the terms SearchOptimizer produced for this specific role.
+     * They were being computed, logged, paid for and then thrown away here
+     * while the templates below ran instead.
+     */
+    if (Array.isArray(role.finalSearchTerms) && role.finalSearchTerms.length > 0) {
+      const aiTerms = role.finalSearchTerms.filter(term => typeof term === 'string' && term.trim());
+      if (aiTerms.length > 0) {
+        logger.info(`🎯 Using ${aiTerms.length} AI-generated search terms for ${characterName}`);
+        return aiTerms.slice(0, 8).map(term => this.addQualityHints(term));
+      }
+    }
+
+    logger.info(`ℹ️ No AI search terms for ${characterName}; using template queries`);
     
     // ENHANCED: Strategy-based query generation
     switch (searchStrategy) {
@@ -291,12 +348,14 @@ class AIFirstImageFetcher {
       const params = {
         api_key: config.api.serpApiKey,
         engine: 'google_images',
-        q: query,
+        q: this.withExclusions(query),
         num: Math.min(maxResults, 100),
         ijn: 0,
         safe: 'active',
         imgtype: 'photo',
-        imgsz: 'l', // Large images preferred
+        // Ask the engine for large results up front rather than filtering
+        // most of the page away after the fact.
+        imgsz: 'l',
         imgc: 'color' // Color images preferred
       };
 
@@ -332,6 +391,17 @@ class AIFirstImageFetcher {
     }
   }
   
+  /**
+   * Append negative terms so retail listings never enter the candidate pool.
+   */
+  withExclusions(query) {
+    const exclusions = config.search.excludeTerms
+      .map(term => (term.includes(' ') ? `-"${term}"` : `-${term}`))
+      .join(' ');
+
+    return exclusions ? `${query} ${exclusions}` : query;
+  }
+
   /**
    * ENHANCED: Calculate quality score for initial ranking
    */
@@ -395,6 +465,13 @@ class AIFirstImageFetcher {
       
       // ENHANCED: Block autograph indicators
       for (const exclusion of this.autographExclusions) {
+        if (title.includes(exclusion) || url.includes(exclusion)) {
+          return false;
+        }
+      }
+
+      // Block home-video packaging and retail listings before download.
+      for (const exclusion of this.packagingExclusions) {
         if (title.includes(exclusion) || url.includes(exclusion)) {
           return false;
         }
@@ -529,26 +606,21 @@ class AIFirstImageFetcher {
    * ENHANCED: Validate image quality
    */
   validateImageQuality(dimensions, fileSize, filepath) {
-    // Resolution check
-    if (dimensions.width < this.minResolution.width || 
+    if (dimensions.width < this.minResolution.width ||
         dimensions.height < this.minResolution.height) {
       return false;
     }
-    
-    // File size check (avoid overly compressed images)
-    const pixels = dimensions.width * dimensions.height;
-    const expectedMinSize = pixels * 0.1; // Very rough estimate
-    
-    if (fileSize < expectedMinSize) {
-      return false; // Likely over-compressed
+
+    if (fileSize < config.search.minFileSizeBytes) {
+      return false; // Thumbnail or heavily recompressed
     }
-    
-    // Aspect ratio check (avoid extreme ratios)
+
     const aspectRatio = dimensions.width / dimensions.height;
-    if (aspectRatio > 3 || aspectRatio < 0.3) {
-      return false; // Weird aspect ratio
+    const maxRatio = config.search.maxAspectRatio;
+    if (aspectRatio > maxRatio || aspectRatio < 1 / maxRatio) {
+      return false; // Banner or strip, not a portrait subject
     }
-    
+
     return true;
   }
   

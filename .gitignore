@@ -58,3 +58,7 @@ uploads/
 downloads/
 temp/
 *.zip
+
+# Env templates are tracked as .env.example only
+.env.backup
+.env.*.backup

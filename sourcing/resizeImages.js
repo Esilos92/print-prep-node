@@ -2,7 +2,8 @@ const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
-const { sanitizeFilename, generateFilename } = require('../utils/helpers');
+const config = require('../utils/config');
+const { sanitizeFilename, generateFilename, getBestFormat, effectiveDpi } = require('../utils/helpers');
 
 class ImageResizer {
   
@@ -44,17 +45,28 @@ class ImageResizer {
             image.formatIndex = counter;
             image.currentFormat = format;
             
-            const outputPath = await this.resizeToFormat(image, format, formatDir);
-            
+            const result = await this.resizeToFormat(image, format, formatDir);
+            const dpi = effectiveDpi(
+              image.actualWidth || image.width,
+              image.actualHeight || image.height,
+              format
+            );
+
             resizedImages.push({
               ...image,
-              resizedPath: outputPath,
+              resizedPath: result.outputPath,
               format: format,
               originalPath: image.filepath,
-              formatIndex: counter
+              formatIndex: counter,
+              outputWidth: result.width,
+              outputHeight: result.height,
+              printDpi: dpi
             });
-            
-            logger.info(`Resized ${image.filename} to ${format} (#${counter})`);
+
+            logger.info(
+              `Resized ${image.filename} to ${format} (#${counter}) ` +
+              `- ${result.width}x${result.height} @ ${dpi} DPI`
+            );
             
             // Increment the appropriate counter
             if (format === '8x10') {
@@ -69,9 +81,17 @@ class ImageResizer {
         }
       }
       
+      const printable = new Set(resizedImages.map(i => i.filename)).size;
+      const dropped = validatedImages.length - printable;
+
       logger.info(`Resizing complete: ${resizedImages.length} output files`);
       logger.info(`- 8x10 images: ${counter8x10 - 1}`);
       logger.info(`- 11x17 images: ${counter11x17 - 1}`);
+      if (dropped > 0) {
+        logger.warn(
+          `- ${dropped} image(s) dropped: below ${config.print.minDpi} DPI at every sheet size`
+        );
+      }
       
       return resizedImages;
       
@@ -82,68 +102,59 @@ class ImageResizer {
   }
   
   /**
-   * NEW: Determine which formats an image should be resized to based on dimensions
+   * Print formats this image can actually be output at.
+   *
+   * Eligibility is decided by real detail (see helpers.effectiveDpi), not by
+   * aspect ratio alone. An image that cannot hold the DPI floor at any sheet
+   * size returns [] and is skipped rather than being enlarged to fit.
    */
   static determineFormats(image) {
     const width = image.actualWidth || image.width || 0;
     const height = image.actualHeight || image.height || 0;
-    
+
     if (width === 0 || height === 0) {
-      logger.warn(`Image ${image.filename} has no dimension data, defaulting to 8x10`);
-      return ['8x10'];
+      logger.warn(`Image ${image.filename} has no dimension data, skipping`);
+      return [];
     }
-    
-    const aspectRatio = width / height;
-    const formats = [];
-    
-    // 8x10 aspect ratio is 0.8 (4:5)
-    // 11x17 aspect ratio is ~0.647 (roughly 2:3)
-    
-    // For portrait images (height > width)
-    if (aspectRatio <= 1.0) {
-      if (aspectRatio >= 0.75 && aspectRatio <= 0.85) {
-        // Close to 8x10 ratio (0.8)
-        formats.push('8x10');
-      } else if (aspectRatio >= 0.55 && aspectRatio <= 0.75) {
-        // Close to 11x17 ratio (0.647)
-        formats.push('11x17');
-      } else {
-        // Default for portrait: try both if very tall/wide, otherwise 8x10
-        formats.push('8x10');
-        if (aspectRatio < 0.6) {
-          formats.push('11x17'); // Very tall images work better as 11x17
-        }
-      }
-    } 
-    // For landscape images (width > height)
-    else {
-      const landscapeRatio = height / width; // Flip for landscape
-      
-      if (landscapeRatio >= 0.75 && landscapeRatio <= 0.85) {
-        // Close to 8x10 ratio when flipped
-        formats.push('8x10');
-      } else if (landscapeRatio >= 0.55 && landscapeRatio <= 0.75) {
-        // Close to 11x17 ratio when flipped  
-        formats.push('11x17');
-      } else {
-        // Default for landscape
-        formats.push('8x10');
-        if (landscapeRatio < 0.6) {
-          formats.push('11x17'); // Very wide images work better as 11x17
-        }
+
+    const eligible = getBestFormat(width, height);
+
+    if (eligible.length === 0) {
+      const best = effectiveDpi(width, height, '8x10');
+      logger.warn(
+        `⬇️ Too small to print: ${image.filename} (${width}x${height}) ` +
+        `would be ${best} DPI at 8x10, floor is ${config.print.minDpi}`
+      );
+      return [];
+    }
+
+    // Among formats the image can support, prefer the sheet whose proportions
+    // are closest to the source so the least is lost to letterboxing.
+    const sourceRatio = Math.min(width, height) / Math.max(width, height);
+    const mismatch = (format) => {
+      const target = config.print.formats[format];
+      const targetRatio = target.width / target.height;
+      return Math.abs(sourceRatio - targetRatio);
+    };
+
+    const ranked = [...eligible].sort((a, b) => mismatch(a) - mismatch(b));
+    const formats = [ranked[0]];
+
+    // Include a second sheet size only when it fits the image nearly as well.
+    for (const format of ranked.slice(1)) {
+      if (mismatch(format) - mismatch(ranked[0]) <= 0.08) {
+        formats.push(format);
       }
     }
-    
-    // Ensure we always have at least one format
-    if (formats.length === 0) {
-      formats.push('8x10');
-    }
-    
-    logger.info(`Image ${image.filename} (${width}x${height}, ratio: ${aspectRatio.toFixed(3)}) -> formats: ${formats.join(', ')}`);
-    
+
+    const dpiNote = formats
+      .map(f => `${f} @ ${effectiveDpi(width, height, f)}dpi`)
+      .join(', ');
+    logger.info(`Image ${image.filename} (${width}x${height}) -> ${dpiNote}`);
+
     return formats;
   }
-  
+
   /**
    * Extract clean role name from image data
    */
@@ -225,48 +236,48 @@ class ImageResizer {
   }
   
   /**
-   * FIXED: Resize image to specific print format with format-specific numbering
+   * Resize to a print format. Never enlarges.
+   *
+   * `fit: 'inside'` keeps the original proportions and caps the output at the
+   * sheet size; combined with `withoutEnlargement` a source smaller than the
+   * sheet passes through at its native size. That is deliberate — the file
+   * carries the detail it really has, and the manifest records the DPI it
+   * will print at, instead of shipping an upscaled file that claims 300 DPI
+   * and delivers half of it.
    */
   static async resizeToFormat(image, format, formatDir) {
     const dimensions = this.getPrintDimensions(format);
-    
-    // Use clean role name for filename generation
     const cleanRoleName = image.cleanRoleName || 'Unknown';
-    
-    // FIXED: Generate clean filename with FORMAT-SPECIFIC counter
+
     const outputFilename = generateFilename(
       image.celebrityName || 'Unknown',
       cleanRoleName,
-      image.formatIndex || 1, // Use format-specific counter
+      image.formatIndex || 1,
       format
     );
     const outputPath = path.join(formatDir, outputFilename);
-    
-    await sharp(image.filepath)
+
+    const output = await sharp(image.filepath)
       .resize(dimensions.width, dimensions.height, {
         fit: 'inside',
-        withoutEnlargement: false,
-        background: { r: 255, g: 255, b: 255 }
+        withoutEnlargement: !config.print.allowUpscale
       })
       .jpeg({
-        quality: 95,
-        progressive: true
+        quality: config.print.jpegQuality,
+        progressive: true,
+        // Full chroma resolution: skin tones and edges stay clean in print.
+        chromaSubsampling: '4:4:4'
       })
       .toFile(outputPath);
-    
-    return outputPath;
+
+    return { outputPath, width: output.width, height: output.height };
   }
-  
+
   /**
    * Get print dimensions for format
    */
   static getPrintDimensions(format) {
-    const dimensions = {
-      '8x10': { width: 2400, height: 3000 },   // 300 DPI
-      '11x17': { width: 3300, height: 5100 }   // 300 DPI
-    };
-    
-    return dimensions[format] || dimensions['8x10'];
+    return config.print.formats[format] || config.print.formats['8x10'];
   }
 }
 

@@ -6,6 +6,7 @@ const { resizeImages } = require('./sourcing/resizeImages');
 const { generateManifest } = require('./sourcing/generateManifest');
 const { zipAndUpload } = require('./sourcing/zipAndUpload');
 const logger = require('./utils/logger');
+const progress = require('./utils/progress');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -24,11 +25,38 @@ async function main() {
     
     logger.info(`🚀 Starting AI-POWERED image sourcing for: ${celebrityName}`);
     
-    // Create temporary working directory
-    const workDir = path.join(__dirname, 'temp', celebrityName.replace(/\s+/g, '_'));
+    /**
+     * Build the working directory from a slug, not from the raw name.
+     *
+     * This path is created, written to, and at the end of a successful run
+     * removed with { recursive: true, force: true }. `replace(/\s+/g, '_')`
+     * substituted whitespace only, so a name like "../../etc" walked straight
+     * out of temp/. The containment check below is the backstop in case the
+     * slug rules ever loosen.
+     */
+    const slug = celebrityName
+      .normalize('NFKD')
+      .replace(/[^\p{L}\p{N}]+/gu, '_')
+      .replace(/^_+|_+$/g, '')
+      .substring(0, 60);
+
+    if (!slug) {
+      logger.error(`❌ Celebrity name produces no usable directory name: ${celebrityName}`);
+      process.exit(1);
+    }
+
+    const tempRoot = path.join(__dirname, 'temp');
+    const workDir = path.join(tempRoot, slug);
+
+    if (path.relative(tempRoot, workDir).startsWith('..') || path.isAbsolute(path.relative(tempRoot, workDir))) {
+      logger.error(`❌ Refusing to work outside ${tempRoot}`);
+      process.exit(1);
+    }
+
     await fs.mkdir(workDir, { recursive: true });
     
     // Step 1: AI-powered role discovery (replaces old fetchRoles)
+    progress.phase('role_discovery', 5, 'Discovering roles...');
     logger.info('🤖 Step 1: AI discovering top roles...');
     const aiResults = await fetchCelebrityRoles(celebrityName);
     
@@ -69,6 +97,8 @@ async function main() {
       ...role // Spread all other properties from orchestrator
     }));
     
+    progress.phase('roles_found', 25, `${roles.length} roles discovered`);
+    roles.forEach(role => progress.role(role.character, role.title));
     logger.info(`✅ AI discovered ${roles.length} roles:`);
     roles.forEach((role, i) => {
       const voiceMarker = role.isVoiceRole ? ' (VOICE)' : '';
@@ -91,6 +121,7 @@ async function main() {
     });
     
     // Step 2: Fetch images for each role (enhanced with AI search terms)
+    progress.phase('image_search', 40, 'Searching for images...');
     logger.info('🖼️  Step 2: Fetching images with AI-optimized search terms...');
     const allImages = [];
     for (const role of roles) {
@@ -98,6 +129,7 @@ async function main() {
         // 🎯 NOW PASSING COMPLETE SMART SEARCH DATA TO fetchImages
         const images = await fetchImages(celebrityName, role, workDir);
         allImages.push(...images);
+        progress.counts({ verified: allImages.length });
         logger.info(`📸 ${role.character}: ${images.length} images found`);
       } catch (error) {
         logger.warn(`❌ Failed to fetch images for ${role.character}: ${error.message}`);
@@ -105,11 +137,14 @@ async function main() {
     }
     
     if (allImages.length === 0) {
-      logger.error('❌ No images found for any roles. Check your SerpAPI configuration.');
+      progress.problem('No images passed identity verification for any role.');
+      logger.error('❌ No images survived search and verification for any role.');
+      logger.error('   Check SERP_API_KEY, and OPENAI_API_KEY / ANTHROPIC_API_KEY for verification.');
       process.exit(1);
     }
     
     // Step 3: Validate and filter images
+    progress.phase('validation', 70, 'Validating image quality...');
     logger.info('🔍 Step 3: Validating images...');
     let validImages = [];
     
@@ -140,11 +175,14 @@ async function main() {
     }
     
     // Step 4: Resize images
+    progress.phase('resize', 82, 'Preparing print formats...');
     logger.info('📐 Step 4: Resizing images for print formats...');
     const resizedImages = await resizeImages(validImages, workDir, celebrityName);
+    progress.counts({ printable: resizedImages.length });
     logger.info(`✅ Resized ${resizedImages.length} images across multiple formats`);
     
     // Step 5: Generate manifest with AI metadata
+    progress.phase('manifest', 90, 'Writing manifest...');
     logger.info('📄 Step 5: Generating AI-enhanced manifest...');
     const manifest = await generateManifest(resizedImages, celebrityName, roles);
     
@@ -188,8 +226,11 @@ async function main() {
     );
     
     // Step 6: Zip and upload to Google Drive
+    progress.phase('upload', 95, 'Uploading to Google Drive...');
     logger.info('📦 Step 6: Zipping and uploading to Google Drive...');
     const uploadResult = await zipAndUpload(workDir, celebrityName);
+    progress.download(uploadResult.webViewLink);
+    progress.phase('complete', 100, 'Mission Complete!');
     logger.info(`✅ Upload complete: ${uploadResult.webViewLink}`);
     
     // Final success summary with AI insights
