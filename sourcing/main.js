@@ -3,6 +3,7 @@ const config = require('../utils/config');
 const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
 const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js');
 const RedFlagRoleDetector = require('./ai-services/RedFlagRoleDetector.js');
+const TmdbCredits = require('./ai-services/TmdbCredits.js');
 const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
 const roleCache = require('../utils/roleCache');
 
@@ -12,6 +13,7 @@ class CelebrityRoleOrchestrator {
     this.searchOptimizer = new SearchOptimizer();
     this.roleVerifier = new SimpleRoleVerifier();
     this.redFlagDetector = new RedFlagRoleDetector();
+    this.tmdbCredits = new TmdbCredits();
     this.cache = new Map();
   }
 
@@ -44,8 +46,9 @@ class CelebrityRoleOrchestrator {
         throw new Error(`No roles found for ${celebrityName}`);
       }
 
-      // Step 2: SIMPLIFIED character name validation (only obvious errors)
-      const rolesWithValidatedNames = await this.validateCharacterNames(roles, celebrityName);
+      // Step 2: character name validation, then a deterministic credit check
+      const rolesWithNames = await this.validateCharacterNames(roles, celebrityName);
+      const rolesWithValidatedNames = await this.verifyAgainstTmdb(rolesWithNames, celebrityName);
 
       // Step 3: Role verification (essential for accuracy)
       console.log(`🔍 Verifying ${rolesWithValidatedNames.length} discovered roles...`);
@@ -134,6 +137,110 @@ class CelebrityRoleOrchestrator {
       console.error(`❌ Failed to get results for ${celebrityName}:`, error.message);
       return this.handleFailure(celebrityName, error);
     }
+  }
+
+  /**
+   * Check every discovered role against TMDb's cast list.
+   *
+   * validateCharacterNames only catches literal placeholders, so a confident
+   * hallucination that looks like a real character name — "Yoda" for George
+   * Takei — passes it and the run reports "No suspicious character names
+   * found". TMDb holds the actual credits, so this is a lookup rather than a
+   * second opinion from another model.
+   *
+   * Four outcomes, deliberately distinguished:
+   *   confirmed       keep, and tag whether it is a voice credit
+   *   wrong_character correct it to the real credit instead of dropping the title
+   *   non_visual      drop — a narrator or "Himself" yields no in-character image
+   *   no_such_title   drop
+   *   unchecked       keep; TMDb being down must not empty the roster
+   */
+  async verifyAgainstTmdb(roles, celebrityName) {
+    if (!this.tmdbCredits.available) {
+      console.log('⚠️ No TMDB_API_KEY — skipping credit verification (roles are unverified)');
+      return roles;
+    }
+
+    const credits = await this.tmdbCredits.getCredits(celebrityName);
+    if (!credits) {
+      console.log('⚠️ No TMDb credits returned — keeping roles unverified');
+      return roles;
+    }
+
+    const kept = [];
+
+    for (const role of roles) {
+      const verdict = TmdbCredits.checkRole(role, credits);
+
+      switch (verdict.status) {
+        case 'confirmed':
+          kept.push({
+            ...role,
+            character: verdict.credit.character || role.character,
+            year: role.year || verdict.credit.year,
+            creditVerified: true,
+            // Drives the search branch: a voice role needs character art,
+            // never a photograph of the performer.
+            roleType: verdict.credit.isVoice ? 'voice' : 'live_action',
+            isVoiceRole: verdict.credit.isVoice
+          });
+          console.log(`  ✅ ${role.character} (${role.title})`);
+          break;
+
+        case 'wrong_character':
+          console.log(`  🔁 ${role.character} (${role.title}) — ${verdict.reason}`);
+          if (verdict.correction && !TmdbCredits.isNonVisualCredit(verdict.correction.character)) {
+            kept.push({
+              ...role,
+              character: verdict.correction.character,
+              year: verdict.correction.year,
+              creditVerified: true,
+              creditCorrected: true,
+              roleType: verdict.correction.isVoice ? 'voice' : 'live_action',
+              isVoiceRole: verdict.correction.isVoice
+            });
+            console.log(`     → corrected to "${verdict.correction.character}"`);
+          }
+          break;
+
+        case 'non_visual':
+        case 'no_such_title':
+          console.log(`  ⛔ ${role.character} (${role.title}) — ${verdict.reason}`);
+          break;
+
+        default:
+          kept.push(role);
+      }
+    }
+
+    console.log(`🎬 Credit check: ${kept.length} of ${roles.length} roles survive`);
+
+    /**
+     * If the check emptied the roster, fall back to TMDb's own top credits
+     * rather than failing the job — the data to do it right is already loaded.
+     */
+    if (kept.length === 0) {
+      const usable = credits
+        .filter(c => !c.isNonVisual)
+        .sort((a, b) => b.popularity - a.popularity)
+        .slice(0, 5)
+        .map(c => ({
+          character: c.character,
+          title: c.title,
+          year: c.year,
+          medium: c.isVoice ? 'voice' : `live_action_${c.mediaType}`,
+          popularity: 'high',
+          creditVerified: true,
+          fromTmdb: true,
+          roleType: c.isVoice ? 'voice' : 'live_action',
+          isVoiceRole: c.isVoice
+        }));
+
+      console.log(`🔁 No discovered role survived; using ${usable.length} top TMDb credits instead`);
+      return usable;
+    }
+
+    return kept;
   }
 
   /**

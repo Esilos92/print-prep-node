@@ -291,6 +291,27 @@ body {
 
 /* ---------- terminal ---------- */
 
+/*
+ * The terminal panel needs a DEFINITE height, not a minimum.
+ *
+ * `.term-scroll` already had overflow-y:auto and min-height:0, and the whole
+ * flex chain above it was correct — but every ancestor was sized by content,
+ * so `flex-1` resolved to "as tall as the messages" and the overflow never had
+ * anything to overflow. The log simply grew the page instead of scrolling, and
+ * `.cyber-panel`'s own overflow:hidden then clipped what ran past it.
+ *
+ * A clamped viewport-relative height gives the chain something real to divide
+ * up, while still adapting to the window instead of pinning a magic number.
+ */
+.terminal-panel {
+  height: clamp(420px, 68vh, 760px);
+}
+
+/* On a phone the two panels stack, so let the terminal take a taller slice. */
+@media (max-width: 720px) {
+  .terminal-panel { height: clamp(380px, 62vh, 560px); }
+}
+
 .term-window {
   display: flex;
   flex-direction: column;

@@ -137,7 +137,16 @@ const config = {
      * carries base64 image data, and provider rate limits bite sooner than
      * bandwidth does.
      */
-    concurrency: int(process.env.VERIFY_CONCURRENCY, 4)
+    concurrency: int(process.env.VERIFY_CONCURRENCY, 4),
+
+    /**
+     * Longest edge, in pixels, of the image actually sent to a vision API.
+     *
+     * Full-resolution print candidates are enormous in image tokens and a run
+     * spends itself against the provider's per-minute token ceiling rather
+     * than on verification. A face is identifiable far below this.
+     */
+    maxImageEdge: int(process.env.VERIFY_MAX_IMAGE_EDGE, 1024)
   }
 };
 

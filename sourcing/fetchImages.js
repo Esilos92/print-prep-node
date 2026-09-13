@@ -549,12 +549,17 @@ class AIFirstImageFetcher {
      * settleLimit isolates failures instead of rejecting the batch.
      */
     const settled = await settleLimit(images, config.search.downloadConcurrency, async (image, i) => {
-      const filename = this.generateSafeFilename(role.name, i + 1, image.url);
-      const filepath = path.join(downloadDir, filename);
-      
-      const success = await this.downloadSingleImage(image.url, filepath);
-      
-      if (success) {
+      // Download to a provisional name, then rename by what was actually
+      // served — the URL is not a reliable guide to the bytes.
+      const provisional = path.join(downloadDir, `dl_${i + 1}.part`);
+      const result = await this.downloadSingleImage(image.url, provisional);
+
+      if (result.ok) {
+        const ext = this.getImageExtension(image.url, result.contentType);
+        const filename = this.generateSafeFilename(role.name, i + 1, `.${ext}`);
+        const filepath = path.join(downloadDir, filename);
+        await fs.rename(provisional, filepath);
+
         const actualDimensions = await this.getActualImageDimensions(filepath);
         const fileSize = await this.getFileSize(filepath);
 
@@ -674,7 +679,7 @@ class AIFirstImageFetcher {
    */
   async downloadSingleImage(url, filepath, retries = 3) {
     if (!this.isValidImageUrl(url)) {
-      return false;
+      return { ok: false };
     }
 
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -699,19 +704,20 @@ class AIFirstImageFetcher {
         response.data.pipe(writer);
 
         return new Promise((resolve, reject) => {
-          writer.on('finish', () => resolve(true));
+          // Report the served type so the caller can name the file honestly.
+          writer.on('finish', () => resolve({ ok: true, contentType }));
           writer.on('error', reject);
         });
         
       } catch (error) {
         if (attempt === retries) {
-          return false;
+          return { ok: false };
         }
         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
-    
-    return false;
+
+    return { ok: false };
   }
   
   /**
@@ -774,9 +780,28 @@ class AIFirstImageFetcher {
   /**
    * Get image extension
    */
-  getImageExtension(url) {
-    const extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-    for (const ext of extensions) {
+  /**
+   * Extension from the response's content-type where available, falling back
+   * to the URL.
+   *
+   * Guessing from the URL and defaulting to 'jpg' meant most files were named
+   * .jpg regardless of their actual bytes. Downstream that was read as "this
+   * is a JPEG" and a hardcoded image/jpeg was declared to the vision APIs,
+   * which Anthropic rejects outright for a PNG or WebP.
+   */
+  getImageExtension(url, contentType) {
+    const fromType = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/gif': 'gif',
+      'image/avif': 'avif'
+    }[(contentType || '').split(';')[0].trim().toLowerCase()];
+
+    if (fromType) return fromType;
+
+    for (const ext of ['jpg', 'jpeg', 'png', 'webp', 'gif']) {
       if (url.toLowerCase().includes(`.${ext}`)) {
         return ext === 'jpeg' ? 'jpg' : ext;
       }
@@ -799,4 +824,7 @@ class AIFirstImageFetcher {
   }
 }
 
-module.exports = { fetchImages: AIFirstImageFetcher.fetchImages.bind(AIFirstImageFetcher) };
+module.exports = {
+  fetchImages: AIFirstImageFetcher.fetchImages.bind(AIFirstImageFetcher),
+  AIFirstImageFetcher
+};

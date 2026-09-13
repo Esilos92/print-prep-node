@@ -253,7 +253,7 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
     from === 'USER' ? DATA.accent : from === 'SYS' ? DATA.warning : DATA.good;
 
   return (
-    <div className="cyber-panel panel-live flex flex-col" style={{ minHeight: '520px' }}>
+    <div className="cyber-panel panel-live terminal-panel flex flex-col">
       <div className="panel-head">
         <Bot className="w-4 h-4" style={{ color: 'var(--neon-blue)' }} aria-hidden />
         <span className="panel-title">GBot.EXE</span>
@@ -272,7 +272,7 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
       </div>
 
       <div className="panel-body flex flex-col gap-3 flex-1 min-h-0">
-        <div className="term-window flex-1 min-h-0" style={{ minHeight: '300px' }}>
+        <div className="term-window flex-1 min-h-0">
           <div className="term-bar">
             <span className="term-dot" style={{ background: DATA.critical }} />
             <span className="term-dot" style={{ background: DATA.warning }} />
@@ -327,7 +327,10 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
             placeholder={busy ? 'mission running…' : 'enter subject name, or "help"'}
             autoComplete="off"
           />
-          <button type="submit" className="cyber-button" disabled={!input.trim()}>
+          {/* The label is hidden at phone width, so the button needs its own
+              accessible name — otherwise it is an unnamed icon to a screen
+              reader and to anything driving the page by role. */}
+          <button type="submit" className="cyber-button" disabled={!input.trim()} aria-label="Send">
             <Send className="w-4 h-4" aria-hidden />
             <span className="hidden sm:inline">Send</span>
           </button>

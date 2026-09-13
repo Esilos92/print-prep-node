@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../../utils/config');
+const sharp = require('sharp');
 const { mapLimit } = require('../../utils/concurrency');
 
 class AIImageVerifier {
@@ -21,6 +22,12 @@ class AIImageVerifier {
       INVALID_MERCHANDISE: 'merchandise',
       INVALID_UNRELATED: 'unrelated',
       INVALID_LOW_CONFIDENCE: 'low_confidence',
+      /**
+       * Right person, wrong context: red carpet, interview, convention panel,
+       * awards show. These never tripped wrong_person — it IS the performer —
+       * so they passed verification and reached print packages.
+       */
+      INVALID_OUT_OF_CHARACTER: 'out_of_character',
       VERIFICATION_FAILED: 'failed',
       UNVERIFIED: 'unverified'
     };
@@ -194,24 +201,46 @@ person may appear at different ages and in character makeup.`
 
 Answer VALID only if ${celebrityName} is clearly and identifiably the person shown.`;
 
-    return `You are checking images for an autograph print run. Getting the wrong
-person into a print package is a costly error.
+    const inCharacter = character && character !== 'Unknown'
+      ? `They must be IN CHARACTER as ${character}${title ? ` from ${title}` : ''} — in costume,
+in the production, as the audience sees them on screen.`
+      : `They must be in a production still or publicity photograph, not at a
+public appearance.`;
+
+    return `You are checking images for an autograph print run. These are sold as
+prints of a performer in a role, so the photograph has to show the role.
 
 ${subject}
 
-Reject:
+${inCharacter}
+
+Reject as INVALID_OUT_OF_CHARACTER — this is the most common mistake, and the
+person being correct does not make the image usable:
+- red carpet, premiere or awards appearances
+- interviews, talk shows, podcasts
+- convention panels, signings, fan photos
+- modern photographs of the performer out of costume
+- candid or paparazzi shots
+The subject may be exactly the right person in all of these. That is precisely
+why they slip through. Judge the costume and the setting, not the face.
+
+Reject as INVALID_WRONG_PERSON:
 - a different person, including co-stars and lookalikes
 - a group shot where you cannot confidently pick out the target
+
+Also reject:
 - toys, figures, statues or other merchandise
 - images so small, blurry or obstructed that you cannot be sure
 ${this.packagingRejections}
 
 ${this.packagingCaveat}
 
-If you are not confident it is the right person, reject. An uncertain match is a rejection.
+If you are not confident it is the right person in character, reject. An
+uncertain match is a rejection.
 
 Reply with exactly: VERDICT|CONFIDENCE
-VERDICT is one of VALID, INVALID_WRONG_PERSON, INVALID_MERCHANDISE, INVALID_UNRELATED.
+VERDICT is one of VALID, INVALID_OUT_OF_CHARACTER, INVALID_WRONG_PERSON,
+INVALID_MERCHANDISE, INVALID_UNRELATED.
 CONFIDENCE is an integer 1-10 for how sure you are of that verdict.
 Example: VALID|8`;
   }
@@ -223,15 +252,17 @@ Example: VALID|8`;
     const content = [{ type: 'text', text: this.buildPrompt(context, hasReference) }];
 
     if (hasReference) {
+      const ref = await this.prepareImage(context.referencePath);
       content.push({
         type: 'image_url',
-        image_url: { url: `data:image/jpeg;base64,${await this.imageToBase64(context.referencePath)}`, detail }
+        image_url: { url: `data:${ref.mediaType};base64,${ref.data}`, detail }
       });
     }
 
+    const candidate = await this.prepareImage(imagePath);
     content.push({
       type: 'image_url',
-      image_url: { url: `data:image/jpeg;base64,${await this.imageToBase64(imagePath)}`, detail }
+      image_url: { url: `data:${candidate.mediaType};base64,${candidate.data}`, detail }
     });
 
     const completion = await this.openai.chat.completions.create({
@@ -249,23 +280,17 @@ Example: VALID|8`;
     const content = [{ type: 'text', text: this.buildPrompt(context, hasReference) }];
 
     if (hasReference) {
+      const ref = await this.prepareImage(context.referencePath);
       content.push({
         type: 'image',
-        source: {
-          type: 'base64',
-          media_type: 'image/jpeg',
-          data: await this.imageToBase64(context.referencePath)
-        }
+        source: { type: 'base64', media_type: ref.mediaType, data: ref.data }
       });
     }
 
+    const candidate = await this.prepareImage(imagePath);
     content.push({
       type: 'image',
-      source: {
-        type: 'base64',
-        media_type: 'image/jpeg',
-        data: await this.imageToBase64(imagePath)
-      }
+      source: { type: 'base64', media_type: candidate.mediaType, data: candidate.data }
     });
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -326,6 +351,7 @@ Example: VALID|8`;
     const verdict = (() => {
       if (verdictPart === 'VALID') return this.verificationResults.VALID;
       if (verdictPart.includes('WRONG_PERSON')) return this.verificationResults.INVALID_WRONG_PERSON;
+      if (verdictPart.includes('OUT_OF_CHARACTER')) return this.verificationResults.INVALID_OUT_OF_CHARACTER;
       if (verdictPart.includes('WRONG_CHARACTER')) return this.verificationResults.INVALID_WRONG_CHARACTER;
       if (verdictPart.includes('MERCHANDISE')) return this.verificationResults.INVALID_MERCHANDISE;
       if (verdictPart.includes('UNRELATED')) return this.verificationResults.INVALID_UNRELATED;
@@ -344,9 +370,45 @@ Example: VALID|8`;
   /**
    * Utility functions
    */
+  /**
+   * Prepare an image for a vision API.
+   *
+   * Two bugs lived here. The bytes were sent at full resolution — a 2400x3000
+   * source is a very large number of image tokens, and with gpt-4o's 30,000
+   * TPM ceiling a run would spend most of a job being throttled; 95 429s in a
+   * single run. And the media type was hardcoded to image/jpeg on both
+   * providers while the downloader names every file .jpg regardless of what
+   * the bytes actually are, so PNG and WebP candidates were declared as JPEG.
+   * OpenAI tolerated the lie; Anthropic rejected it with a 400. Primary
+   * throttled, fallback refusing — and every affected image fell through to
+   * "unverified" and was discarded.
+   *
+   * Re-encoding to a bounded JPEG fixes both at once: the declared type
+   * becomes true by construction, and the token cost drops by roughly an
+   * order of magnitude. Identity is still legible — 1024px is far more than a
+   * face needs, and well above the ~512px that `detail: "low"` would have
+   * given us.
+   */
+  async prepareImage(imagePath) {
+    const maxEdge = config.verification.maxImageEdge;
+
+    try {
+      const buffer = await sharp(imagePath)
+        .rotate()                       // honour EXIF orientation
+        .resize(maxEdge, maxEdge, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+
+      return { data: buffer.toString('base64'), mediaType: 'image/jpeg' };
+    } catch (error) {
+      // A file sharp cannot decode is not one a vision model will read either.
+      throw new Error(`Unreadable image ${path.basename(imagePath)}: ${error.message}`);
+    }
+  }
+
+  /** Kept for callers that only need the bytes. */
   async imageToBase64(imagePath) {
-    const imageBuffer = await fs.readFile(imagePath);
-    return imageBuffer.toString('base64');
+    return (await this.prepareImage(imagePath)).data;
   }
 
   /**

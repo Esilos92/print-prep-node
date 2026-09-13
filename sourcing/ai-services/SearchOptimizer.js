@@ -130,16 +130,21 @@ class SearchOptimizer {
     const showTitle = role.title || role.name || 'Unknown';
     
     if (characterName === 'Unknown' || showTitle === 'Unknown') {
-      return [`"anime character" HD`, `"animation character" HD`];
+      return [`"animated character" official art`];
     }
-    
+
+    /**
+     * Character art only. "anime" was hardcoded here, which is wrong for
+     * every western animation — Star Wars: The Clone Wars is not anime — so
+     * it narrowed the search to the wrong corner of the web.
+     */
     return [
-      `"${characterName}"`,
       `"${characterName}" "${showTitle}"`,
-      `"${characterName}" anime`,
-      `"${showTitle}" "${characterName}"`,
-      `"${characterName}" character`,
-      `"${showTitle}" character`
+      `"${characterName}" "${showTitle}" official art`,
+      `"${showTitle}" "${characterName}" character design`,
+      `"${characterName}" character art`,
+      `"${showTitle}" "${characterName}" still`,
+      `"${characterName}" animated`
     ];
   }
 
@@ -152,7 +157,10 @@ class SearchOptimizer {
     
     return [
       `"${characterName}" "${showTitle}"`,
-      `"${celebrityName}" "${characterName}"`,
+      // Multi-actor characters are the one case where the performer's name is
+      // needed to disambiguate which Batman — but pair it with the title so it
+      // lands on the production rather than on interviews about the actor.
+      `"${celebrityName}" "${characterName}" "${showTitle}"`,
       `"${showTitle}" "${characterName}"`,
       `"${characterName}" scene`,
       `"${celebrityName}" "${showTitle}"`,
@@ -212,18 +220,42 @@ class SearchOptimizer {
   generateCharacterFirstTerms(celebrityName, role) {
     const characterName = role.character || role.characterName || 'Unknown';
     const showTitle = role.title || role.name || 'Unknown';
-    
+
     if (characterName === 'Unknown' || showTitle === 'Unknown') {
       return this.generateHeadshotTerms(celebrityName, role);
     }
-    
+
+    /**
+     * A voice credit can never be served by the performer's name.
+     *
+     * `"George Takei" "Yoda"` returns photographs of Takei or drawings of
+     * Yoda, never "the actor playing the role" — there is no such image. Voice
+     * roles want character art and nothing else.
+     */
+    if (role.roleType === 'voice' || role.isVoiceRole) {
+      return this.generateCharacterOnlyTerms(role);
+    }
+
+    /**
+     * The performer's real name is deliberately absent from these.
+     *
+     * `"George Takei" "Hikaru Sulu" HD` does not find Takei in costume as
+     * Sulu; it finds pages *about* Takei that mention Sulu — interviews,
+     * convention panels, talk shows, retrospectives — and the images on those
+     * pages are the actor as himself. Two of the six terms here used to be of
+     * that shape, so roughly a third of every role's searches were fetching
+     * out-of-character material by construction.
+     *
+     * Identity is confirmed later against a reference portrait; the search
+     * only needs to find the character.
+     */
     return [
       `"${characterName}" "${showTitle}"`,
-      `"${characterName}"`,
-      `"${showTitle}" "${characterName}"`,
-      `"${celebrityName}" "${characterName}"`,
+      `"${showTitle}" "${characterName}" scene`,
+      `"${characterName}" "${showTitle}" still`,
+      `"${showTitle}" film still ${characterName}`,
       `"${characterName}" character`,
-      `"${celebrityName}" "${showTitle}"`
+      `"${showTitle}" promotional still`
     ];
   }
 
