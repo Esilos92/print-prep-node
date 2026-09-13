@@ -17,7 +17,7 @@
     "health": "curl http://localhost:4000/api/health"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.1",
     "axios": "^1.7.7",
     "cheerio": "^1.0.0",
     "cors": "^2.8.5",
@@ -27,7 +27,7 @@
     "googleapis": "^144.0.0",
     "imghash": "^0.0.9",
     "openai": "^5.8.2",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

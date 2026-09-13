@@ -7,7 +7,7 @@ class ManifestGenerator {
   /**
    * Generate manifest.json for all processed images
    */
-  static async generateManifest(resizedImages, celebrityName) {
+  static async generateManifest(resizedImages, celebrityName, roles = []) {
     try {
       logger.info('Generating manifest...');
       
@@ -16,6 +16,16 @@ class ManifestGenerator {
         generated: new Date().toISOString(),
         totalImages: resizedImages.length,
         formats: this.getFormatCounts(resizedImages),
+        // index.js has always passed roles as a third argument; the parameter
+        // was missing, so the role list was silently dropped from every
+        // manifest ever generated.
+        roles: roles.map(role => ({
+          character: role.character,
+          title: role.title,
+          medium: role.medium,
+          year: role.year
+        })),
+        printQuality: this.getPrintQualitySummary(resizedImages),
         images: resizedImages.map(image => this.createImageEntry(image))
       };
       
@@ -37,11 +47,23 @@ class ManifestGenerator {
       filename: path.basename(image.resizedPath),
       originalFilename: image.filename,
       role: image.role,
+      character: image.character,
       format: image.format,
+      /**
+       * Source is what was downloaded; output is the file in this package.
+       * `dimensions` previously reported the SOURCE size under a key that
+       * reads like the print size — misleading in a manifest whose whole
+       * purpose is telling a print shop what it is receiving.
+       */
       dimensions: {
+        width: image.outputWidth || image.actualWidth,
+        height: image.outputHeight || image.actualHeight
+      },
+      sourceDimensions: {
         width: image.actualWidth,
         height: image.actualHeight
       },
+      printDpi: image.printDpi || null,
       tags: image.tags || [],
       sourceUrl: image.originalUrl,
       orientation: this.getImageOrientation(image.actualWidth, image.actualHeight),
@@ -50,6 +72,22 @@ class ManifestGenerator {
     };
   }
   
+  /**
+   * Print-quality spread, so the weakest file in a package is visible without
+   * opening every image.
+   */
+  static getPrintQualitySummary(images) {
+    const dpis = images.map(i => i.printDpi).filter(Number.isFinite);
+    if (dpis.length === 0) return null;
+
+    return {
+      minDpi: Math.min(...dpis),
+      maxDpi: Math.max(...dpis),
+      medianDpi: dpis.slice().sort((a, b) => a - b)[Math.floor(dpis.length / 2)],
+      atFull300Dpi: dpis.filter(d => d >= 300).length
+    };
+  }
+
   /**
    * Get counts by format
    */

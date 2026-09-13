@@ -10,6 +10,8 @@ class SimpleRoleVerifier {
     // Web search configuration
     this.serpApiKey = process.env.SERP_API_KEY;
     this.hasWebSearch = !!this.serpApiKey;
+    this.searchFailures = 0;
+    this.unverifiedRoles = 0;
     
     // Multi-actor roles only
     this.definiteMultiActorRoles = [
@@ -128,11 +130,17 @@ Answer: HIGH|YES|reason OR MEDIUM|NO|reason`;
       }
     }
 
-    // Default to allowing role
-    return { 
-      isValid: true, 
-      confidence: 'UNKNOWN', 
-      reason: 'No verification available, allowing role' 
+    /**
+     * Still lenient by default, deliberately: role verification runs before
+     * any images are fetched, and rejecting on "could not check" would drop
+     * every role whenever the search path is down. But it is now counted and
+     * reported, rather than passing as though it had been verified.
+     */
+    this.unverifiedRoles++;
+    return {
+      isValid: true,
+      confidence: 'UNKNOWN',
+      reason: 'No verification available, allowing role'
     };
   }
 
@@ -158,7 +166,12 @@ Answer: HIGH|YES|reason OR MEDIUM|NO|reason`;
             return verification;
           }
         } catch (error) {
+          // Include the reason. This line fired on every run for months
+          // saying only "Search query failed", which told nobody that an
+          // entire verification path was dead.
           console.log(`⚠️ Search query failed: ${query}`);
+          console.log(`   reason: ${error.message}`);
+          this.searchFailures++;
         }
       }
 
@@ -186,12 +199,25 @@ Answer: HIGH|YES|reason OR MEDIUM|NO|reason`;
     const characterLower = role.character.toLowerCase();
     const titleLower = role.title.toLowerCase();
 
-    // Look for positive matches
+    /**
+     * Names go into these patterns as literals, not as regex source.
+     *
+     * Interpolating them raw was wrong twice over. A character name with
+     * unbalanced brackets — "Wade Wilson (Deadpool" — threw a SyntaxError
+     * that the caller swallowed as "Search query failed", silently skipping
+     * verification. And even when the expression was valid, it matched the
+     * wrong thing: "Wade Wilson (Deadpool)" compiled to a capturing group, so
+     * a snippet containing those literal parentheses never matched at all.
+     */
+    const esc = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const celeb = esc(celebrityLower);
+    const character = esc(characterLower);
+
     const positivePatterns = [
-      new RegExp(`${celebrityLower}.*${characterLower}`, 'i'),
-      new RegExp(`${characterLower}.*${celebrityLower}`, 'i'),
-      new RegExp(`${celebrityLower}.*plays.*${characterLower}`, 'i'),
-      new RegExp(`${celebrityLower}.*as.*${characterLower}`, 'i')
+      new RegExp(`${celeb}.*${character}`, 'i'),
+      new RegExp(`${character}.*${celeb}`, 'i'),
+      new RegExp(`${celeb}.*plays.*${character}`, 'i'),
+      new RegExp(`${celeb}.*as.*${character}`, 'i')
     ];
 
     const hasPositiveMatch = positivePatterns.some(pattern => pattern.test(allText));
