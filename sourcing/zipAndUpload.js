@@ -1,4 +1,6 @@
-const AdmZip = require('adm-zip');
+// archiver 8 is ESM-only and exports classes rather than a factory
+// function; Node 22 loads it from CommonJS via require() unflagged.
+const { ZipArchive } = require('archiver');
 const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
@@ -30,90 +32,102 @@ class ZipUploader {
   }
   
   /**
-   * FIXED: Create zip file with separate folders for 8x10 and 11x17
+   * Build the delivery zip by streaming entries to disk.
+   *
+   * This used to buffer every image into memory with adm-zip's addLocalFile
+   * and write the accumulated result at the end. That is what OOM-killed the
+   * process in January, on this exact step, and it is what left the system
+   * silent for eight months: the log ends mid-zip with no error because the
+   * kernel took the process. Swap now catches the overflow, but swap is a
+   * backstop, not a fix — a larger filmography still overruns it.
+   *
+   * Streaming holds roughly one file at a time regardless of package size.
    */
   static async createZipFile(workDir, celebrityName) {
-    const zip = new AdmZip();
     const zipPath = path.join(workDir, '..', `${celebrityName.replace(/\s+/g, '_')}_images.zip`);
-    
-    // Add resized images with folder structure
     const resizedDir = path.join(workDir, 'resized');
-    
-    try {
-      // Check if we have the new folder structure
-      const format8x10Dir = path.join(resizedDir, '8x10');
-      const format11x17Dir = path.join(resizedDir, '11x17');
-      
-      // Add 8x10 images to zip in their own folder
-      try {
-        const files8x10 = await fs.readdir(format8x10Dir);
-        logger.info(`Adding ${files8x10.length} 8x10 images to zip`);
-        
-        for (const file of files8x10) {
-          const filePath = path.join(format8x10Dir, file);
-          // Add to zip with folder structure: 8x10/filename.jpg
-          zip.addLocalFile(filePath, '8x10/');
+
+    const output = require('fs').createWriteStream(zipPath);
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+
+    const finished = new Promise((resolve, reject) => {
+      output.on('close', resolve);
+      output.on('error', reject);
+      archive.on('error', reject);
+      // Missing files are warnings, not failures — a partial package still
+      // ships, and the entry that failed is named rather than swallowed.
+      archive.on('warning', (err) => {
+        if (err.code === 'ENOENT') {
+          logger.warn(`Zip entry missing: ${err.message}`);
+        } else {
+          reject(err);
         }
-      } catch (error) {
-        logger.warn('No 8x10 directory found');
-      }
-      
-      // Add 11x17 images to zip in their own folder
+      });
+    });
+
+    archive.pipe(output);
+
+    let entryCount = 0;
+
+    for (const format of ['8x10', '11x17']) {
+      const formatDir = path.join(resizedDir, format);
       try {
-        const files11x17 = await fs.readdir(format11x17Dir);
-        logger.info(`Adding ${files11x17.length} 11x17 images to zip`);
-        
-        for (const file of files11x17) {
-          const filePath = path.join(format11x17Dir, file);
-          // Add to zip with folder structure: 11x17/filename.jpg
-          zip.addLocalFile(filePath, '11x17/');
-        }
-      } catch (error) {
-        logger.warn('No 11x17 directory found');
-      }
-      
-      // Fallback: if no subfolder structure exists, add all files from resized root
-      try {
-        const allFiles = await fs.readdir(resizedDir);
-        const imageFiles = allFiles.filter(file => 
-          file.toLowerCase().endsWith('.jpg') || 
-          file.toLowerCase().endsWith('.jpeg') || 
-          file.toLowerCase().endsWith('.png')
-        );
-        
-        if (imageFiles.length > 0) {
-          logger.info(`Adding ${imageFiles.length} images from resized root (fallback)`);
-          
-          for (const file of imageFiles) {
-            const filePath = path.join(resizedDir, file);
-            // Determine folder based on filename format indicator
-            const folder = this.determineFolderFromFilename(file);
-            zip.addLocalFile(filePath, `${folder}/`);
+        const files = await fs.readdir(formatDir);
+        const images = files.filter(f => /\.(jpe?g|png)$/i.test(f));
+        if (images.length > 0) {
+          logger.info(`Adding ${images.length} ${format} images to zip`);
+          for (const file of images) {
+            archive.file(path.join(formatDir, file), { name: `${format}/${file}` });
+            entryCount++;
           }
         }
       } catch (error) {
-        logger.warn('Error reading resized directory for fallback');
+        logger.warn(`No ${format} directory found`);
       }
-      
-    } catch (error) {
-      logger.warn('No resized directory found, skipping image files');
     }
-    
-    // Add manifest to root of zip
+
+    // Fallback for loose images sitting in the resized root.
+    try {
+      const loose = (await fs.readdir(resizedDir))
+        .filter(f => /\.(jpe?g|png)$/i.test(f));
+
+      if (loose.length > 0) {
+        logger.info(`Adding ${loose.length} images from resized root (fallback)`);
+        for (const file of loose) {
+          const folder = this.determineFolderFromFilename(file);
+          archive.file(path.join(resizedDir, file), { name: `${folder}/${file}` });
+          entryCount++;
+        }
+      }
+    } catch (error) {
+      logger.warn('Error reading resized directory for fallback');
+    }
+
     const manifestPath = path.join(workDir, 'manifest.json');
     try {
-      zip.addLocalFile(manifestPath);
+      await fs.access(manifestPath);
+      archive.file(manifestPath, { name: 'manifest.json' });
+      entryCount++;
     } catch (error) {
       logger.warn('No manifest file found');
     }
-    
-    // Write zip file
-    zip.writeZip(zipPath);
-    logger.info(`Zip file created with organized folders: ${zipPath}`);
-    
+
+    if (entryCount === 0) {
+      archive.abort();
+      throw new Error('Refusing to upload an empty package: no images survived the pipeline');
+    }
+
+    await archive.finalize();
+    await finished;
+
+    const { size } = await fs.stat(zipPath);
+    logger.info(
+      `Zip created: ${zipPath} (${entryCount} entries, ${(size / 1024 / 1024).toFixed(1)} MB)`
+    );
+
     return zipPath;
   }
-  
+
   /**
    * NEW: Determine folder from filename when using fallback method
    */
@@ -191,4 +205,7 @@ class ZipUploader {
   }
 }
 
-module.exports = { zipAndUpload: ZipUploader.zipAndUpload.bind(ZipUploader) };
+module.exports = {
+  zipAndUpload: ZipUploader.zipAndUpload.bind(ZipUploader),
+  ZipUploader
+};

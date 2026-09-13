@@ -2,6 +2,7 @@ const OpenAI = require('openai');
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../../utils/config');
+const { mapLimit } = require('../../utils/concurrency');
 
 class AIImageVerifier {
   constructor() {
@@ -376,20 +377,32 @@ Example: VALID|8`;
     const results = { valid: [], invalid: [], totalCost: 0, serviceUsage: {}, verdictCounts: {} };
     const context = { celebrityName, character, title, medium, referencePath };
 
-    for (const image of images) {
-      let verification;
-
-      try {
-        verification = await this.verifyImage(image.filepath, context);
-      } catch (error) {
-        verification = {
-          result: this.verificationResults.VERIFICATION_FAILED,
-          service: 'none',
-          cost: 0,
-          confidence: 0,
-          error: error.message
-        };
+    /**
+     * Verification runs concurrently. Each image is an independent round-trip
+     * to a vision API, and running them one at a time made verification the
+     * longest phase of a job by a wide margin. mapLimit preserves order, so
+     * the accepted set stays in quality-ranked sequence.
+     */
+    const verifications = await mapLimit(
+      images,
+      config.verification.concurrency,
+      async (image) => {
+        try {
+          return await this.verifyImage(image.filepath, context);
+        } catch (error) {
+          return {
+            result: this.verificationResults.VERIFICATION_FAILED,
+            service: 'none',
+            cost: 0,
+            confidence: 0,
+            error: error.message
+          };
+        }
       }
+    );
+
+    images.forEach((image, index) => {
+      const verification = verifications[index];
 
       results.totalCost += verification.cost || 0;
       results.serviceUsage[verification.service] = (results.serviceUsage[verification.service] || 0) + 1;
@@ -400,7 +413,7 @@ Example: VALID|8`;
       } else {
         results.invalid.push({ ...image, verification, reason: verification.result });
       }
-    }
+    });
 
     console.log(`✅ AI SELECTED: ${results.valid.length} of ${images.length} images`);
     console.log(`📊 Verdicts:`, results.verdictCounts);

@@ -65,6 +65,13 @@ const config = {
      * image's own title and URL (fetchImages.packagingExclusions), where
      * matching is precise. Only high-precision terms belong here.
      */
+    /**
+     * Image downloads in flight at once. These are I/O-bound and were run one
+     * at a time, each with a 25-second timeout, so a role spent most of its
+     * wall-clock time idle. Bounded because this box has one vCPU and 2 GB.
+     */
+    downloadConcurrency: int(process.env.DOWNLOAD_CONCURRENCY, 6),
+
     excludeTerms: (process.env.SEARCH_EXCLUDE_TERMS
       || 'ebay,etsy,for sale,boxset,box set,laserdisc'
     ).split(',').map(t => t.trim()).filter(Boolean)
@@ -107,7 +114,14 @@ const config = {
     /** Reject a candidate unless the model is at least this confident (1-10). */
     minConfidence: int(process.env.MIN_VERIFY_CONFIDENCE, 7),
     /** Compare candidates against a reference portrait pulled from TMDb. */
-    useReferenceImage: process.env.USE_REFERENCE_IMAGE !== 'false'
+    useReferenceImage: process.env.USE_REFERENCE_IMAGE !== 'false',
+
+    /**
+     * Vision calls in flight at once. Lower than the download limit: each call
+     * carries base64 image data, and provider rate limits bite sooner than
+     * bandwidth does.
+     */
+    concurrency: int(process.env.VERIFY_CONCURRENCY, 4)
   }
 };
 

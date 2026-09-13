@@ -4,6 +4,8 @@ const path = require('path');
 const config = require('../utils/config');
 const logger = require('../utils/logger');
 const progress = require('../utils/progress');
+const { settleLimit } = require('../utils/concurrency');
+const serpapi = require('../utils/serpapi');
 const AIImageVerifier = require('./ai-services/AIImageVerifier');
 const ReferencePortrait = require('./ai-services/ReferencePortrait');
 
@@ -345,9 +347,7 @@ class AIFirstImageFetcher {
    */
   async searchWithQualityHints(query, maxResults = 35) {
     try {
-      const params = {
-        api_key: config.api.serpApiKey,
-        engine: 'google_images',
+      const data = await serpapi.searchImages({
         q: this.withExclusions(query),
         num: Math.min(maxResults, 100),
         ijn: 0,
@@ -356,13 +356,10 @@ class AIFirstImageFetcher {
         // Ask the engine for large results up front rather than filtering
         // most of the page away after the fact.
         imgsz: 'l',
-        imgc: 'color' // Color images preferred
-      };
+        imgc: 'color'
+      }, { timeout: 30000 });
 
-      const response = await axios.get(config.api.serpEndpoint, { 
-        params,
-        timeout: 30000
-      });
+      const response = { data };
 
       if (!response.data?.images_results) {
         logger.warn(`No images found for: ${query}`);
@@ -547,58 +544,69 @@ class AIFirstImageFetcher {
     const downloadDir = path.join(workDir, 'downloaded');
     await fs.mkdir(downloadDir, { recursive: true });
     
-    const downloadedImages = [];
-    
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
+    /**
+     * Downloads run concurrently. One bad URL costs one image, not the role —
+     * settleLimit isolates failures instead of rejecting the batch.
+     */
+    const settled = await settleLimit(images, config.search.downloadConcurrency, async (image, i) => {
+      const filename = this.generateSafeFilename(role.name, i + 1, image.url);
+      const filepath = path.join(downloadDir, filename);
       
-      try {
-        const filename = this.generateSafeFilename(role.name, i + 1, image.url);
-        const filepath = path.join(downloadDir, filename);
-        
-        const success = await this.downloadSingleImage(image.url, filepath);
-        
-        if (success) {
-          // ENHANCED: Get actual dimensions and validate quality
-          const actualDimensions = await this.getActualImageDimensions(filepath);
-          const fileSize = await this.getFileSize(filepath);
-          
-          // ENHANCED: Strict quality validation
-          if (this.validateImageQuality(actualDimensions, fileSize, filepath)) {
-            downloadedImages.push({
-              filename: filename,
-              filepath: filepath,
-              originalUrl: image.url,
-              role: role.name,
-              character: role.character || role.characterName,
-              title: image.title,
-              source: image.source,
-              sourceUrl: image.sourceUrl,
-              actualWidth: actualDimensions.width,
-              actualHeight: actualDimensions.height,
-              fileSize: fileSize,
-              qualityScore: image.qualityScore || 0,
-              tags: [
-                role.media_type || 'unknown', 
-                'enhanced_search',
-                role.isVoiceRole ? 'voice_role' : 'live_action',
-                'quality_filtered'
-              ]
-            });
-            
-            logger.info(`✅ Downloaded QUALITY: ${filename} (${actualDimensions.width}x${actualDimensions.height})`);
-          } else {
-            // Remove low-quality images
-            await fs.unlink(filepath);
-            logger.info(`❌ Quality rejected: ${filename} (${actualDimensions.width}x${actualDimensions.height})`);
-          }
+      const success = await this.downloadSingleImage(image.url, filepath);
+      
+      if (success) {
+        const actualDimensions = await this.getActualImageDimensions(filepath);
+        const fileSize = await this.getFileSize(filepath);
+
+        if (this.validateImageQuality(actualDimensions, fileSize, filepath)) {
+          const entry = {
+            filename: filename,
+            filepath: filepath,
+            originalUrl: image.url,
+            role: role.name,
+            character: role.character || role.characterName,
+            title: image.title,
+            source: image.source,
+            sourceUrl: image.sourceUrl,
+            actualWidth: actualDimensions.width,
+            actualHeight: actualDimensions.height,
+            fileSize: fileSize,
+            qualityScore: image.qualityScore || 0,
+            tags: [
+              role.media_type || 'unknown', 
+              'enhanced_search',
+              role.isVoiceRole ? 'voice_role' : 'live_action',
+              'quality_filtered'
+            ]
+          };
+
+          logger.info(`✅ Downloaded QUALITY: ${filename} (${actualDimensions.width}x${actualDimensions.height})`);
+          return entry;
         }
-        
-      } catch (error) {
-        logger.warn(`❌ Download failed: ${image.title} - ${error.message}`);
+
+        await fs.unlink(filepath);
+        logger.info(`❌ Quality rejected: ${filename} (${actualDimensions.width}x${actualDimensions.height})`);
+      }
+
+      return null;
+    });
+
+    const downloadedImages = [];
+    let failures = 0;
+
+    for (const result of settled) {
+      if (!result.ok) {
+        failures++;
+        logger.warn(`❌ Download error: ${result.error.message}`);
+      } else if (result.value) {
+        downloadedImages.push(result.value);
       }
     }
-    
+
+    if (failures > 0) {
+      logger.warn(`⚠️ ${failures} download(s) failed out of ${images.length}`);
+    }
+
     return downloadedImages;
   }
   

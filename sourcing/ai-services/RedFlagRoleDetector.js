@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 const axios = require('axios');
+const serpapi = require('../../utils/serpapi');
 
 /**
  * SIMPLE: Red Flag Emergency - TMDb API (Because We Had It All Along)
@@ -370,19 +371,8 @@ class RedFlagRoleDetector {
    * Perform web search using SerpAPI
    */
   async performWebSearch(query) {
-    const params = {
-      api_key: this.serpApiKey,
-      engine: 'google',
-      q: query,
-      num: 10
-    };
-
-    const response = await axios.get('https://serpapi.com/search', { 
-      params,
-      timeout: 10000
-    });
-
-    return response.data;
+    // Shared client: retries transient failures instead of losing the query.
+    return serpapi.searchWeb(query, { timeout: 10000 });
   }
 
   /**
