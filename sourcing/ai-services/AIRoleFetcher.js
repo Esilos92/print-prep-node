@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const config = require('../../utils/config');
 const { PROMPTS, PROMPT_CONFIG } = require('../config/prompts.js');
 
 class AIRoleFetcher {
@@ -63,7 +64,7 @@ class AIRoleFetcher {
       const simplePrompt = PROMPTS.FETCH_ROLES(celebrityName, 8);
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: config.models.roleDiscovery,
         messages: [
           {
             role: "system",
@@ -103,7 +104,7 @@ Return what you can find:
 [{"character": "Character Name", "title": "Project Title", "franchise": "Series name or null", "medium": "live_action_movie", "year": "YYYY", "popularity": "medium"}]`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: config.models.roleDiscovery,
         messages: [
           {
             role: "system",
@@ -266,7 +267,7 @@ Return what you can find:
     if (this.hasOpenAI) {
       try {
         await this.openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: config.models.roleDiscovery,
           messages: [{ role: "user", content: "Test" }],
           max_tokens: 5
         });

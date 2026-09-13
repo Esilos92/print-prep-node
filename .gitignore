@@ -62,3 +62,6 @@ temp/
 # Env templates are tracked as .env.example only
 .env.backup
 .env.*.backup
+
+# Role discovery cache
+.cache/

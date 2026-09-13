@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const config = require('../../utils/config');
 const serpapi = require('../../utils/serpapi');
 
 class SimpleRoleVerifier {
@@ -116,7 +117,7 @@ Only say NO if you're absolutely certain it's wrong.
 Answer: HIGH|YES|reason OR MEDIUM|NO|reason`;
 
         const completion = await this.openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: config.models.roleDiscovery,
           messages: [{ role: "user", content: prompt }],
           temperature: 0.1,
           max_tokens: 100

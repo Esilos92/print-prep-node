@@ -6,11 +6,71 @@ const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
+const rateLimit = require('express-rate-limit');
 const { PREFIX: PROGRESS_PREFIX } = require('./utils/progress');
 
 const app = express();
+
+/**
+ * Behind a reverse proxy the client IP arrives in X-Forwarded-For; without
+ * this the rate limiter buckets every request under the proxy's own address.
+ */
+app.set('trust proxy', 1);
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+
+/**
+ * Optional shared-secret auth.
+ *
+ * Off unless API_KEY is set, so enabling it is a deliberate act and does not
+ * strand a working dashboard. Note that a key shipped to a browser is not a
+ * secret — this protects against drive-by abuse of a public port, not against
+ * a determined attacker who can read the page source. The durable fix is to
+ * stop exposing port 4000 at all and have the dashboard's server call it over
+ * localhost.
+ */
+const API_KEY = process.env.API_KEY;
+
+function requireApiKey(req, res, next) {
+  if (!API_KEY) return next();
+
+  const presented = req.get('X-API-Key') || req.query.api_key;
+  if (presented === API_KEY) return next();
+
+  return res.status(401).json({ error: 'Missing or invalid API key' });
+}
+
+/**
+ * Rate limit. Generous enough that a person clicking through the dashboard
+ * never notices, tight enough that a loop cannot drain SerpApi, OpenAI and
+ * Drive quota unattended.
+ */
+const jobLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: parseInt(process.env.MAX_JOBS_PER_HOUR, 10) || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many jobs started from this address. Try again later.' }
+});
+
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: parseInt(process.env.MAX_READS_PER_MINUTE, 10) || 240,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use('/api/', readLimiter);
+
+/**
+ * Hard ceiling on simultaneous jobs.
+ *
+ * Each job spawns a Node process that downloads, resizes and zips. This box
+ * has one vCPU, 2 GB and a history of being OOM-killed mid-zip; without a cap
+ * a handful of concurrent requests is an outage rather than a slowdown.
+ */
+const MAX_CONCURRENT_JOBS = parseInt(process.env.MAX_CONCURRENT_JOBS, 10) || 2;
 
 // Job tracking in memory (will persist in files later)
 const activeJobs = new Map();
@@ -197,12 +257,20 @@ function invalidCelebrityName(value) {
   return null;
 }
 
-app.post('/api/jobs', async (req, res) => {
+app.post('/api/jobs', requireApiKey, jobLimiter, async (req, res) => {
   const { celebrity } = req.body;
 
   const nameError = invalidCelebrityName(celebrity);
   if (nameError) {
     return res.status(400).json({ error: nameError });
+  }
+
+  if (activeJobs.size >= MAX_CONCURRENT_JOBS) {
+    return res.status(429).json({
+      error: `Already running ${activeJobs.size} job(s). Wait for one to finish.`,
+      activeJobs: activeJobs.size,
+      maxConcurrent: MAX_CONCURRENT_JOBS
+    });
   }
 
   // Generate unique job ID
@@ -306,7 +374,7 @@ app.get('/api/jobs/:jobId/download', async (req, res) => {
 });
 
 // 5. Cancel running job
-app.delete('/api/jobs/:jobId', (req, res) => {
+app.delete('/api/jobs/:jobId', requireApiKey, (req, res) => {
   const { jobId } = req.params;
   const job = activeJobs.get(jobId);
 
@@ -503,7 +571,7 @@ app.get('/download/:filename', async (req, res) => {
 });
 
 // 🎯 NEW: Admin endpoint to view all saved download links
-app.get('/api/admin/download-links', async (req, res) => {
+app.get('/api/admin/download-links', requireApiKey, async (req, res) => {
   try {
     const linksData = await fs.readFile(DOWNLOAD_LINKS_FILE, 'utf8');
     const downloadLinks = JSON.parse(linksData);
@@ -514,7 +582,7 @@ app.get('/api/admin/download-links', async (req, res) => {
 });
 
 // 🎯 NEW: Admin endpoint to manually save a download link
-app.post('/api/admin/download-links', async (req, res) => {
+app.post('/api/admin/download-links', requireApiKey, async (req, res) => {
   const { jobId, celebrity, downloadLink } = req.body;
   
   if (!jobId || !celebrity || !downloadLink) {
@@ -583,6 +651,8 @@ function start() {
     app.listen(PORT, () => {
       console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
       console.log(`🔧 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🔒 API key: ${API_KEY ? 'required' : 'NOT SET — endpoints are open to anyone who can reach this port'}`);
+      console.log(`🚦 Limits: ${MAX_CONCURRENT_JOBS} concurrent job(s), ${jobLimiter.limit ?? ''} jobs/hour per address`);
       console.log(`💾 Persistent storage: ${JOBS_DATA_FILE}, ${DOWNLOAD_LINKS_FILE}`);
     });
   }).catch(error => {

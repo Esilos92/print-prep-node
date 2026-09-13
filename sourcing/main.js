@@ -1,8 +1,10 @@
 const AIRoleFetcher = require('./ai-services/AIRoleFetcher.js');
+const config = require('../utils/config');
 const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
 const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js');
 const RedFlagRoleDetector = require('./ai-services/RedFlagRoleDetector.js');
 const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
+const roleCache = require('../utils/roleCache');
 
 class CelebrityRoleOrchestrator {
   constructor() {
@@ -20,10 +22,19 @@ class CelebrityRoleOrchestrator {
     try {
       console.log(`\n🎬 Starting enhanced role discovery for: ${celebrityName}`);
       
-      // Check cache first
-      if (this.cache.has(celebrityName)) {
-        console.log(`💾 Using cached results for ${celebrityName}`);
-        return this.cache.get(celebrityName);
+      /**
+       * Disk cache, not the in-process Map this used to consult.
+       *
+       * Every job is a fresh `node index.js`, so the Map was empty at start
+       * and discarded at exit — it never returned a hit in its life. A
+       * convention roster repeats the same performers across events, and a
+       * hit here skips discovery, verification and search-term generation
+       * entirely.
+       */
+      const cached = await roleCache.get(celebrityName);
+      if (cached) {
+        console.log(`💾 Using cached roles for ${celebrityName} (cached ${cached.ageHours}h ago)`);
+        return cached.value;
       }
 
       // Step 1: AI discovers roles with universal approach
@@ -112,8 +123,7 @@ class CelebrityRoleOrchestrator {
       const optimizationStats = this.searchOptimizer.getOptimizationStats(rolesWithStrategies);
       const finalResults = this.processOptimizedResults(celebrityName, rolesWithStrategies, optimizationStats);
 
-      // Cache results
-      this.cache.set(celebrityName, finalResults);
+      await roleCache.set(celebrityName, finalResults);
 
       console.log(`✅ Role discovery complete: ${finalResults.roles.length} optimized roles for ${celebrityName}`);
       console.log(`📊 Expected image volume: ${this.estimateImageVolume(finalResults)} images`);
@@ -191,8 +201,7 @@ class CelebrityRoleOrchestrator {
         }
       };
       
-      // Cache results
-      this.cache.set(celebrityName, finalResults);
+      await roleCache.set(celebrityName, finalResults);
       
       console.log(`✅ Enhanced emergency recovery complete: ${finalResults.roles.length} roles for ${celebrityName}`);
       console.log(`📊 Recovery stats: ${finalResults.emergencyRecovery.recoveryStats.successRate}% success rate`);
@@ -247,7 +256,7 @@ Format: TITLE|CORRECTED_NAME|CONFIDENCE
 If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
 
       const validation = await this.roleFetcher.openai.chat.completions.create({
-        model: "gpt-4o-mini", // Cost-efficient for simple validation
+        model: config.models.roleDiscovery, // Cost-efficient for simple validation
         messages: [{ role: "user", content: validationPrompt }],
         temperature: 0.1,
         max_tokens: 300
@@ -676,7 +685,7 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
     try {
       if (this.roleFetcher.hasOpenAI) {
         const completion = await this.roleFetcher.openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: config.models.roleDiscovery,
           messages: [{ role: "user", content: simplifiedPrompt }],
           temperature: 0.5,
           max_tokens: 500

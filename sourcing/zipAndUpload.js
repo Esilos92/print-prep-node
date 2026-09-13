@@ -164,7 +164,8 @@ class ZipUploader {
       };
       
       const response = await drive.files.create({
-        resource: fileMetadata,
+        // `resource` is the legacy alias; googleapis v180 wants requestBody.
+        requestBody: fileMetadata,
         media: media,
         fields: 'id,webViewLink',
         supportsAllDrives: true

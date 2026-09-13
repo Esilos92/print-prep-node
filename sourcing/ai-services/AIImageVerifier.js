@@ -235,7 +235,7 @@ Example: VALID|8`;
     });
 
     const completion = await this.openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: config.models.vision,
       messages: [{ role: 'user', content }],
       max_tokens: 10,
       temperature: 0
@@ -450,7 +450,7 @@ Example: VALID|8`;
 Respond with just a number 1-10.`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: config.models.vision,
         messages: [{
           role: "user",
           content: [
@@ -502,7 +502,7 @@ Respond with just a number 1-10.`;
     if (this.hasOpenAI) {
       try {
         const completion = await this.openai.chat.completions.create({
-          model: "gpt-4o",
+          model: config.models.vision,
           messages: [{ role: "user", content: "Test" }],
           max_tokens: 5
         });

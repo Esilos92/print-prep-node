@@ -104,6 +104,22 @@ const config = {
     minDimensions: PRINT_FORMATS
   },
 
+  /**
+   * Model identifiers, in one place.
+   *
+   * These were hardcoded across eleven call sites, so changing provider or
+   * model meant hunting through five files and missing one. Override any of
+   * them from .env without touching code.
+   */
+  models: {
+    // Role discovery, character validation — cheap, high volume.
+    roleDiscovery: process.env.MODEL_ROLE_DISCOVERY || 'gpt-4o-mini',
+    // Identity verification from images — the quality-critical one.
+    vision: process.env.MODEL_VISION || 'gpt-4o',
+    // Claude fallback when the primary vision service errors.
+    visionFallback: process.env.ANTHROPIC_VERIFY_MODEL || 'claude-opus-5'
+  },
+
   verification: {
     /**
      * "low" downsamples the image to roughly 512px before the model sees it,
