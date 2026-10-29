@@ -97,8 +97,11 @@ async function tmdbCandidates(role) {
 
     const byVotes = (a, b) => (b.vote_count || 0) - (a.vote_count || 0) || (b.width || 0) - (a.width || 0);
     const usable = (img) => bigEnough(img.width, img.height);
+    // English posters carry the title; textless ones are fine as a fallback.
+    const posterOrder = (a, b) => (b.iso_639_1 === 'en') - (a.iso_639_1 === 'en') || byVotes(a, b);
 
-    const posters = (response.data?.posters || []).filter(usable).sort(byVotes).slice(0, 8);
+    // Posters are not size-filtered: the guaranteed poster must exist even when small.
+    const posters = (response.data?.posters || []).sort(posterOrder).slice(0, 8);
     const stills = (response.data?.backdrops || []).filter(usable).sort(byVotes).slice(0, 16);
 
     const toCandidate = (kind) => (img, i) => ({
@@ -109,6 +112,8 @@ async function tmdbCandidates(role) {
       height: img.height,
       source: 'tmdb',
       hint: kind,
+      lang: img.iso_639_1 || null,
+      belowFloor: !usable(img),
       rank: i
     });
 
@@ -124,7 +129,8 @@ async function tmdbCandidates(role) {
 /** Queries used when no model is available, or as a backstop if it fails. */
 function templateQueries(celebrityName, role) {
   const t = `"${role.title}"`;
-  const c = `"${role.character}"`;
+  // "Will Wilson / Jacob Wells" -> search the first name; quoting both finds nothing.
+  const c = `"${(role.character || '').split(/\s*\/\s*/)[0]}"`;
   const tv = role.mediaType === 'tv' || /tv/.test(role.medium || '');
 
   if (isAnimated(role)) {

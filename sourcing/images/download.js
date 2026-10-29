@@ -15,7 +15,7 @@ const FORMATS = new Set(['jpeg', 'png', 'webp', 'avif', 'tiff', 'heif']);
  * record its true pixel dimensions and a perceptual hash for de-duplication.
  * Returns null for anything unusable; never throws.
  */
-async function downloadOne(candidate, dir) {
+async function downloadOne(candidate, dir, { anySize = false } = {}) {
   try {
     const response = await axios.get(candidate.url, {
       responseType: 'arraybuffer',
@@ -37,7 +37,7 @@ async function downloadOne(candidate, dir) {
     const rotated = (meta.orientation || 1) >= 5;
     const width = rotated ? meta.height : meta.width;
     const height = rotated ? meta.width : meta.height;
-    if (!bigEnough(width, height)) return null;
+    if (!anySize && !bigEnough(width, height)) return null;
 
     const id = crypto.createHash('sha1').update(candidate.url).digest('hex').slice(0, 12);
     const filepath = path.join(dir, `${id}.${meta.format === 'jpeg' ? 'jpg' : meta.format}`);
@@ -123,4 +123,4 @@ async function downloadCandidates(candidates, dir, { seen = [], triedUrls = new 
   return { images: kept, attempted: fresh.length };
 }
 
-module.exports = { downloadCandidates, perceptualHash, hammingDistance, isDuplicate };
+module.exports = { downloadCandidates, downloadOne, perceptualHash, hammingDistance, isDuplicate };

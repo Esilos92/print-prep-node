@@ -115,11 +115,14 @@ async function main() {
     progress.phase('image_search', 40, 'Finding photos...');
     logger.info('🖼️  Step 2: Sourcing photos (TMDb official images + targeted search, batch review)...');
 
-    const referencePath = config.verification.useReferenceImage
-      ? await new ReferencePortrait().getPortrait(celebrityName, path.join(workDir, 'reference'))
-      : null;
+    const referencePaths = config.verification.useReferenceImage
+      ? await new ReferencePortrait().getPortraits(celebrityName, path.join(workDir, 'reference'), 3)
+      : [];
+    if (referencePaths.length === 0) {
+      progress.problem('No reference photo found on TMDb — identity checks are weaker for this run.');
+    }
 
-    const context = { referencePath, seen: [], triedUrls: new Set() };
+    const context = { referencePaths, seen: [], triedUrls: new Set() };
     const selectedImages = [];
     const roleReports = [];
     const outages = [];

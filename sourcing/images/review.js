@@ -63,14 +63,15 @@ const REVIEW_SCHEMA = {
   }
 };
 
-function buildPrompt(celebrityName, role, count, hasReference) {
+function buildPrompt(celebrityName, role, count, referenceCount) {
+  const hasReference = referenceCount > 0;
   const animated = isAnimated(role);
   const target = animated
     ? `the animated character ${role.character} from "${role.title}" (voiced by ${celebrityName})`
     : `${celebrityName} as ${role.character} in "${role.title}"`;
 
   return `You are selecting photos for autograph prints of ${target}.
-${hasReference ? `The first image (REFERENCE) is a confirmed photo of ${celebrityName}. Use it to judge identity by facial structure, not by hair, clothing, age or lighting — the same person may look different in character.\n` : ''}
+${hasReference ? `The first ${referenceCount === 1 ? 'image (REFERENCE) is a confirmed photo' : `${referenceCount} images (REFERENCE 1-${referenceCount}) are confirmed photos`} of ${celebrityName}. Judge identity by facial structure — eyes, nose, jaw, ears, face shape — not by hair, clothing, age or lighting; the same person may look different in character. Lookalike co-stars are common: if the face does not clearly match, target_present is false.\n` : ''}
 Then come ${count} candidate images, labelled Image 1 to Image ${count}. Each label gives where the image was found.
 
 For EACH candidate report:
@@ -107,13 +108,13 @@ function describeSource(image) {
   return `web: "${(image.title || '').slice(0, 80)}" (${host})`;
 }
 
-async function callOpenAI(prompt, reference, images) {
+async function callOpenAI(prompt, references, images, { maxTokens, schema = REVIEW_SCHEMA, effort } = {}) {
   const detail = config.verification.visionDetail;
   const content = [{ type: 'text', text: prompt }];
 
-  if (reference) {
-    content.push({ type: 'text', text: 'REFERENCE:' });
-    content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${reference}`, detail } });
+  for (const [i, ref] of references.entries()) {
+    content.push({ type: 'text', text: references.length > 1 ? `REFERENCE ${i + 1}:` : 'REFERENCE:' });
+    content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${ref}`, detail } });
   }
   for (const [i, image] of images.entries()) {
     content.push({ type: 'text', text: `Image ${i + 1} — ${describeSource(image)}:` });
@@ -123,18 +124,19 @@ async function callOpenAI(prompt, reference, images) {
   const reply = await chat({
     model: config.models.vision,
     messages: [{ role: 'user', content }],
-    maxTokens: 250 * images.length,
-    schema: REVIEW_SCHEMA
+    maxTokens: maxTokens || 250 * images.length,
+    schema,
+    effort
   });
-  return reply.images || [];
+  return schema === REVIEW_SCHEMA ? (reply.images || []) : reply;
 }
 
 /** Claude fallback with the same schema, forced through a tool call. */
-async function callClaude(prompt, reference, images) {
+async function callClaude(prompt, references, images, { schema = REVIEW_SCHEMA } = {}) {
   const content = [{ type: 'text', text: prompt }];
-  if (reference) {
-    content.push({ type: 'text', text: 'REFERENCE:' });
-    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: reference } });
+  for (const [i, ref] of references.entries()) {
+    content.push({ type: 'text', text: references.length > 1 ? `REFERENCE ${i + 1}:` : 'REFERENCE:' });
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: ref } });
   }
   for (const [i, image] of images.entries()) {
     content.push({ type: 'text', text: `Image ${i + 1} — ${describeSource(image)}:` });
@@ -151,7 +153,7 @@ async function callClaude(prompt, reference, images) {
     body: JSON.stringify({
       model: config.models.visionFallback,
       max_tokens: 300 * images.length,
-      tools: [{ name: 'report', description: 'Report the review', input_schema: REVIEW_SCHEMA.schema }],
+      tools: [{ name: 'report', description: 'Report the review', input_schema: schema.schema }],
       tool_choice: { type: 'tool', name: 'report' },
       messages: [{ role: 'user', content }]
     })
@@ -163,7 +165,7 @@ async function callClaude(prompt, reference, images) {
   }
   const data = await response.json();
   const tool = (data.content || []).find(c => c.type === 'tool_use');
-  return tool?.input?.images || [];
+  return schema === REVIEW_SCHEMA ? (tool?.input?.images || []) : (tool?.input || {});
 }
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -173,13 +175,13 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * only when no service could review it — the caller reports that as an
  * outage, never as "rejected".
  */
-async function reviewBatch(prompt, reference, images) {
+async function reviewBatch(prompt, references, images, options = {}) {
   const errors = [];
 
   if (process.env.OPENAI_API_KEY) {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        return { results: await callOpenAI(prompt, reference, images), service: 'openai' };
+        return { results: await callOpenAI(prompt, references, images, options), service: 'openai' };
       } catch (error) {
         errors.push(error.message);
         if (attempt < 3) await sleep(2000 * attempt * attempt);
@@ -189,7 +191,7 @@ async function reviewBatch(prompt, reference, images) {
 
   if (process.env.ANTHROPIC_API_KEY) {
     try {
-      return { results: await callClaude(prompt, reference, images), service: 'claude' };
+      return { results: await callClaude(prompt, references, images, options), service: 'claude' };
     } catch (error) {
       errors.push(error.message);
     }
@@ -219,7 +221,7 @@ function decide(review, role) {
   if (kind === 'other') return { accepted: false, why: 'not_a_usable_kind' };
   if (!review.from_production) return { accepted: false, why: animated ? 'not_official' : 'not_from_production' };
   if (!review.matches_title) return { accepted: false, why: 'other_project' };
-  if ((review.print_quality || 0) < 2) return { accepted: false, why: 'low_quality' };
+  if ((review.print_quality || 0) < config.sourcing.minPrintQuality) return { accepted: false, why: 'low_quality' };
 
   // A poster qualifies on being the official poster; the person need not be on it.
   if (kind !== 'poster') {
@@ -234,10 +236,18 @@ function decide(review, role) {
  * Review downloaded images for one role. Returns each image annotated with
  * `review` and `decision`, plus counts of why images were rejected.
  */
-async function reviewImages(images, { celebrityName, role, referencePath }) {
+async function loadReferences(referencePaths, maxSide) {
+  const refs = [];
+  for (const p of referencePaths || []) {
+    try { refs.push(await toJpegBase64(p, maxSide)); } catch { /* skip */ }
+  }
+  return refs;
+}
+
+async function reviewImages(images, { celebrityName, role, referencePaths }) {
   const animated = isAnimated(role);
   // A face photo of the performer says nothing about an animated character.
-  const reference = !animated && referencePath ? await toJpegBase64(referencePath, 768) : null;
+  const references = animated ? [] : await loadReferences(referencePaths, 768);
 
   const batchSize = Math.max(1, config.sourcing.reviewBatchSize);
   const reviewed = [];
@@ -255,11 +265,11 @@ async function reviewImages(images, { celebrityName, role, referencePath }) {
     }
     if (batch.length === 0) continue;
 
-    const prompt = buildPrompt(celebrityName, role, batch.length, !!reference);
+    const prompt = buildPrompt(celebrityName, role, batch.length, references.length);
 
     let outcome;
     try {
-      outcome = await reviewBatch(prompt, reference, batch);
+      outcome = await reviewBatch(prompt, references, batch);
     } catch (error) {
       outageError = error;
       reasons.review_unavailable = (reasons.review_unavailable || 0) + batch.length;
@@ -286,4 +296,52 @@ async function reviewImages(images, { celebrityName, role, referencePath }) {
   return { reviewed, reasons };
 }
 
-module.exports = { reviewImages, decide, buildPrompt, REVIEW_SCHEMA };
+const CONFIRM_SCHEMA = {
+  name: 'identity_check',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['same_person', 'confidence', 'reason'],
+    properties: {
+      same_person: { type: 'boolean' },
+      confidence: { type: 'integer' },
+      reason: { type: 'string' }
+    }
+  }
+};
+
+/**
+ * Second, stricter identity check on one photo at higher resolution.
+ *
+ * The batch review sees eight small images at once, which is enough to sort
+ * them but not to tell a lookalike co-star from the performer. Every photo
+ * of a person is confirmed on its own before it can be delivered. A failed
+ * check (API error) returns null, and the caller does not deliver the photo.
+ */
+async function confirmIdentity(image, { celebrityName, role, referencePaths }) {
+  const references = await loadReferences(referencePaths, 1024);
+  if (references.length === 0) return { same_person: true, confidence: 0, reason: 'no reference available', unchecked: true };
+
+  const candidate = { ...image, b64: await toJpegBase64(image.filepath, 1280) };
+  const many = references.length > 1;
+  const prompt = `${many ? `REFERENCE 1-${references.length} are confirmed photos` : 'REFERENCE is a confirmed photo'} of ${celebrityName}, taken at different times.
+The last image is a candidate for an autograph print of ${celebrityName} as ${role.character} in "${role.title}"${image.decision?.bucket === 'group' ? '. It is a group photo: decide whether ' + celebrityName + ' is one of the people in it' : ''}.
+
+Is ${celebrityName} in the candidate image? Compare facial structure — eye shape and spacing, nose, mouth, jaw and chin, ears, hairline — and allow for age, makeup, lighting and hair. Co-stars and lookalikes are common in these searches; if any feature clearly differs, answer false.
+
+confidence: 1-10 for your answer. reason: at most 12 words.`;
+
+  try {
+    const { results } = await reviewBatch(prompt, references, [candidate], {
+      schema: CONFIRM_SCHEMA,
+      maxTokens: 200,
+      effort: 'medium'
+    });
+    return results;
+  } catch (error) {
+    console.log(`⚠️ Identity confirmation unavailable: ${error.message}`);
+    return null;
+  }
+}
+
+module.exports = { reviewImages, confirmIdentity, decide, buildPrompt, REVIEW_SCHEMA };

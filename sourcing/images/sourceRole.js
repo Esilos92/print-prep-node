@@ -1,8 +1,8 @@
 const path = require('path');
 const config = require('../../utils/config');
 const { tmdbCandidates, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
-const { downloadCandidates } = require('./download');
-const { reviewImages } = require('./review');
+const { downloadCandidates, downloadOne } = require('./download');
+const { reviewImages, confirmIdentity } = require('./review');
 
 /**
  * Finds, reviews and selects the photos for one role.
@@ -51,8 +51,66 @@ function mergeReasons(into, from) {
   for (const [key, value] of Object.entries(from)) into[key] = (into[key] || 0) + value;
 }
 
+/**
+ * The title's official poster, taken straight from TMDb: it is the record,
+ * so it needs no identity check, and it is always delivered at 11x17.
+ */
+async function officialPoster(official, dir, triedUrls) {
+  const fs = require('fs').promises;
+  await fs.mkdir(dir, { recursive: true });
+  for (const candidate of official.filter(c => c.hint === 'poster').slice(0, 3)) {
+    triedUrls.add(candidate.url);
+    const image = await downloadOne(candidate, dir, { anySize: true });
+    if (!image) continue;
+    return {
+      ...image,
+      guaranteedPoster: true,
+      review: { kind: 'poster', print_quality: 5, identity_confidence: 0, keep_box: null, reason: 'official TMDb poster' },
+      decision: { accepted: true, bucket: 'poster' }
+    };
+  }
+  return null;
+}
+
+/**
+ * Choose the final photos, confirming identity one by one. A photo that
+ * fails the stricter check is replaced by the next best, so a lookalike
+ * costs a slot only until something better is found.
+ */
+async function selectConfirmed(accepted, count, { celebrityName, role, referencePaths, report }) {
+  const needsCheck = (image) => !isAnimated(role) && image.decision.bucket !== 'poster';
+  const pool = accepted.slice();
+  const confirmed = new Set();
+  let checks = 0;
+  const maxChecks = count * 3;
+
+  for (;;) {
+    const chosen = selectMix(pool, count);
+    const pending = chosen.filter(image => needsCheck(image) && !confirmed.has(image));
+    if (pending.length === 0 || checks >= maxChecks) {
+      return chosen.filter(image => !needsCheck(image) || confirmed.has(image));
+    }
+
+    for (const image of pending) {
+      checks++;
+      const result = await confirmIdentity(image, { celebrityName, role, referencePaths });
+      const pass = result && result.same_person
+        && (result.unchecked || result.confidence >= config.sourcing.confirmConfidence);
+      if (pass) {
+        confirmed.add(image);
+        image.identityCheck = result;
+      } else {
+        pool.splice(pool.indexOf(image), 1);
+        const why = result ? 'failed_identity_check' : 'identity_check_unavailable';
+        report.rejected[why] = (report.rejected[why] || 0) + 1;
+      }
+      if (checks >= maxChecks) break;
+    }
+  }
+}
+
 async function sourceRole(celebrityName, role, workDir, context) {
-  const { referencePath, seen, triedUrls } = context;
+  const { referencePaths, seen, triedUrls } = context;
   const dir = path.join(workDir, 'candidates', `${role.tmdbId || role.title}`.replace(/[^\w-]+/g, '_'));
   const perPass = config.sourcing.candidatesPerPass;
   const animated = isAnimated(role);
@@ -82,7 +140,7 @@ async function sourceRole(celebrityName, role, workDir, context) {
     report.downloaded += images.length;
     if (images.length === 0) return;
 
-    const { reviewed, reasons } = await reviewImages(images, { celebrityName, role, referencePath });
+    const { reviewed, reasons } = await reviewImages(images, { celebrityName, role, referencePaths });
     report.reviewed += reviewed.length;
     mergeReasons(report.rejected, reasons);
 
@@ -101,6 +159,8 @@ async function sourceRole(celebrityName, role, workDir, context) {
       return [];
     })
   ]);
+  const poster = config.sourcing.alwaysPoster ? await officialPoster(official, dir, triedUrls) : null;
+  report.officialPoster = !!poster;
   await runPass([...official, ...web]);
 
   // Pass 2, only when the first came up short.
@@ -110,7 +170,25 @@ async function sourceRole(celebrityName, role, workDir, context) {
     await runPass(more);
   }
 
-  const selected = selectMix(accepted, config.sourcing.imagesPerRole);
+  const slots = config.sourcing.imagesPerRole - (poster ? 1 : 0);
+  const selected = await selectConfirmed(accepted, slots, { celebrityName, role, referencePaths, report });
+
+  // A small TMDb poster prints soft; a larger reviewed one from the web wins.
+  const posterPixels = (img) => img.width * img.height;
+  const biggerPoster = poster && accepted
+    .filter(i => i.decision.bucket === 'poster' && posterPixels(i) > posterPixels(poster) * 1.5)
+    .sort((a, b) => posterPixels(b) - posterPixels(a))[0];
+
+  if (biggerPoster) {
+    biggerPoster.guaranteedPoster = true;
+    if (!selected.includes(biggerPoster)) selected.unshift(biggerPoster);
+  } else if (poster) {
+    selected.unshift(poster);
+  } else if (config.sourcing.alwaysPoster) {
+    const best = selected.find(i => i.decision.bucket === 'poster');
+    if (best) best.guaranteedPoster = true;
+    else console.log(`⚠️ ${role.character}: no official poster found for ${role.title}`);
+  }
   // Later roles must not reuse these pictures.
   seen.push(...selected);
 

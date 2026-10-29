@@ -88,19 +88,23 @@ function planCrop(image, W, H, format) {
 
   if (keep) {
     if (keep.x1 - keep.x0 > cw + 1 || keep.y1 - keep.y0 > ch + 1) {
-      return { skip: 'crop would cut the subject' };
+      if (!(image.guaranteedPoster && format === '11x17')) return { skip: 'crop would cut the subject' };
+      // Guaranteed poster that won't fit: centre crop, trimming the edges evenly.
+    } else {
+      // Centre on the keep region, then slide just enough to contain it.
+      left = Math.round((keep.x0 + keep.x1) / 2 - cw / 2);
+      top = Math.round((keep.y0 + keep.y1) / 2 - ch / 2);
+      left = Math.min(Math.max(left, Math.ceil(keep.x1 - cw)), Math.floor(keep.x0));
+      top = Math.min(Math.max(top, Math.ceil(keep.y1 - ch)), Math.floor(keep.y0));
+      left = Math.min(Math.max(0, left), W - cw);
+      top = Math.min(Math.max(0, top), H - ch);
     }
-    // Centre on the keep region, then slide just enough to contain it.
-    left = Math.round((keep.x0 + keep.x1) / 2 - cw / 2);
-    top = Math.round((keep.y0 + keep.y1) / 2 - ch / 2);
-    left = Math.min(Math.max(left, Math.ceil(keep.x1 - cw)), Math.floor(keep.x0));
-    top = Math.min(Math.max(top, Math.ceil(keep.y1 - ch)), Math.floor(keep.y0));
-    left = Math.min(Math.max(0, left), W - cw);
-    top = Math.min(Math.max(0, top), H - ch);
   }
 
   const dpi = Math.floor(Math.min(cw / sheet.wIn, ch / sheet.hIn));
-  if (dpi < config.print.minDpi && !config.print.allowUpscale) {
+  // The official poster always ships at 11x17, at whatever resolution exists.
+  const forced = image.guaranteedPoster && format === '11x17';
+  if (dpi < config.print.minDpi && !config.print.allowUpscale && !forced) {
     return { skip: `only ${dpi} DPI at ${format}` };
   }
 
