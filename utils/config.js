@@ -116,8 +116,13 @@ const config = {
     roleDiscovery: process.env.MODEL_ROLE_DISCOVERY || 'gpt-5.5',
     // Small text checks: name cleanup, yes/no role checks.
     fast: process.env.MODEL_FAST || 'gpt-5.4-mini',
-    // Identity verification from images — the quality-critical one.
+    // Final one-photo check (identity + quality) — the quality-critical one.
     vision: process.env.MODEL_VISION || 'gpt-5.5',
+    // First-pass batch sort of candidates. High volume, so a cheaper model;
+    // the final check above still decides identity.
+    review: process.env.MODEL_REVIEW || 'gpt-5.4-mini',
+    // Thinking effort for the final check: low keeps cost down.
+    finalCheckEffort: process.env.FINAL_CHECK_EFFORT || 'low',
     // Claude fallback when the primary vision service errors.
     visionFallback: process.env.ANTHROPIC_VERIFY_MODEL || 'claude-opus-5',
     // How much reasoning models think before answering: minimal|low|medium|high.
@@ -143,6 +148,12 @@ const config = {
     reviewBatchSize: int(process.env.REVIEW_BATCH_SIZE, 8),
     /** Reviewer's print-quality score (1-5) a photo needs. 3 = fine. */
     minPrintQuality: int(process.env.MIN_PRINT_QUALITY, 3),
+    /** Reference photos sent with each review / final check (era stills first). */
+    maxReferences: int(process.env.MAX_REFERENCES, 2),
+    /** Final checks allowed per photo slot (replacements for ones that fail). */
+    finalChecksPerSlot: int(process.env.FINAL_CHECKS_PER_SLOT, 2),
+    /** Run the wider second search even when the first found nothing usable. */
+    widenWhenEmpty: process.env.WIDEN_WHEN_EMPTY === 'true',
     /** Confidence (1-10) the one-photo identity check needs before delivery. */
     confirmConfidence: int(process.env.CONFIRM_CONFIDENCE, 8),
     /**

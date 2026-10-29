@@ -3,7 +3,7 @@ const config = require('../../utils/config');
 const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, titleCast, seriesContext, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
 const { planCrop } = require('./print');
 const { downloadCandidates, downloadOne, isDuplicate } = require('./download');
-const { reviewImages, confirmIdentity, finalVerdict, loadReferences } = require('./review');
+const { reviewImages, confirmIdentity, finalVerdict, referenceSet } = require('./review');
 const { mapLimit } = require('../../utils/concurrency');
 
 /**
@@ -116,11 +116,11 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
   const pool = accepted.slice();
   const confirmed = new Set();
   let checks = 0;
-  // The final check is strict, so allow several replacements per slot.
-  const maxChecks = count * 4;
-  // Load and encode the reference photos once, not once per check.
-  const era = await loadReferences(role.eraReferencePaths, 1024);
-  const references = [...era, ...await loadReferences(referencePaths, 1024)];
+  // A replacement or two per slot; more than that rarely finds a keeper.
+  const maxChecks = count * config.sourcing.finalChecksPerSlot;
+  // Load and encode the reference photos once, not once per check. Two is
+  // enough to judge a face; era stills come first.
+  const { references, eraCount } = await referenceSet(role, referencePaths);
 
   for (;;) {
     const chosen = selectMix(pool, count);
@@ -132,7 +132,7 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
     // Several checks at once: each one is a careful, slow call.
     const batch = pending.slice(0, Math.max(1, maxChecks - checks));
     checks += batch.length;
-    const results = await mapLimit(batch, 4, image => confirmIdentity(image, { celebrityName, role, references, eraCount: era.length }));
+    const results = await mapLimit(batch, 4, image => confirmIdentity(image, { celebrityName, role, references, eraCount }));
 
     batch.forEach((image, i) => {
       const result = results[i];
@@ -249,7 +249,10 @@ async function sourceRole(celebrityName, role, workDir, context) {
   await runPass([...tagged, ...fandom.filter(f => !f.belowFloor), ...official, ...web]);
 
   // Pass 2, only when the first came up short.
-  if (accepted.length < config.sourcing.minPerRole) {
+  // A role that found nothing usable in its best sources rarely recovers on
+  // page two, so the wider pass only runs when the first found something.
+  const worthWidening = accepted.length > 0 || config.sourcing.widenWhenEmpty;
+  if (accepted.length < config.sourcing.minPerRole && worthWidening) {
     console.log(`🔁 ${role.character}: ${accepted.length} accepted, widening the search`);
     const more = await googleCandidates(queries, { page: 1, animated }).catch(() => []);
     await runPass(more);
@@ -286,10 +289,9 @@ async function sourceRole(celebrityName, role, workDir, context) {
 
     const room = limit - upscale.length;
     if (room > 0 && tooSmall.length) {
-      const era = await loadReferences(role.eraReferencePaths, 1024);
-      const references = [...era, ...await loadReferences(referencePaths, 1024)];
+      const { references, eraCount } = await referenceSet(role, referencePaths);
       const shortlist = tooSmall.sort((a, b) => score(b) - score(a)).slice(0, room * 2);
-      const results = await mapLimit(shortlist, 4, image => confirmIdentity(image, { celebrityName, role, references, eraCount: era.length }));
+      const results = await mapLimit(shortlist, 4, image => confirmIdentity(image, { celebrityName, role, references, eraCount }));
       shortlist.forEach((image, i) => {
         const r = results[i];
         const identityOk = r && r.same_person && (r.confidence || 0) >= config.sourcing.confirmConfidence;

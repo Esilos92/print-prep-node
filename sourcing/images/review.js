@@ -162,7 +162,7 @@ function describeSource(image) {
   return `web: "${(image.title || '').slice(0, 80)}" (${host})`;
 }
 
-async function callOpenAI(prompt, references, images, { maxTokens, schema = REVIEW_SCHEMA, effort } = {}) {
+async function callOpenAI(prompt, references, images, { maxTokens, schema = REVIEW_SCHEMA, effort, model } = {}) {
   const detail = config.verification.visionDetail;
   const content = [{ type: 'text', text: prompt }];
 
@@ -176,7 +176,8 @@ async function callOpenAI(prompt, references, images, { maxTokens, schema = REVI
   }
 
   const reply = await chat({
-    model: config.models.vision,
+    // Batch sorting uses the cheaper review model unless told otherwise.
+    model: model || (schema === REVIEW_SCHEMA ? config.models.review : config.models.vision),
     messages: [{ role: 'user', content }],
     maxTokens: maxTokens || 250 * images.length,
     schema,
@@ -306,11 +307,25 @@ async function loadReferences(referencePaths, maxSide) {
   return refs;
 }
 
+/**
+ * The reference photos for a role, capped at MAX_REFERENCES. With era stills
+ * available, keep one recent profile photo too: era stills can have several
+ * people in them, and the profile photo shows which one is the target.
+ */
+async function referenceSet(role, referencePaths, maxSide = 768) {
+  const max = Math.max(1, config.sourcing.maxReferences);
+  const era = await loadReferences(role.eraReferencePaths, maxSide);
+  const recent = await loadReferences(referencePaths, maxSide);
+  const eraTake = recent.length && max > 1 ? Math.min(era.length, max - 1) : Math.min(era.length, max);
+  const references = [...era.slice(0, eraTake), ...recent].slice(0, max);
+  return { references, eraCount: eraTake };
+}
+
 async function reviewImages(images, { celebrityName, role, referencePaths }) {
   const animated = isAnimated(role);
   // A face photo of the performer says nothing about an animated character.
-  const era = animated ? [] : await loadReferences(role.eraReferencePaths, 768);
-  const references = animated ? [] : [...era, ...await loadReferences(referencePaths, 768)];
+  const refs = animated ? { references: [], eraCount: 0 } : await referenceSet(role, referencePaths);
+  const references = refs.references;
 
   const batchSize = Math.max(1, config.sourcing.reviewBatchSize);
   const reviewed = [];
@@ -332,7 +347,7 @@ async function reviewImages(images, { celebrityName, role, referencePaths }) {
     }
     if (batch.length === 0) return [];
 
-    const prompt = buildPrompt(celebrityName, role, batch.length, references.length, era.length);
+    const prompt = buildPrompt(celebrityName, role, batch.length, references.length, refs.eraCount);
     let outcome;
     try {
       outcome = await reviewBatch(prompt, references, batch);
@@ -441,7 +456,7 @@ Answer:
     const { results } = await reviewBatch(prompt, references, images, {
       schema: CONFIRM_SCHEMA,
       maxTokens: 300,
-      effort: 'medium'
+      effort: config.models.finalCheckEffort
     });
     return results;
   } catch (error) {
@@ -462,4 +477,4 @@ function finalVerdict(result) {
   return null;
 }
 
-module.exports = { reviewImages, confirmIdentity, finalVerdict, loadReferences, decide, buildPrompt, REVIEW_SCHEMA };
+module.exports = { reviewImages, confirmIdentity, finalVerdict, loadReferences, referenceSet, decide, buildPrompt, REVIEW_SCHEMA };
