@@ -135,6 +135,7 @@ async function toJpegBase64(filepath, maxSide = 768) {
 }
 
 function describeSource(image) {
+  if (image.source === 'closeup') return 'full-resolution close-up of the faces in Image 1';
   if (image.source === 'tmdb') return `TMDb official ${image.hint}`;
   let host = '';
   try { host = new URL(image.pageUrl || image.url).hostname; } catch { /* ignore */ }
@@ -345,49 +346,100 @@ async function reviewImages(images, { celebrityName, role, referencePaths }) {
 }
 
 const CONFIRM_SCHEMA = {
-  name: 'identity_check',
+  name: 'final_check',
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['same_person', 'confidence', 'reason'],
+    required: ['same_person', 'confidence', 'face_sharp', 'clean_image', 'good_expression',
+      'target_featured', 'print_quality', 'reason'],
     properties: {
       same_person: { type: 'boolean' },
       confidence: { type: 'integer' },
+      face_sharp: { type: 'boolean' },
+      clean_image: { type: 'boolean' },
+      good_expression: { type: 'boolean' },
+      target_featured: { type: 'boolean' },
+      print_quality: { type: 'integer' },
       reason: { type: 'string' }
     }
   }
 };
 
+/** Full-resolution close-up around the faces, so blur and artifacts are visible. */
+async function faceCloseup(image) {
+  const box = image.review?.keep_box;
+  if (!box) return null;
+  const meta = await sharp(image.filepath, { failOn: 'none' }).rotate().metadata();
+  const sideways = (meta.orientation || 1) >= 5;
+  const W = sideways ? meta.height : meta.width;
+  const H = sideways ? meta.width : meta.height;
+  const pad = 0.25;
+  const left = Math.max(0, Math.floor((box.x - box.w * pad) * W));
+  const top = Math.max(0, Math.floor((box.y - box.h * pad) * H));
+  const width = Math.min(W - left, Math.ceil(box.w * (1 + 2 * pad) * W));
+  const height = Math.min(H - top, Math.ceil(box.h * (1 + 2 * pad) * H));
+  if (width < 32 || height < 32) return null;
+  const buffer = await sharp(image.filepath, { failOn: 'none' })
+    .rotate()
+    .extract({ left, top, width, height })
+    // Never enlarge: the point is to show the real pixels.
+    .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+  return buffer.toString('base64');
+}
+
 /**
- * Second, stricter identity check on one photo at higher resolution.
- *
- * The batch review sees eight small images at once, which is enough to sort
- * them but not to tell a lookalike co-star from the performer. Every photo
- * of a person is confirmed on its own before it can be delivered. A failed
- * check (API error) returns null, and the caller does not deliver the photo.
+ * Final check on one photo before it can be delivered: identity, and whether
+ * it is a photo the performer would be happy to sign. The batch review sees
+ * small copies, where blur, compression artifacts and an awkward expression
+ * barely show, so this looks at the whole photo at high resolution plus a
+ * full-resolution close-up of the face. Returns null on an API failure; the
+ * caller then does not deliver the photo.
  */
 async function confirmIdentity(image, { celebrityName, role, references, eraCount = 0 }) {
-  if (references.length === 0) return { same_person: true, confidence: 0, reason: 'no reference available', unchecked: true };
-
+  const group = image.decision?.bucket === 'group';
   const candidate = { ...image, b64: await toJpegBase64(image.filepath, 1280) };
-  const prompt = `${referenceIntro(celebrityName, role, eraCount, references.length)}
-The last image is a candidate for an autograph print of ${celebrityName} as ${role.character} in "${role.title}"${image.decision?.bucket === 'group' ? '. It is a group photo: decide whether ' + celebrityName + ' is one of the people in it' : ''}.
-${eraNote(celebrityName, role)}
-Is ${celebrityName} in the candidate image? Compare facial structure — eye shape and spacing, nose, mouth, jaw and chin, ears, hairline — and allow for age, makeup, lighting and hair. Co-stars and lookalikes are common in these searches; if any feature clearly differs, answer false.
+  const closeup = await faceCloseup(image).catch(() => null);
+  const images = closeup ? [candidate, { ...image, source: 'closeup', b64: closeup }] : [candidate];
 
-confidence: 1-10 for your answer. reason: at most 12 words.`;
+  const prompt = `${references.length ? referenceIntro(celebrityName, role, eraCount, references.length) : ''}
+${closeup ? 'After the references come the candidate (Image 1) and a full-resolution close-up of its faces (Image 2) so you can judge sharpness.' : 'After the references comes the candidate (Image 1).'}
+It is a candidate for an autograph print that ${celebrityName} will personally sign, as ${role.character} in "${role.title}"${group ? ' — a group photo' : ''}.
+${eraNote(celebrityName, role)}
+Answer:
+- same_person: is ${celebrityName} in the candidate? Compare facial structure — eye shape and spacing, nose, mouth, jaw and chin, ears, hairline — allowing for age, makeup, lighting and hair. Co-stars and lookalikes are common; if any feature clearly differs, false.${references.length ? '' : ' (No reference photos are available: judge from your own knowledge, and be conservative.)'}
+- confidence: 1-10 for same_person.
+- face_sharp: ${celebrityName}'s face is in focus at full size — no motion blur, no focus miss, no smeared detail.
+- clean_image: free of heavy JPEG blocking, banding, noise, visible upscaling smear, watermarks or burned-in captions/logos.
+- good_expression: a flattering moment — eyes open, a natural or in-character expression. False for mid-blink, mid-word with mouth hanging open, gaping, grimacing, eating, or an unflattering angle.
+- target_featured: ${group ? `${celebrityName} is a clear, prominent part of the photo — not tiny, cut off, turned away or half hidden behind someone.` : 'true unless the face is tiny, cut off or turned away.'}
+- print_quality: 1-5 for an 8x10 print a fan would frame. 3 = fine, 4 = good, 5 = excellent.
+- reason: at most 12 words.`;
 
   try {
-    const { results } = await reviewBatch(prompt, references, [candidate], {
+    const { results } = await reviewBatch(prompt, references, images, {
       schema: CONFIRM_SCHEMA,
-      maxTokens: 200,
+      maxTokens: 300,
       effort: 'medium'
     });
     return results;
   } catch (error) {
-    console.log(`⚠️ Identity confirmation unavailable: ${error.message}`);
+    console.log(`⚠️ Final photo check unavailable: ${error.message}`);
     return null;
   }
 }
 
-module.exports = { reviewImages, confirmIdentity, loadReferences, decide, buildPrompt, REVIEW_SCHEMA };
+/** Why a final check fails, or null when the photo passes. */
+function finalVerdict(result) {
+  if (!result) return 'final_check_unavailable';
+  if (!result.same_person || (result.confidence || 0) < config.sourcing.confirmConfidence) return 'failed_identity_check';
+  if (!result.face_sharp) return 'blurry';
+  if (!result.clean_image) return 'artifacts';
+  if (!result.good_expression) return 'unflattering';
+  if (!result.target_featured) return 'not_featured';
+  if ((result.print_quality || 0) < config.sourcing.minPrintQuality) return 'low_quality_full_size';
+  return null;
+}
+
+module.exports = { reviewImages, confirmIdentity, finalVerdict, loadReferences, decide, buildPrompt, REVIEW_SCHEMA };

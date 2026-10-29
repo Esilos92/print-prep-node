@@ -3,7 +3,7 @@ const config = require('../../utils/config');
 const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, titleCast, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
 const { planCrop } = require('./print');
 const { downloadCandidates, downloadOne, isDuplicate } = require('./download');
-const { reviewImages, confirmIdentity, loadReferences } = require('./review');
+const { reviewImages, confirmIdentity, finalVerdict, loadReferences } = require('./review');
 const { mapLimit } = require('../../utils/concurrency');
 
 /**
@@ -96,7 +96,8 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
   const pool = accepted.slice();
   const confirmed = new Set();
   let checks = 0;
-  const maxChecks = count * 3;
+  // The final check is strict, so allow several replacements per slot.
+  const maxChecks = count * 4;
   // Load and encode the reference photos once, not once per check.
   const era = await loadReferences(role.eraReferencePaths, 1024);
   const references = [...era, ...await loadReferences(referencePaths, 1024)];
@@ -115,14 +116,12 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
 
     batch.forEach((image, i) => {
       const result = results[i];
-      const pass = result && result.same_person
-        && (result.unchecked || result.confidence >= config.sourcing.confirmConfidence);
-      if (pass) {
+      const why = finalVerdict(result);
+      if (!why) {
         confirmed.add(image);
-        image.identityCheck = result;
+        image.finalCheck = result;
       } else {
         pool.splice(pool.indexOf(image), 1);
-        const why = result ? 'failed_identity_check' : 'identity_check_unavailable';
         report.rejected[why] = (report.rejected[why] || 0) + 1;
       }
     });

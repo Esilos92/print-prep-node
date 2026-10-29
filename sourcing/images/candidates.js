@@ -220,46 +220,67 @@ async function titleCast(celebrityName, role) {
  * its gallery page is mostly official screenshots and promo photos of
  * exactly this character. Fan art can appear too; the reviewer rejects it.
  */
+async function findFandomPage(name, role) {
+  const queries = [
+    `"${name}" "${role.title}" fandom wiki`,
+    `"${name}" ${role.title} wiki`
+  ];
+  for (const q of queries) {
+    const data = await searchWeb(q, { timeout: 45000 });
+    const link = (data.organic_results || [])
+      .map(r => r.link || '')
+      .find(l => /^https:\/\/[a-z0-9-]+\.fandom\.com\/(?:[a-z-]+\/)?wiki\//i.test(l));
+    if (link) return link;
+  }
+  return null;
+}
+
 async function fandomCandidates(role) {
   const name = (role.character || '').split(/\s*\/\s*/)[0];
   if (!name || !config.api.serpApiKey) return [];
 
   try {
-    const data = await searchWeb(`"${name}" "${role.title}" fandom wiki`);
-    const pages = (data.organic_results || [])
-      .map(r => r.link)
-      .filter(link => /\.fandom\.com\/wiki\//.test(link || ''));
-    if (pages.length === 0) return [];
+    const link = await findFandomPage(name, role);
+    if (!link) return [];
 
-    const page = pages[0].split('#')[0].replace(/\/Gallery$/i, '');
-    let html = '';
-    let pageUrl = `${page}/Gallery`;
-    for (const url of [pageUrl, page]) {
-      try {
-        const response = await axios.get(url, {
-          timeout: 20000,
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PrintPrep/2.0)' }
-        });
-        html = String(response.data || '');
-        pageUrl = url;
-        if (html.includes('static.wikia.nocookie.net')) break;
-      } catch {
-        // gallery subpage may not exist; fall back to the character page
-      }
-    }
+    // https://scream.fandom.com/wiki/Trevor_Sheldon -> host, base path, page title
+    const url = new URL(link.split('#')[0]);
+    const [, langPrefix = '', rawTitle] = url.pathname.match(/^\/(?:([a-z-]+)\/)?wiki\/(.+)$/i) || [];
+    if (!rawTitle) return [];
+    const pageTitle = decodeURIComponent(rawTitle).replace(/\/Gallery$/i, '').replace(/_/g, ' ');
+    const api = `${url.origin}${langPrefix ? `/${langPrefix}` : ''}/api.php`;
 
-    // Strip Fandom's resize suffixes to get the original upload.
-    const urls = new Set();
-    for (const match of html.matchAll(/https:\/\/static\.wikia\.nocookie\.net\/[^"'\s)]+?\.(?:jpe?g|png|webp)/gi)) {
-      const original = match[0].replace(/\/revision\/.*$/, '');
-      if (/(wiki-wordmark|site-logo|favicon|placeholder|icon|avatar|badge)/i.test(original)) continue;
-      urls.add(`${original}/revision/latest`);
-    }
+    // Fandom's MediaWiki API: every image used on the character page and its
+    // gallery subpage, with the original file's URL and real pixel size.
+    const response = await axios.get(api, {
+      params: {
+        action: 'query',
+        format: 'json',
+        redirects: 1,
+        titles: `${pageTitle}|${pageTitle}/Gallery`,
+        generator: 'images',
+        gimlimit: 'max',
+        prop: 'imageinfo',
+        iiprop: 'url|size|mime'
+      },
+      timeout: 20000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PrintPrep/2.0; +https://github.com/Esilos92/print-prep-node)' }
+    });
 
-    return [...urls].slice(0, 40).map((url, i) => ({
-      url,
-      pageUrl,
-      title: decodeURIComponent(url.split('/').slice(-3, -2)[0] || '').replace(/_/g, ' '),
+    const files = Object.values(response.data?.query?.pages || {})
+      .map(p => ({ title: p.title, info: p.imageinfo?.[0] }))
+      .filter(f => f.info?.url && /^image\/(jpeg|png|webp)$/i.test(f.info.mime || ''))
+      .filter(f => !/(wordmark|logo|favicon|placeholder|icon|avatar|badge|flag|symbol)/i.test(f.title))
+      .filter(f => bigEnough(f.info.width, f.info.height))
+      .sort((a, b) => b.info.width * b.info.height - a.info.width * a.info.height);
+
+    const gallery = `${url.origin}${langPrefix ? `/${langPrefix}` : ''}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
+    return files.slice(0, 40).map((f, i) => ({
+      url: f.info.url,
+      pageUrl: gallery,
+      title: f.title.replace(/^File:/, ''),
+      width: f.info.width,
+      height: f.info.height,
       source: 'fandom',
       hint: 'solo',
       rank: i
