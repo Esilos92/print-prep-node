@@ -430,7 +430,7 @@ ${eraNote(celebrityName, role)}
 Answer:
 - same_person: is ${celebrityName} in the candidate? Compare facial structure — eye shape and spacing, nose, mouth, jaw and chin, ears, hairline — allowing for age, makeup, lighting and hair. Co-stars and lookalikes are common; if any feature clearly differs, false.${references.length ? '' : ' (No reference photos are available: judge from your own knowledge, and be conservative.)'}
 - confidence: 1-10 for same_person.
-- face_sharp: ${celebrityName}'s face would look crisp printed at 8x10 — real fine detail in eyes, skin and hair, not merely acceptable on a screen. Screenshots from older or DVD-era video are often soft and should be false. No motion blur, focus miss or smeared detail.
+- face_sharp: ${celebrityName}'s face is in focus at full size — no motion blur, no focus miss, no smeared detail.
 - clean_image: free of heavy JPEG blocking, banding, noise, visible upscaling smear, watermarks or burned-in captions/logos.
 - good_expression: a strong moment — eyes open, a natural or in-character expression. Dramatic in-character expressions are good: a scream in a horror film, fear, anger, tears. Blood, gore and death scenes are fine too. False for an accidental, unflattering moment: mid-blink, caught mid-word with mouth hanging open, chewing, a blank gape, or a badly unflattering angle.
 - target_featured: ${group ? `${celebrityName} is a clear, prominent part of the photo — not tiny, cut off, turned away or half hidden behind someone.` : 'true unless the face is tiny, cut off or turned away.'}
@@ -458,7 +458,7 @@ function finalVerdict(result) {
   if (!result.clean_image) return 'artifacts';
   if (!result.good_expression) return 'unflattering';
   if (!result.target_featured) return 'not_featured';
-  if ((result.print_quality || 0) < config.sourcing.finalPrintQuality) return 'low_quality_full_size';
+  if ((result.print_quality || 0) < config.sourcing.minPrintQuality) return 'low_quality_full_size';
   return null;
 }
 
