@@ -25,6 +25,35 @@ function score(image) {
     + ((image.printable || []).includes('8x10') ? 1 : 0);
 }
 
+/**
+ * Order the TMDb title images and the web results for review.
+ *
+ * TMDb's stills for a title are official, but for an ensemble show they
+ * mostly feature the leads. Put first, 24 of them used most of a supporting
+ * actor's review budget on photos they weren't in (Sons of Anarchy). So:
+ * cap them, interleave them with the web, and put web results from queries
+ * naming the character ahead of general ones.
+ */
+function mixSources(role, official, web) {
+  const posters = official.filter(c => c.hint === 'poster').slice(0, 2);
+  const stills = official.filter(c => c.hint !== 'poster').slice(0, 6);
+
+  const firstName = (role.character || '').split(/\s*\/\s*/)[0].toLowerCase();
+  const namesCharacter = (c) => firstName && (c.query || '').toLowerCase().includes(firstName);
+  const webOrdered = [...web.filter(namesCharacter), ...web.filter(c => !namesCharacter(c))];
+
+  // Two web results, then one TMDb image, until both run out.
+  const tmdb = [...stills, ...posters];
+  const out = [];
+  let w = 0;
+  let t = 0;
+  while (w < webOrdered.length || t < tmdb.length) {
+    for (let k = 0; k < 2 && w < webOrdered.length; k++) out.push(webOrdered[w++]);
+    if (t < tmdb.length) out.push(tmdb[t++]);
+  }
+  return out;
+}
+
 /** Fails every sheet only on resolution, and would pass at twice the size. */
 function onlyTooSmall(image) {
   const config = require('../../utils/config');
@@ -246,12 +275,15 @@ async function sourceRole(celebrityName, role, workDir, context) {
   const poster = config.sourcing.alwaysPoster ? await officialPoster(official, dir, triedUrls, seen) : null;
   report.officialPoster = !!poster;
   // Most reliable first: tagged stills, the character's wiki gallery, TMDb art, then the open web.
-  await runPass([...tagged, ...fandom.filter(f => !f.belowFloor), ...official, ...web]);
+  await runPass([...tagged, ...fandom.filter(f => !f.belowFloor), ...mixSources(role, official, web)]);
 
   // Pass 2, only when the first came up short.
   // A role that found nothing usable in its best sources rarely recovers on
   // page two, so the wider pass only runs when the first found something.
-  const worthWidening = accepted.length > 0 || config.sourcing.widenWhenEmpty;
+  // Exception: a long-running TV character (10+ episodes) almost certainly
+  // has good photos somewhere, so one empty page isn't the end of it.
+  const bigTvRole = role.mediaType === 'tv' && (role.episodes || 0) >= 10;
+  const worthWidening = accepted.length > 0 || bigTvRole || config.sourcing.widenWhenEmpty;
   if (accepted.length < config.sourcing.minPerRole && worthWidening) {
     console.log(`🔁 ${role.character}: ${accepted.length} accepted, widening the search`);
     const more = await googleCandidates(queries, { page: 1, animated }).catch(() => []);
