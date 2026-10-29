@@ -72,7 +72,8 @@ async function search(params, { retries = 3, timeout = 20000, label = 'search' }
 
 /** Image search (google_images engine). */
 function searchImages(params, options = {}) {
-  return search({ engine: 'google_images', ...params }, { label: 'image search', ...options });
+  // Image searches routinely take 10-30s at SerpApi; 20s cut good ones off.
+  return search({ engine: 'google_images', ...params }, { label: 'image search', timeout: 45000, ...options });
 }
 
 /** Web search (google engine), used for role verification. */

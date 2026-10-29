@@ -2,6 +2,7 @@ const axios = require('axios');
 const config = require('../../utils/config');
 const { chat } = require('../../utils/openai');
 const { searchImages } = require('../../utils/serpapi');
+const { settleLimit } = require('../../utils/concurrency');
 
 /**
  * Gathers candidate images for one role, best sources first.
@@ -216,39 +217,42 @@ function exclusionSuffix() {
 
 async function googleCandidates(queries, { page = 0, animated = false } = {}) {
   const suffix = exclusionSuffix();
-  const lists = [];
   const errors = [];
 
-  for (const query of queries) {
-    try {
-      const data = await searchImages({
-        q: `${query.q} ${suffix}`.trim(),
-        ijn: page,
-        // Large images only for photos; official animation art is often mid-sized.
-        ...(animated ? {} : { tbs: 'isz:l' })
-      });
+  // A few at a time, so one slow search doesn't hold up the rest.
+  const outcomes = await settleLimit(queries, 3, async (query) => {
+    const data = await searchImages({
+      q: `${query.q} ${suffix}`.trim(),
+      ijn: page,
+      // Large images only for photos; official animation art is often mid-sized.
+      ...(animated ? {} : { tbs: 'isz:l' })
+    });
 
-      const results = (data.images_results || [])
-        .filter(r => r.original && !isBlocked(r.original, r.link))
-        .filter(r => bigEnough(r.original_width, r.original_height))
-        .map((r, i) => ({
-          url: r.original,
-          pageUrl: r.link,
-          title: r.title || '',
-          width: r.original_width,
-          height: r.original_height,
-          source: 'google',
-          hint: query.aim,
-          query: query.q,
-          rank: i
-        }));
+    return (data.images_results || [])
+      .filter(r => r.original && !isBlocked(r.original, r.link))
+      .filter(r => bigEnough(r.original_width, r.original_height))
+      .map((r, i) => ({
+        url: r.original,
+        pageUrl: r.link,
+        title: r.title || '',
+        width: r.original_width,
+        height: r.original_height,
+        source: 'google',
+        hint: query.aim,
+        query: query.q,
+        rank: i
+      }));
+  });
 
-      lists.push(results);
-    } catch (error) {
-      errors.push(error.message);
-      console.log(`⚠️ Search failed for ${query.q}: ${error.message}`);
+  const lists = [];
+  outcomes.forEach((outcome, i) => {
+    if (outcome.ok) {
+      lists.push(outcome.value);
+    } else {
+      errors.push(outcome.error.message);
+      console.log(`⚠️ Search failed for ${queries[i].q}: ${outcome.error.message}`);
     }
-  }
+  });
 
   if (lists.length === 0 && errors.length > 0) {
     throw new Error(`Every image search failed: ${errors[0]}`);
