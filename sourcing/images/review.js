@@ -118,7 +118,7 @@ For EACH candidate report:
     : `TRUE only on clear visible evidence the photo is NOT from the production or its promotion: red carpet or press wall, premiere, interview or talk-show set, podcast, convention panel or signing, fan photo, selfie, paparazzi, or an obvious personal headshot / modelling shoot (photographer's seamless backdrop, posed fashion styling). Many roles are set in the present day in ordinary clothes, and most scene stills give no sign of which production they are from — that is normal and is FALSE. When in doubt, FALSE.`}
 - clearly_other_project: TRUE only when there is clear evidence the image belongs to a different film or show than "${role.title}" (another title's poster or logo, a costume or setting that unmistakably belongs elsewhere, or the source label names another title). Not being able to tell which project it is from is FALSE.
 - problem: the single main reason it is unusable, or "none". Use not_from_production / other_project only when the matching clearly_ field is TRUE, and wrong_person only when the target is clearly absent (identity_confidence 1-3) — never just because you are unsure. merchandise_or_packaging covers DVD/Blu-ray/VHS cases, toys, shop listings and photos of physical posters for sale. collage_or_text_overlay covers memes, collages, article screenshots and heavy captions (a real poster's own text is fine).
-- print_quality: 1-5 for a large print — sharpness, noise, lighting, composition. 1 = unusable, 3 = fine, 5 = excellent.
+- print_quality: 1-5 for a large print — sharpness, noise, lighting, composition. 1 = unusable, 3 = fine, 5 = excellent. Horror, blood and violent scenes are acceptable content; judge only the photo's quality.
 - keep_box: the smallest box (x, y, w, h as fractions 0-1 of the image width/height, origin top-left) that a crop must not cut: it must contain EVERY face in the image (forehead to chin, ear to ear) and the target's whole head and hair. Faces only, not bodies — the crop adds its own margin. For posters, the whole artwork including the title.
 - reason: at most 12 words.
 
@@ -412,7 +412,7 @@ Answer:
 - confidence: 1-10 for same_person.
 - face_sharp: ${celebrityName}'s face is in focus at full size — no motion blur, no focus miss, no smeared detail.
 - clean_image: free of heavy JPEG blocking, banding, noise, visible upscaling smear, watermarks or burned-in captions/logos.
-- good_expression: a flattering moment — eyes open, a natural or in-character expression. False for mid-blink, mid-word with mouth hanging open, gaping, grimacing, eating, or an unflattering angle.
+- good_expression: a strong moment — eyes open, a natural or in-character expression. Dramatic in-character expressions are good: a scream in a horror film, fear, anger, tears. Blood, gore and death scenes are fine too. False for an accidental, unflattering moment: mid-blink, caught mid-word with mouth hanging open, chewing, a blank gape, or a badly unflattering angle.
 - target_featured: ${group ? `${celebrityName} is a clear, prominent part of the photo — not tiny, cut off, turned away or half hidden behind someone.` : 'true unless the face is tiny, cut off or turned away.'}
 - print_quality: 1-5 for an 8x10 print a fan would frame. 3 = fine, 4 = good, 5 = excellent.
 - reason: at most 12 words.`;
