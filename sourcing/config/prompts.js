@@ -105,10 +105,7 @@ const PROMPT_CONFIG = {
     VALIDATION: 150
   },
 
-  MODELS: {
-    PRIMARY: "gpt-4o-mini",
-    FALLBACK: "gpt-4o-mini"
-  }
+  // Model names live in utils/config.js `models`, set from .env.
 };
 
 module.exports = { 

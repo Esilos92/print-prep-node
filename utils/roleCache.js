@@ -18,6 +18,8 @@ const path = require('path');
 const CACHE_DIR = path.join(__dirname, '..', '.cache', 'roles');
 const TTL_HOURS = parseInt(process.env.ROLE_CACHE_TTL_HOURS, 10) || 24 * 30;
 const ENABLED = process.env.ROLE_CACHE !== 'false';
+// Bump when role discovery changes, so roles found the old way are not reused.
+const CACHE_VERSION = 2;
 
 function keyFor(celebrityName) {
   const slug = celebrityName
@@ -43,6 +45,7 @@ async function get(celebrityName) {
     const ageMs = Date.now() - entry.cachedAt;
     const ageHours = Math.round(ageMs / 3600000);
 
+    if (entry.version !== CACHE_VERSION) return null;
     if (ageHours >= TTL_HOURS) return null;
     if (!entry.value?.roles?.length) return null;   // never serve an empty hit
 
@@ -63,7 +66,7 @@ async function set(celebrityName, value) {
     await fs.mkdir(CACHE_DIR, { recursive: true });
     await fs.writeFile(
       file,
-      JSON.stringify({ celebrity: celebrityName, cachedAt: Date.now(), value }, null, 2)
+      JSON.stringify({ version: CACHE_VERSION, celebrity: celebrityName, cachedAt: Date.now(), value }, null, 2)
     );
   } catch {
     // A cache that cannot write is a slow cache, not a broken job.

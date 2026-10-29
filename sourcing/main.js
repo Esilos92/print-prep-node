@@ -4,6 +4,7 @@ const SearchOptimizer = require('./ai-services/SearchOptimizer.js');
 const SimpleRoleVerifier = require('./ai-services/SimpleRoleVerifier.js');
 const RedFlagRoleDetector = require('./ai-services/RedFlagRoleDetector.js');
 const TmdbCredits = require('./ai-services/TmdbCredits.js');
+const { chat } = require('../utils/openai');
 const { PROMPTS, PROMPT_CONFIG } = require('./config/prompts.js');
 const roleCache = require('../utils/roleCache');
 
@@ -362,15 +363,14 @@ KEEP original names if:
 Format: TITLE|CORRECTED_NAME|CONFIDENCE
 If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
 
-      const validation = await this.roleFetcher.openai.chat.completions.create({
-        model: config.models.roleDiscovery, // Cost-efficient for simple validation
+      const validationReply = await chat({
+        model: config.models.fast,
         messages: [{ role: "user", content: validationPrompt }],
-        temperature: 0.1,
-        max_tokens: 300
+        maxTokens: 300
       });
 
       // Parse and apply only high-confidence corrections
-      const corrections = validation.choices[0].message.content.split('\n');
+      const corrections = validationReply.split('\n');
       let correctionCount = 0;
 
       corrections.forEach(line => {
@@ -791,14 +791,11 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
 
     try {
       if (this.roleFetcher.hasOpenAI) {
-        const completion = await this.roleFetcher.openai.chat.completions.create({
+        const response = await chat({
           model: config.models.roleDiscovery,
           messages: [{ role: "user", content: simplifiedPrompt }],
-          temperature: 0.5,
-          max_tokens: 500
+          maxTokens: 500
         });
-
-        const response = completion.choices[0].message.content;
         return this.roleFetcher.parseAndValidateResponse(response, celebrityName);
       }
       return null;

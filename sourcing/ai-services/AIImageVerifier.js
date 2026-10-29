@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const { chat } = require('../../utils/openai');
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../../utils/config');
@@ -202,9 +203,12 @@ person may appear at different ages and in character makeup.`
 Answer VALID only if ${celebrityName} is clearly and identifiably the person shown.`;
 
     const inCharacter = character && character !== 'Unknown'
-      ? `They must be IN CHARACTER as ${character}${title ? ` from ${title}` : ''} — in costume,
-in the production, as the audience sees them on screen.`
-      : `They must be in a production still or publicity photograph, not at a
+      ? `The photograph should show them as ${character}${title ? ` in ${title}` : ''}: a scene
+still, a screenshot, an on-set photo, or an official promotional or cast photo
+for the production. Many roles are set in the present day, so the "costume" may
+be ordinary clothes — do not reject a photo just because there is no
+distinctive costume.`
+      : `They should be in a production still or publicity photograph, not at a
 public appearance.`;
 
     return `You are checking images for an autograph print run. These are sold as
@@ -214,15 +218,15 @@ ${subject}
 
 ${inCharacter}
 
-Reject as INVALID_OUT_OF_CHARACTER — this is the most common mistake, and the
-person being correct does not make the image usable:
-- red carpet, premiere or awards appearances
-- interviews, talk shows, podcasts
-- convention panels, signings, fan photos
-- modern photographs of the performer out of costume
-- candid or paparazzi shots
-The subject may be exactly the right person in all of these. That is precisely
-why they slip through. Judge the costume and the setting, not the face.
+Reject as INVALID_OUT_OF_CHARACTER only when the photo shows clear signs of a
+public appearance rather than the production:
+- red carpet, premiere or awards events (step-and-repeat logo walls, press lines)
+- interviews, talk shows, podcasts (studio desks, microphones, show branding)
+- convention panels, signings, fan photos (badges, tables, crowds, selfies)
+- candid or paparazzi street shots
+- a costume or look that clearly belongs to a different role
+If it is the right person and nothing marks it as one of these, treat it as
+in character.
 
 Reject as INVALID_WRONG_PERSON:
 - a different person, including co-stars and lookalikes
@@ -235,8 +239,8 @@ ${this.packagingRejections}
 
 ${this.packagingCaveat}
 
-If you are not confident it is the right person in character, reject. An
-uncertain match is a rejection.
+If you are not confident it is the right person, reject. An uncertain identity
+match is a rejection.
 
 Reply with exactly: VERDICT|CONFIDENCE
 VERDICT is one of VALID, INVALID_OUT_OF_CHARACTER, INVALID_WRONG_PERSON,
@@ -265,14 +269,13 @@ Example: VALID|8`;
       image_url: { url: `data:${candidate.mediaType};base64,${candidate.data}`, detail }
     });
 
-    const completion = await this.openai.chat.completions.create({
+    const reply = await chat({
       model: config.models.vision,
       messages: [{ role: 'user', content }],
-      max_tokens: 10,
-      temperature: 0
+      maxTokens: 20
     });
 
-    return this.parseVerificationResponse(completion.choices[0].message.content);
+    return this.parseVerificationResponse(reply);
   }
 
   async verifyWithClaude(imagePath, context) {
@@ -511,7 +514,7 @@ Example: VALID|8`;
 
 Respond with just a number 1-10.`;
 
-      const completion = await this.openai.chat.completions.create({
+      const reply = await chat({
         model: config.models.vision,
         messages: [{
           role: "user",
@@ -526,11 +529,10 @@ Respond with just a number 1-10.`;
             }
           ]
         }],
-        max_tokens: 5,
-        temperature: 0.1
+        maxTokens: 10
       });
 
-      const score = parseInt(completion.choices[0].message.content.trim());
+      const score = parseInt(reply, 10);
       
       return {
         confidence: score >= 7 ? 'high' : score >= 4 ? 'medium' : 'low',
@@ -563,12 +565,8 @@ Respond with just a number 1-10.`;
   async testConnection() {
     if (this.hasOpenAI) {
       try {
-        const completion = await this.openai.chat.completions.create({
-          model: config.models.vision,
-          messages: [{ role: "user", content: "Test" }],
-          max_tokens: 5
-        });
-        return completion.choices && completion.choices.length > 0;
+        await chat({ model: config.models.vision, messages: [{ role: "user", content: "Reply OK" }], maxTokens: 5 });
+        return true;
       } catch (error) {
         console.error('OpenAI connection test failed:', error.message);
         return false;

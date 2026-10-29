@@ -1,131 +1,65 @@
-const OpenAI = require('openai');
+const { PROMPTS } = require('../config/prompts.js');
 const config = require('../../utils/config');
-const { PROMPTS, PROMPT_CONFIG } = require('../config/prompts.js');
+const { chat, getClient } = require('../../utils/openai');
+const { TMDbFilmography } = require('./TMDbFilmography');
 
 class AIRoleFetcher {
   constructor() {
-    this.openai = null;
-    this.hasOpenAI = false;
-    this.initializeOpenAI();
-  }
-
-  initializeOpenAI() {
-    try {
-      if (process.env.OPENAI_API_KEY) {
-        this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        this.hasOpenAI = true;
-        console.log('✅ OpenAI initialized for role discovery');
-      } else {
-        console.log('ℹ️ OpenAI not configured, using fallback methods');
-      }
-    } catch (error) {
-      console.log('⚠️ OpenAI initialization failed, using fallback methods');
-      this.hasOpenAI = false;
-    }
+    this.filmography = new TMDbFilmography();
+    // Kept for callers in main.js that check `roleFetcher.hasOpenAI`.
+    this.openai = getClient();
+    this.hasOpenAI = !!this.openai;
+    console.log(this.filmography.available
+      ? '✅ Role discovery: TMDb credits' + (this.hasOpenAI ? ` + ${config.models.roleDiscovery}` : '')
+      : (this.hasOpenAI ? `ℹ️ No TMDB_API_KEY — role discovery falls back to ${config.models.roleDiscovery} memory` : 'ℹ️ No role discovery configured'));
   }
 
   /**
-   * SIMPLIFIED: Basic role discovery - trust OpenAI to do its job
+   * Real credits from TMDb first. A model recalling a filmography from memory
+   * is the fallback, for performers TMDb doesn't know.
    */
   async fetchRoles(celebrityName) {
+    const maxRoles = config.roles.maxRoles;
+    console.log(`🎯 Role discovery for: ${celebrityName}`);
+
     try {
-      console.log(`🎯 Role discovery for: ${celebrityName}`);
-      
-      // Single simple AI call
-      const roles = await this.performSimpleDiscovery(celebrityName);
-      
-      if (!roles || roles.length === 0) {
-        console.log(`⚠️ No roles found, trying broader search...`);
-        const broadRoles = await this.performBroadDiscovery(celebrityName);
-        return broadRoles || [];
+      const tmdbRoles = await this.filmography.getRoles(celebrityName, maxRoles);
+      if (tmdbRoles.length > 0) {
+        const roles = this.enforceDistinctRoles(tmdbRoles.map(r => this.normalizeRole(r)), celebrityName).slice(0, maxRoles);
+        console.log(`✅ Discovery complete (TMDb): ${roles.length} roles for ${celebrityName}`);
+        return roles;
       }
+    } catch (error) {
+      console.log(`⚠️ TMDb role lookup failed: ${error.message}`);
+    }
 
-      console.log(`✅ Discovery complete: ${roles.length} roles for ${celebrityName}`);
+    try {
+      const roles = await this.discoverFromMemory(celebrityName, maxRoles);
+      console.log(`✅ Discovery complete (AI memory): ${roles.length} roles for ${celebrityName}`);
       return roles;
-
     } catch (error) {
       console.error(`❌ Role discovery failed for ${celebrityName}:`, error.message);
       return [];
     }
   }
 
-  /**
-   * SIMPLIFIED: Simple discovery - let OpenAI do what it does best
-   */
-  async performSimpleDiscovery(celebrityName) {
-    if (!this.hasOpenAI) return null;
+  async discoverFromMemory(celebrityName, maxRoles) {
+    if (!this.hasOpenAI) return [];
 
-    try {
-      /**
-       * Use the shared prompt. This used to be an inline copy that had drifted
-       * from PROMPTS.FETCH_ROLES, so the central prompts file was dead code
-       * and edits to it silently did nothing.
-       */
-      const simplePrompt = PROMPTS.FETCH_ROLES(celebrityName, 8);
+    // Over-request: duplicates are stripped afterwards.
+    const reply = await chat({
+      model: config.models.roleDiscovery,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an entertainment expert. Use exact character names from official sources. Every role must be a different character, and no two may come from the same film series or franchise. Never invent roles.'
+        },
+        { role: 'user', content: PROMPTS.FETCH_ROLES(celebrityName, maxRoles + 3) }
+      ],
+      maxTokens: 1200
+    });
 
-      const completion = await this.openai.chat.completions.create({
-        model: config.models.roleDiscovery,
-        messages: [
-          {
-            role: "system",
-            content: "You are an entertainment expert. Always use exact character names from official sources. Every role you list must be a different character, and no two may come from the same film series or franchise."
-          },
-          {
-            role: "user", 
-            content: simplePrompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 800
-      });
-
-      const response = completion.choices[0].message.content;
-      return this.parseAndValidateResponse(response, celebrityName);
-      
-    } catch (error) {
-      console.log(`Simple discovery failed: ${error.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * SIMPLIFIED: Broad discovery for difficult cases
-   */
-  async performBroadDiscovery(celebrityName) {
-    if (!this.hasOpenAI) return null;
-
-    try {
-      const broadPrompt = `Find ANY notable acting work for "${celebrityName}" - include small roles, indie films, streaming content, voice work, or recent performances.
-
-Each entry must be a DIFFERENT character, and no two entries may come from the
-same film series or franchise.
-
-Return what you can find:
-[{"character": "Character Name", "title": "Project Title", "franchise": "Series name or null", "medium": "live_action_movie", "year": "YYYY", "popularity": "medium"}]`;
-
-      const completion = await this.openai.chat.completions.create({
-        model: config.models.roleDiscovery,
-        messages: [
-          {
-            role: "system",
-            content: "You are researching performers. Find any acting work, no matter how small. Never list the same character or franchise twice."
-          },
-          {
-            role: "user", 
-            content: broadPrompt
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 400
-      });
-
-      const response = completion.choices[0].message.content;
-      return this.parseAndValidateResponse(response, celebrityName);
-      
-    } catch (error) {
-      console.log(`Broad discovery failed: ${error.message}`);
-      return null;
-    }
+    return this.parseAndValidateResponse(reply, celebrityName) || [];
   }
 
   /**
@@ -144,7 +78,7 @@ Return what you can find:
           .filter(role => role.character && role.title)
           .map(role => this.normalizeRole(role)),
         celebrityName
-      ).slice(0, 5);
+      ).slice(0, config.roles.maxRoles);
 
       return validRoles;
       
@@ -256,34 +190,28 @@ Return what you can find:
       title: (role.title || '').trim(),
       medium: role.medium || 'live_action_movie',
       year: role.year || 'unknown',
-      popularity: role.popularity || 'medium'
+      popularity: role.popularity || 'medium',
+      franchise: role.franchise || null,
+      source: role.source || 'ai_memory'
     };
   }
 
-  /**
-   * System diagnostics
-   */
   async testConnection() {
-    if (this.hasOpenAI) {
-      try {
-        await this.openai.chat.completions.create({
-          model: config.models.roleDiscovery,
-          messages: [{ role: "user", content: "Test" }],
-          max_tokens: 5
-        });
-        return true;
-      } catch (e) {
-        return false;
-      }
+    if (!this.hasOpenAI) return false;
+    try {
+      await chat({ model: config.models.roleDiscovery, messages: [{ role: 'user', content: 'Reply OK' }], maxTokens: 5 });
+      return true;
+    } catch (e) {
+      return false;
     }
-    return false;
   }
 
   getSystemStatus() {
     return {
       openaiAPI: this.hasOpenAI,
-      primaryEngine: this.hasOpenAI ? 'OpenAI GPT-4o-mini' : 'None',
-      approach: 'Simple Discovery - Trust OpenAI'
+      tmdb: this.filmography.available,
+      primaryEngine: this.filmography.available ? 'TMDb credits' : (this.hasOpenAI ? config.models.roleDiscovery : 'None'),
+      approach: 'TMDb filmography, AI picks the best-known roles'
     };
   }
 }

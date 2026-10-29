@@ -112,12 +112,21 @@ const config = {
    * them from .env without touching code.
    */
   models: {
-    // Role discovery, character validation — cheap, high volume.
-    roleDiscovery: process.env.MODEL_ROLE_DISCOVERY || 'gpt-4o-mini',
+    // Choosing roles from the TMDb filmography — judgement, a few calls per job.
+    roleDiscovery: process.env.MODEL_ROLE_DISCOVERY || 'gpt-5.5',
+    // Small text checks: name cleanup, yes/no role checks.
+    fast: process.env.MODEL_FAST || 'gpt-5.4-mini',
     // Identity verification from images — the quality-critical one.
-    vision: process.env.MODEL_VISION || 'gpt-4o',
+    vision: process.env.MODEL_VISION || 'gpt-5.5',
     // Claude fallback when the primary vision service errors.
-    visionFallback: process.env.ANTHROPIC_VERIFY_MODEL || 'claude-opus-5'
+    visionFallback: process.env.ANTHROPIC_VERIFY_MODEL || 'claude-opus-5',
+    // How much reasoning models think before answering: minimal|low|medium|high.
+    reasoningEffort: process.env.MODEL_REASONING_EFFORT || 'low'
+  },
+
+  roles: {
+    /** Roles per run. Each role costs image searches and identity checks. */
+    maxRoles: int(process.env.MAX_ROLES, 6)
   },
 
   verification: {

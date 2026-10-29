@@ -1,5 +1,6 @@
 const OpenAI = require('openai');
 const config = require('../../utils/config');
+const { chat } = require('../../utils/openai');
 const serpapi = require('../../utils/serpapi');
 
 class SimpleRoleVerifier {
@@ -85,8 +86,11 @@ class SimpleRoleVerifier {
    * Check if role is from emergency recovery
    */
   isEmergencyRole(role) {
-    return role.source === 'imdb_emergency' || 
-           role.source === 'emergency_web_recovery';
+    // TMDb credits are the record itself, so there is nothing to double-check.
+    return role.source === 'imdb_emergency' ||
+           role.source === 'emergency_web_recovery' ||
+           role.source === 'tmdb' ||
+           role.creditVerified === true;
   }
 
   /**
@@ -116,14 +120,11 @@ Only say NO if you're absolutely certain it's wrong.
 
 Answer: HIGH|YES|reason OR MEDIUM|NO|reason`;
 
-        const completion = await this.openai.chat.completions.create({
-          model: config.models.roleDiscovery,
+        const response = await chat({
+          model: config.models.fast,
           messages: [{ role: "user", content: prompt }],
-          temperature: 0.1,
-          max_tokens: 100
+          maxTokens: 100
         });
-
-        const response = completion.choices[0].message.content.trim();
         return this.parseVerificationResponse(response);
         
       } catch (error) {

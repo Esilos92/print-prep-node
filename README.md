@@ -28,7 +28,9 @@ Automates celebrity image sourcing for high-quality autograph print preparation.
 
 ## 📁 System Architecture
 
-- **Role Discovery**: TMDb API → Wikipedia fallback
+- **Role Discovery**: the performer's real TMDb credits (talk shows and guest
+  spots filtered out); an OpenAI model picks the best-known ones. Falls back to
+  the model's own knowledge only when TMDb has no match
 - **Image Sourcing**: SerpApi (Google Images)
 - **Identity Verification**: vision model compares each candidate against a
   TMDb reference portrait; only a confident match is kept
