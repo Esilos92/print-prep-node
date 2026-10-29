@@ -4,6 +4,7 @@
 const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
+const roleLookup = require('./sourcing/roles');
 const path = require('path');
 const fs = require('fs').promises;
 const rateLimit = require('express-rate-limit');
@@ -172,6 +173,8 @@ class JobTracker {
     this.imagesValidated = 0;
     this.imagesPrintable = 0;
     this.problems = [];
+    this.roleResults = [];
+    this.mode = 'auto';
     this.totalImagesAcrossRoles = 0; // 🎯 FIX #4: Cumulative tracking
     this.startTime = new Date();
     this.endTime = null;
@@ -241,7 +244,6 @@ class JobTracker {
 
 // API ENDPOINTS
 
-// 1. Start new celebrity job
 /**
  * A celebrity name reaches the filesystem: the CLI builds its working
  * directory from it, and that directory is later removed recursively. Names
@@ -259,12 +261,45 @@ function invalidCelebrityName(value) {
   return null;
 }
 
+// 1. Start new celebrity job.
+// Optional `roles`: a list chosen in Select or Custom mode. Without it the job
+// discovers roles itself (Auto mode).
+const MAX_CHOSEN_ROLES = 12;
+
+function cleanRoles(roles) {
+  if (roles === undefined || roles === null) return { roles: null };
+  if (!Array.isArray(roles) || roles.length === 0) return { error: 'Choose at least one role.' };
+  if (roles.length > MAX_CHOSEN_ROLES) return { error: `At most ${MAX_CHOSEN_ROLES} roles per job.` };
+
+  const text = (v, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const cleaned = roles.map(r => ({
+    character: text(r?.character),
+    title: text(r?.title),
+    year: text(String(r?.year ?? ''), 10) || 'unknown',
+    tmdbId: Number.isInteger(r?.tmdbId) ? r.tmdbId : null,
+    mediaType: r?.mediaType === 'tv' || r?.mediaType === 'movie' ? r.mediaType : null,
+    medium: text(r?.medium, 40) || 'live_action_movie',
+    isVoiceRole: r?.isVoiceRole === true,
+    episodes: Number.isInteger(r?.episodes) ? r.episodes : null,
+    popularity: 'high',
+    source: r?.source === 'manual' ? 'manual' : 'tmdb',
+    creditVerified: r?.source !== 'manual'
+  }));
+  if (cleaned.some(r => !r.character || !r.title)) return { error: 'Every role needs a character and a title.' };
+  return { roles: cleaned };
+}
+
 app.post('/api/jobs', requireApiKey, jobLimiter, async (req, res) => {
-  const { celebrity } = req.body;
+  const { celebrity, mode } = req.body;
 
   const nameError = invalidCelebrityName(celebrity);
   if (nameError) {
     return res.status(400).json({ error: nameError });
+  }
+
+  const chosen = cleanRoles(req.body.roles);
+  if (chosen.error) {
+    return res.status(400).json({ error: chosen.error });
   }
 
   if (activeJobs.size >= MAX_CONCURRENT_JOBS) {
@@ -275,36 +310,78 @@ app.post('/api/jobs', requireApiKey, jobLimiter, async (req, res) => {
     });
   }
 
-  // Generate unique job ID
-  const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  // Create job tracker
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   const job = new JobTracker(jobId, celebrity.trim());
+  job.mode = chosen.roles ? (mode === 'custom' ? 'custom' : 'select') : 'auto';
   activeJobs.set(jobId, job);
 
   try {
-    // Start the background process (your existing CLI)
-    const childProcess = spawn('node', ['index.js', celebrity.trim()], {
-      cwd: __dirname, // ~/print-prep-node directory
+    const args = ['index.js', celebrity.trim()];
+    let rolesFile = null;
+    if (chosen.roles) {
+      const dir = path.join(__dirname, 'temp', 'jobs');
+      await fs.mkdir(dir, { recursive: true });
+      rolesFile = path.join(dir, `${jobId}.json`);
+      await fs.writeFile(rolesFile, JSON.stringify(chosen.roles));
+      args.push('--roles', rolesFile);
+    }
+
+    const childProcess = spawn('node', args, {
+      cwd: __dirname,
       stdio: ['pipe', 'pipe', 'pipe']
     });
+    if (rolesFile) childProcess.on('close', () => fs.unlink(rolesFile).catch(() => {}));
 
     job.process = childProcess;
-    job.addLog(`Started processing for ${celebrity}`);
+    job.addLog(`Started ${job.mode} job for ${celebrity}${chosen.roles ? ` (${chosen.roles.length} chosen roles)` : ''}`);
 
-    // Monitor process output for progress
     monitorJobProgress(job, childProcess);
 
     res.json({
-      jobId: jobId,
+      jobId,
       status: 'started',
-      celebrity: celebrity,
+      celebrity,
+      mode: job.mode,
       message: 'Job started successfully'
     });
 
   } catch (error) {
     job.error(`Failed to start process: ${error.message}`);
     res.status(500).json({ error: 'Failed to start job' });
+  }
+});
+
+// Role lists for Select mode: ?name=...&sort=popular|newest
+app.get('/api/roles', async (req, res) => {
+  const name = req.query.name;
+  const nameError = invalidCelebrityName(name);
+  if (nameError) return res.status(400).json({ error: nameError });
+
+  const sort = req.query.sort === 'newest' ? 'newest' : 'popular';
+  const limit = Math.min(15, Math.max(3, parseInt(req.query.limit, 10) || 10));
+  try {
+    const result = await roleLookup.listRoles(name.trim(), { sort, limit });
+    if (!result.person) return res.status(404).json({ error: `TMDb has no one named "${name.trim()}".` });
+    res.json({ ...result, sort });
+  } catch (error) {
+    res.status(502).json({ error: `Role lookup failed: ${error.message}` });
+  }
+});
+
+// Custom mode: match typed titles to the person's credits.
+app.post('/api/roles/resolve', async (req, res) => {
+  const { name, titles } = req.body || {};
+  const nameError = invalidCelebrityName(name);
+  if (nameError) return res.status(400).json({ error: nameError });
+  if (!Array.isArray(titles) || titles.length === 0) return res.status(400).json({ error: 'Add at least one title.' });
+  if (titles.length > MAX_CHOSEN_ROLES) return res.status(400).json({ error: `At most ${MAX_CHOSEN_ROLES} titles.` });
+
+  try {
+    const result = await roleLookup.resolveTitles(name.trim(), titles.map(t => String(t).slice(0, 200)));
+    if (!result.found) return res.status(404).json({ error: `TMDb has no one named "${name.trim()}".` });
+    res.json(result);
+  } catch (error) {
+    res.status(502).json({ error: `Title lookup failed: ${error.message}` });
   }
 });
 
@@ -497,6 +574,15 @@ function applyEvent(job, payload) {
       if (Number.isFinite(event.printable)) job.imagesPrintable = event.printable;
       break;
 
+    case 'role_done':
+      job.roleResults.push({
+        character: event.character,
+        title: event.title,
+        selected: event.selected || 0,
+        byKind: event.byKind || {}
+      });
+      break;
+
     case 'download':
       job.downloadLink = event.url;
       job.addLog(`Google Drive link captured: ${event.url}`);
@@ -650,8 +736,12 @@ const PORT = process.env.API_PORT || 4000;
  */
 function start() {
   return loadPersistedData().then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 Celebrity Processing API running on port ${PORT}`);
+    // Only reachable from this machine: the dashboard's server forwards
+    // browser requests here, so the API itself is never open to the internet.
+    // Set API_HOST=0.0.0.0 to expose it directly (not recommended).
+    const host = process.env.API_HOST || '127.0.0.1';
+    app.listen(PORT, host, () => {
+      console.log(`🚀 Celebrity Processing API running on ${host}:${PORT}`);
       console.log(`🔧 Health check: http://localhost:${PORT}/api/health`);
       console.log(`🔒 API key: ${API_KEY ? 'required' : 'NOT SET — endpoints are open to anyone who can reach this port'}`);
       console.log(`🚦 Limits: ${MAX_CONCURRENT_JOBS} concurrent job(s), ${MAX_JOBS_PER_HOUR} jobs/hour per address`);

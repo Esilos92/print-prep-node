@@ -1,5 +1,8 @@
+const axios = require('axios');
+const config = require('../utils/config');
 const AIRoleFetcher = require('./ai-services/AIRoleFetcher');
 const TmdbCredits = require('./ai-services/TmdbCredits');
+const { TMDbFilmography } = require('./ai-services/TMDbFilmography');
 const roleCache = require('../utils/roleCache');
 
 /**
@@ -84,4 +87,114 @@ async function fetchCelebrityRoles(celebrityName) {
   return result;
 }
 
-module.exports = { fetchCelebrityRoles };
+/** The role shape the photo pipeline expects, from a TMDb credit. */
+function roleFromCredit(credit) {
+  return {
+    character: credit.character,
+    title: credit.title,
+    year: credit.year || 'unknown',
+    tmdbId: credit.tmdbId,
+    mediaType: credit.mediaType,
+    medium: credit.isVoice ? `voice_${credit.mediaType}` : `live_action_${credit.mediaType}`,
+    isVoiceRole: !!credit.isVoice,
+    poster: credit.poster || null,
+    episodes: credit.episodes || credit.episodeCount || null,
+    popularity: 'high',
+    source: 'tmdb',
+    creditVerified: true
+  };
+}
+
+/** Select mode: a list of roles to pick from, most popular or newest first. */
+async function listRoles(celebrityName, { sort = 'popular', limit = 10 } = {}) {
+  const { person, roles } = await new TMDbFilmography().listRoles(celebrityName, { sort, limit });
+  return {
+    person,
+    roles: roles.map(r => ({
+      character: r.character,
+      title: r.title,
+      year: r.year,
+      tmdbId: r.tmdbId,
+      mediaType: r.mediaType,
+      medium: r.medium,
+      isVoiceRole: /voice/.test(r.medium),
+      poster: r.poster,
+      episodes: r.episodes || null,
+      recent: r.recent,
+      popularity: 'high',
+      source: 'tmdb',
+      creditVerified: true
+    }))
+  };
+}
+
+/**
+ * Custom mode: turn typed titles into roles. Each title is matched against
+ * the person's real credits; a loose or misspelled title is looked up in
+ * TMDb's own search first. A title they have no credit for comes back as
+ * not_found with TMDb's best guess at the title, so the user can supply the
+ * character name and search it anyway.
+ */
+async function resolveTitles(celebrityName, titles) {
+  const credits = await tmdb.getCredits(celebrityName);
+  if (!credits) return { found: false, results: [] };
+
+  const best = (list) => list
+    .filter(c => !c.isNonVisual)
+    .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))[0];
+
+  const results = [];
+  for (const input of titles.map(t => (t || '').trim()).filter(Boolean)) {
+    let credit = best(credits.filter(c => TmdbCredits.titlesMatch(c.title, input)));
+    let guess = null;
+
+    if (!credit) {
+      try {
+        const response = await axios.get('https://api.themoviedb.org/3/search/multi', {
+          params: { api_key: config.api.tmdbKey, query: input },
+          timeout: 15000
+        });
+        const hits = (response.data?.results || []).filter(r => r.media_type === 'movie' || r.media_type === 'tv').slice(0, 8);
+        const ids = new Set(hits.map(h => h.id));
+        credit = best(credits.filter(c => ids.has(c.tmdbId)));
+        if (!credit && hits[0]) {
+          const h = hits[0];
+          guess = {
+            title: h.title || h.name,
+            year: (h.release_date || h.first_air_date || '').slice(0, 4) || 'unknown',
+            tmdbId: h.id,
+            mediaType: h.media_type,
+            poster: h.poster_path ? `https://image.tmdb.org/t/p/w185${h.poster_path}` : null
+          };
+        }
+      } catch {
+        // search unavailable: report as not found
+      }
+    }
+
+    results.push(credit
+      ? { input, status: 'matched', role: roleFromCredit(credit) }
+      : { input, status: 'not_found', guess });
+  }
+  return { found: true, results };
+}
+
+/**
+ * A role the user typed in by hand (title not in the person's credits).
+ * It is searched like any other; identity checks still apply.
+ */
+function manualRole({ character, title, year, tmdbId, mediaType }) {
+  return {
+    character: (character || '').trim(),
+    title: (title || '').trim(),
+    year: year || 'unknown',
+    tmdbId: tmdbId || null,
+    mediaType: mediaType || null,
+    medium: mediaType === 'tv' ? 'live_action_tv' : 'live_action_movie',
+    isVoiceRole: false,
+    popularity: 'medium',
+    source: 'manual'
+  };
+}
+
+module.exports = { fetchCelebrityRoles, listRoles, resolveTitles, manualRole };

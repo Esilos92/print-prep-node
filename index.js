@@ -64,10 +64,25 @@ function summariseRole(report) {
   }
 }
 
+/**
+ * Roles chosen by the user (Select or Custom mode), passed as a JSON file:
+ *   node index.js "Name" --roles /path/to/roles.json
+ * These skip role discovery and are never written to the role cache, so a
+ * hand-picked list doesn't become the default for later Auto runs.
+ */
+async function chosenRoles() {
+  const flag = process.argv.indexOf('--roles');
+  if (flag === -1) return null;
+  const file = process.argv[flag + 1];
+  const roles = JSON.parse(await fs.readFile(file, 'utf8'));
+  if (!Array.isArray(roles)) throw new Error('--roles file must contain a list of roles');
+  return roles.filter(r => r && r.character && r.title);
+}
+
 async function main() {
   const celebrityName = (process.argv[2] || '').trim();
-  if (!celebrityName) {
-    logger.error('Usage: npm start "Celebrity Name"');
+  if (!celebrityName || celebrityName.startsWith('--')) {
+    logger.error('Usage: npm start "Celebrity Name" [--roles roles.json]');
     process.exit(1);
   }
 
@@ -80,10 +95,14 @@ async function main() {
     await fs.rm(workDir, { recursive: true, force: true });
     await fs.mkdir(workDir, { recursive: true });
 
-    // 1. Roles
+    // 1. Roles: chosen by the user, or discovered
     progress.phase('role_discovery', 5, 'Finding roles...');
-    const { roles } = await fetchCelebrityRoles(celebrityName);
-    if (!roles || roles.length === 0) fail(`No roles found for ${celebrityName}. Check the spelling.`);
+    const picked = await chosenRoles();
+    const { roles } = picked ? { roles: picked } : await fetchCelebrityRoles(celebrityName);
+    if (!roles || roles.length === 0) {
+      fail(picked ? 'No roles were chosen.' : `No roles found for ${celebrityName}. Check the spelling.`);
+    }
+    if (picked) logger.info(`🎯 Using ${roles.length} chosen role(s)`);
 
     progress.phase('roles_found', 25, `${roles.length} roles found`);
     logger.info(`✅ ${roles.length} roles:`);
@@ -113,10 +132,12 @@ async function main() {
         selectedImages.push(...images);
         roleReports.push(report);
         summariseRole(report);
+        progress.roleDone(report);
       } catch (error) {
         outages++;
         logger.warn(`❌ ${role.character}: ${error.message}`);
         roleReports.push({ character: role.character, title: role.title, selected: 0, error: error.message });
+        progress.roleDone({ character: role.character, title: role.title, selected: 0 });
         progress.problem(`${role.character} (${role.title}): ${error.message}`);
       }
       progress.counts({ verified: selectedImages.length });

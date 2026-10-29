@@ -54,13 +54,13 @@ class TMDbFilmography {
     return !!config.api.tmdbKey;
   }
 
-  async getRoles(celebrityName, maxRoles) {
-    if (!this.available) return [];
-
+  /** The person and their raw TMDb acting credits, or null. */
+  async loadCast(celebrityName) {
+    if (!this.available) return null;
     const person = await findPerson(celebrityName);
     if (!person) {
       console.log(`⚠️ TMDb has no person named ${celebrityName}`);
-      return [];
+      return null;
     }
     console.log(`🎞️ TMDb match: ${person.name} (id ${person.id}, known for ${person.known_for_department || 'unknown'})`);
 
@@ -68,8 +68,54 @@ class TMDbFilmography {
       params: { api_key: config.api.tmdbKey },
       timeout: 15000
     });
+    return { person, cast: response.data?.cast || [] };
+  }
 
-    const candidates = this.rankCredits(response.data?.cast || []);
+  /**
+   * A list of roles to choose from, with poster thumbnails. No AI call, so
+   * it returns in a couple of seconds.
+   *   popular: ranked as role discovery ranks them
+   *   newest:  most recent release first; unreleased titles are left out,
+   *            and new shows count even with only a few episodes so far
+   */
+  async listRoles(celebrityName, { sort = 'popular', limit = 10 } = {}) {
+    const loaded = await this.loadCast(celebrityName);
+    if (!loaded) return { person: null, roles: [] };
+
+    const today = new Date().toISOString().slice(0, 10);
+    let roles = this.rankCredits(loaded.cast, { minEpisodes: sort === 'newest' ? 1 : 3 })
+      .filter(r => !r.date || r.date <= today);
+
+    if (sort === 'newest') {
+      roles = roles.filter(r => r.date).sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    // One entry per character and franchise, as role discovery does.
+    const seen = new Set();
+    const distinct = [];
+    for (const role of roles) {
+      const key = `${role.character.toLowerCase()}|${role.title.toLowerCase().replace(/[:\d].*$/, '').trim()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      distinct.push(role);
+    }
+
+    const recentCutoff = new Date(Date.now() - 1000 * 60 * 60 * 24 * 120).toISOString().slice(0, 10);
+    return {
+      person: { name: loaded.person.name, id: loaded.person.id },
+      roles: distinct.slice(0, limit).map(r => ({
+        ...r,
+        // Released in the last ~4 months: photos online may still be scarce.
+        recent: !!r.date && r.date >= recentCutoff
+      }))
+    };
+  }
+
+  async getRoles(celebrityName, maxRoles) {
+    const loaded = await this.loadCast(celebrityName);
+    if (!loaded) return [];
+
+    const candidates = this.rankCredits(loaded.cast);
     console.log(`🎞️ ${candidates.length} acting credits after filtering`);
     if (candidates.length === 0) return [];
 
@@ -79,7 +125,7 @@ class TMDbFilmography {
   }
 
   /** Drop non-acting and bit-part credits, then rank by how well known each role is. */
-  rankCredits(cast) {
+  rankCredits(cast, { minEpisodes = 3 } = {}) {
     const roles = [];
 
     for (const credit of cast) {
@@ -91,7 +137,7 @@ class TMDbFilmography {
       if (!title || !character) continue;
       if (SELF_CHARACTER.test(credit.character || '')) continue;
       if (genres.some(g => NON_ACTING_GENRES.has(g))) continue;
-      if (isTv && (credit.episode_count || 0) < 3) continue;   // guest spots
+      if (isTv && (credit.episode_count || 0) < minEpisodes) continue;   // guest spots
       if (!isTv && (credit.order ?? 99) > 15) continue;        // background parts
 
       const isVoice = genres.includes(ANIMATION_GENRE) || /\(voice\)/i.test(credit.character || '');
@@ -114,6 +160,8 @@ class TMDbFilmography {
         votes: credit.vote_count || 0,
         tmdbId: credit.id,
         mediaType: isTv ? 'tv' : 'movie',
+        date: date || null,
+        poster: credit.poster_path ? `https://image.tmdb.org/t/p/w185${credit.poster_path}` : null,
         score: reach * billing * buzz,
         source: 'tmdb'
       });

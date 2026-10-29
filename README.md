@@ -45,6 +45,21 @@ Automates celebrity image sourcing for high-quality autograph print preparation.
   Never upscales. Each package includes `contact_sheet.jpg` to check crops
 - **Output**: Manifest JSON + Google Drive upload
 
+## 🧭 Modes (dashboard)
+
+- **Auto**: type a name; roles are chosen from TMDb and everything runs.
+- **Select**: type a name, choose Popular or Newest, tick the roles to search.
+- **Custom**: type a name and the shows/movies (➕ for more). Titles are
+  matched to the person's credits; one that isn't can still be searched by
+  typing the character name.
+
+The dashboard is password-protected (`DASHBOARD_PASSWORD` in
+`dashboard/.env.local`) and forwards `/api` to the API, which listens only on
+the droplet itself (`127.0.0.1:4000`).
+
+`node scripts/check-sources.js "Name" "Title"` shows what each photo source
+finds for one role without running a job.
+
 ## 🔧 Configuration
 
 All settings live in `.env`; `.env.example` documents each one. Two settings

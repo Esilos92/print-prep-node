@@ -6,7 +6,7 @@ import GBotTerminal from '@/components/GBotTerminal';
 import MissionStatus from '@/components/MissionStatus';
 import SubjectLog from '@/components/SubjectLog';
 import Analytics from '@/components/Analytics';
-import { celebrityAPI, computeAnalytics, ApiError, type JobStatus } from '@/services/api';
+import { celebrityAPI, computeAnalytics, ApiError, type JobStatus, type RoleChoice, type Mode } from '@/services/api';
 import { DATA } from '@/lib/theme';
 
 type Tab = 'ops' | 'log' | 'analytics';
@@ -64,9 +64,9 @@ export default function Dashboard() {
   }, [jobs, currentJobId, loadJobs]);
 
   /** Returns an error string for GBot to speak, or null on success. */
-  const startJob = useCallback(async (name: string): Promise<string | null> => {
+  const startJob = useCallback(async (name: string, options: { roles?: RoleChoice[]; mode?: Mode } = {}): Promise<string | null> => {
     try {
-      const jobId = await celebrityAPI.startJob(name);
+      const jobId = await celebrityAPI.startJob(name, options);
       setCurrentJobId(jobId);
       setTab('ops');
 

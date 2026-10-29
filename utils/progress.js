@@ -44,6 +44,11 @@ module.exports = {
     emit({ type: 'download', url });
   },
 
+  /** One role finished: what it delivered, for GBot to report. */
+  roleDone({ character, title, selected, byKind }) {
+    emit({ type: 'role_done', character, title, selected, byKind: byKind || {} });
+  },
+
   /** A failure worth surfacing in the dashboard rather than only in the log. */
   problem(message) {
     emit({ type: 'problem', message });

@@ -2,22 +2,49 @@
 import type { JobState } from '@/lib/theme';
 
 /**
- * Backend base URL.
- *
- * This was a hardcoded `http://159.223.131.137:4000/api` compiled into the
- * client bundle, which meant the host could not change without a rebuild and
- * the dashboard could never be served over HTTPS (the call would become
- * blocked mixed content). Configure with NEXT_PUBLIC_API_BASE_URL; the
- * fallback is a same-origin relative path so a reverse proxy works untouched.
+ * The browser calls /api on the dashboard itself, which forwards to the API
+ * on the same machine (see next.config.js). The API is not reachable from
+ * the internet directly, so there is no backend URL to configure here.
  */
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, '') || '/api';
-
-/** Set when the backend has API_KEY configured. */
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+const API_BASE_URL = '/api';
 
 function headers(extra: Record<string, string> = {}): Record<string, string> {
-  return API_KEY ? { ...extra, 'X-API-Key': API_KEY } : extra;
+  return extra;
+}
+
+export type Mode = 'auto' | 'select' | 'custom';
+
+/** A role as the backend describes it, ready to send back with a job. */
+export interface RoleChoice {
+  character: string;
+  title: string;
+  year: string;
+  tmdbId: number | null;
+  mediaType: 'tv' | 'movie' | null;
+  medium: string;
+  isVoiceRole?: boolean;
+  poster?: string | null;
+  episodes?: number | null;
+  /** Released in the last few months: photos may still be scarce. */
+  recent?: boolean;
+  source?: 'tmdb' | 'manual';
+}
+
+export interface RoleList {
+  person: { name: string; id: number } | null;
+  roles: RoleChoice[];
+  sort: 'popular' | 'newest';
+}
+
+export type ResolvedTitle =
+  | { input: string; status: 'matched'; role: RoleChoice }
+  | { input: string; status: 'not_found'; guess: { title: string; year: string; tmdbId: number; mediaType: 'tv' | 'movie'; poster: string | null } | null };
+
+export interface RoleResult {
+  character: string;
+  title: string;
+  selected: number;
+  byKind: Record<string, number>;
 }
 
 export interface JobStatus {
@@ -39,6 +66,9 @@ export interface JobStatus {
   logs?: Array<{ timestamp: Date; message: string }>;
   gBotPhaseChange?: string;
   currentPhaseForGBot?: string;
+  /** One entry per finished role, in order. */
+  roleResults?: RoleResult[];
+  mode?: Mode;
 }
 
 interface StartJobResponse {
@@ -66,23 +96,41 @@ class CelebrityAPI {
   private pollingIntervals = new Map<string, ReturnType<typeof setInterval>>();
   private lastJobStates = new Map<string, JobStatus>();
 
-  async startJob(celebrity: string): Promise<string> {
+  async startJob(celebrity: string, options: { roles?: RoleChoice[]; mode?: Mode } = {}): Promise<string> {
     const response = await fetch(`${API_BASE_URL}/jobs`, {
       method: 'POST',
       headers: headers({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ celebrity })
+      body: JSON.stringify({ celebrity, roles: options.roles, mode: options.mode })
     });
 
     if (!response.ok) {
-      // The server distinguishes a bad name (400), a missing key (401), the
-      // concurrency cap and the rate limit (both 429). Surface its wording —
-      // it is written to be read by the operator.
+      // The server's wording is written to be read by the operator.
       const body = await response.json().catch(() => ({}));
       throw new ApiError(body.error || `Request failed (${response.status})`, response.status);
     }
 
     const result: StartJobResponse = await response.json();
     return result.jobId;
+  }
+
+  /** Select mode: roles to choose from. */
+  async listRoles(name: string, sort: 'popular' | 'newest'): Promise<RoleList> {
+    const response = await fetch(`${API_BASE_URL}/roles?name=${encodeURIComponent(name)}&sort=${sort}&limit=10`, { headers: headers() });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(body.error || `Request failed (${response.status})`, response.status);
+    return body as RoleList;
+  }
+
+  /** Custom mode: match typed titles to the person's credits. */
+  async resolveTitles(name: string, titles: string[]): Promise<ResolvedTitle[]> {
+    const response = await fetch(`${API_BASE_URL}/roles/resolve`, {
+      method: 'POST',
+      headers: headers({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ name, titles })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(body.error || `Request failed (${response.status})`, response.status);
+    return body.results as ResolvedTitle[];
   }
 
   async getJob(jobId: string): Promise<JobStatus | null> {

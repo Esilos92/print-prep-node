@@ -141,6 +141,7 @@ class TmdbCredits {
             year: date ? date.slice(0, 4) : 'unknown',
             mediaType: c.media_type === 'tv' ? 'tv' : 'movie',
             tmdbId: c.id,
+            poster: c.poster_path ? `https://image.tmdb.org/t/p/w185${c.poster_path}` : null,
             popularity: c.popularity || 0,
             episodeCount: c.episode_count || 0,
             // (voice) in the credit string is TMDb's own marker; genre 16 catches the rest.
