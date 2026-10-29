@@ -1,6 +1,7 @@
 const path = require('path');
 const config = require('../../utils/config');
-const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
+const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, titleCast, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
+const { planCrop } = require('./print');
 const { downloadCandidates, downloadOne, isDuplicate } = require('./download');
 const { reviewImages, confirmIdentity, loadReferences } = require('./review');
 const { mapLimit } = require('../../utils/concurrency');
@@ -20,7 +21,14 @@ function score(image) {
   return r.print_quality * 2
     + (r.identity_confidence || 0) / 2
     + Math.min(2, megapixels / 6)
-    + (image.source === 'tmdb' ? 1 : 0);
+    + (image.source === 'tmdb' ? 1 : 0)
+    + ((image.printable || []).includes('8x10') ? 1 : 0);
+}
+
+/** Which sheets this photo can be printed on without cutting anyone or going soft. */
+function printableFormats(image) {
+  const config = require('../../utils/config');
+  return Object.keys(config.print.formats).filter(format => !planCrop(image, image.width, image.height, format).skip);
 }
 
 /**
@@ -142,6 +150,8 @@ async function sourceRole(celebrityName, role, workDir, context) {
   };
 
   const accepted = [];
+  // Co-stars tell the search which "Trespass" we mean, and the reviewer which faces aren't the target.
+  role.coStars = role.coStars || await titleCast(celebrityName, role);
 
   const runPass = async (candidates) => {
     report.passes++;
@@ -156,7 +166,15 @@ async function sourceRole(celebrityName, role, workDir, context) {
     mergeReasons(report.rejected, reasons);
 
     for (const image of reviewed) {
-      if (image.decision.accepted) accepted.push(image);
+      if (!image.decision.accepted) continue;
+      // A photo no sheet can take (a wide group shot that can't be cropped
+      // without cutting someone out) would only waste a slot.
+      image.printable = printableFormats(image);
+      if (image.printable.length === 0) {
+        report.rejected.unprintable = (report.rejected.unprintable || 0) + 1;
+        continue;
+      }
+      accepted.push(image);
     }
   };
 

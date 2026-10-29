@@ -188,6 +188,31 @@ async function tmdbTaggedCandidates(celebrityName, role) {
     }));
 }
 
+/**
+ * The title's top-billed cast other than the performer. Used to tell a
+ * search engine which "Trespass" we mean, and to tell the reviewer which
+ * faces in a photo are co-stars rather than the target.
+ */
+async function titleCast(celebrityName, role) {
+  if (!config.api.tmdbKey) return [];
+  try {
+    const title = await findTitleId(role);
+    if (!title) return [];
+    const path = title.mediaType === 'tv' ? 'aggregate_credits' : 'credits';
+    const response = await axios.get(`${TMDB}/${title.mediaType}/${title.id}/${path}`, {
+      params: { api_key: config.api.tmdbKey },
+      timeout: 15000
+    });
+    const norm = (v) => (v || '').toLowerCase().trim();
+    return (response.data?.cast || [])
+      .filter(c => norm(c.name) !== norm(celebrityName))
+      .slice(0, 6)
+      .map(c => c.name);
+  } catch {
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------- fandom
 
 /**
@@ -263,12 +288,14 @@ function templateQueries(celebrityName, role) {
     ];
   }
 
+  const year = role.year && role.year !== 'unknown' ? ` ${role.year}` : '';
+  const costar = role.coStars?.[0] ? ` "${role.coStars[0]}"` : '';
   return [
-    { q: `"${celebrityName}" ${t} still`, aim: 'solo' },
-    { q: `${c} ${t} scene`, aim: 'solo' },
-    { q: `"${celebrityName}" as ${c}`, aim: 'solo' },
-    { q: `${t} cast ${tv ? 'promotional photo' : 'still'}`, aim: 'group' },
-    { q: `${t} official poster`, aim: 'poster' }
+    { q: `"${celebrityName}" ${t}${year} still`, aim: 'solo' },
+    { q: `${c} ${t}${year} scene`, aim: 'solo' },
+    { q: `"${celebrityName}" as ${c}${tv ? '' : year}`, aim: 'solo' },
+    { q: `${t}${year}${costar} cast ${tv ? 'promotional photo' : 'still'}`, aim: 'group' },
+    { q: `${t}${year} official poster`, aim: 'poster' }
   ];
 }
 
@@ -303,6 +330,7 @@ async function plannedQueries(celebrityName, role) {
 
 Performer: ${celebrityName}
 Role: ${role.character} in "${role.title}" (${role.year || 'year unknown'}, ${role.mediaType || role.medium || 'unknown type'}${role.episodes ? `, ${role.episodes} episodes` : ''})
+${role.coStars?.length ? `Co-stars: ${role.coStars.join(', ')}` : ''}
 ${animated ? 'This is a VOICE/ANIMATED role: we need OFFICIAL art of the character — studio artwork, key visuals, official promotional art, screenshots from the show/film. Never fan art.' : 'This is a LIVE-ACTION role: we need the performer IN THIS ROLE — scene stills, episode screenshots, on-set photos, official cast/promotional photos. Not red carpets, interviews or conventions.'}
 
 Write 7 queries:
@@ -310,7 +338,7 @@ Write 7 queries:
 - 2 with aim "group": ${animated ? 'the character with other characters, official group art' : 'official cast photos or scenes with co-stars'}
 - 1 with aim "poster": the official poster or key art for the title
 
-Tips: quote exact names; add disambiguating words when the title is a common word (e.g. TV series, film, the year, the network); words like still, scene, episode, season, promotional, official help. Do not use site: or minus operators.`;
+Tips: quote exact names. Many titles are shared by several films or shows, so include the year in most queries, and a co-star's name in some, so results are about THIS "${role.title}". Words like still, scene, episode, season, promotional, official help. Do not use site: or minus operators.`;
 
   try {
     const reply = await chat({
@@ -391,6 +419,7 @@ module.exports = {
   tmdbCandidates,
   tmdbTaggedCandidates,
   fandomCandidates,
+  titleCast,
   plannedQueries,
   templateQueries,
   googleCandidates,
