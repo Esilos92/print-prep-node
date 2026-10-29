@@ -69,7 +69,7 @@ function eraNote(celebrityName, role) {
   const year = parseInt(role.year, 10);
   const gap = Number.isFinite(year) ? new Date().getFullYear() - year : 0;
   const era = gap >= 4
-    ? `This role is from ${year}, about ${gap} years ago. The reference photos are likely more recent, so expect ${celebrityName} to look younger, with different hair, facial hair, weight or styling. Match bone structure, not current look.\n`
+    ? `This role is from ${year}, about ${gap} years ago. ${role.eraReferencePaths?.length ? 'The profile photos' : 'The reference photos'} are likely more recent, so expect ${celebrityName} to look younger, with different hair, facial hair, weight or styling. Match bone structure, not current look.\n`
     : '';
   const cast = role.coStars?.length
     ? `Other cast members of "${role.title}": ${role.coStars.join(', ')}. They are NOT the target, but their presence is good evidence the photo is from this title.\n`
@@ -77,7 +77,26 @@ function eraNote(celebrityName, role) {
   return era + cast;
 }
 
-function buildPrompt(celebrityName, role, count, referenceCount) {
+/**
+ * Describe the reference photos. Era references are TMDb stills from this
+ * very title tagged as containing the performer — the best possible match
+ * for a role from decades ago. Recent references are profile photos.
+ */
+function referenceIntro(celebrityName, role, eraCount, total) {
+  if (total === 0) return '';
+  const recent = total - eraCount;
+  const parts = [];
+  if (eraCount > 0) {
+    parts.push(`REFERENCE ${eraCount === 1 ? '1 is a still' : `1-${eraCount} are stills`} from "${role.title}" itself${role.year ? ` (${role.year})` : ''}, recorded by TMDb as containing ${celebrityName} — the best guide to how they looked in this role. Other people may also be in ${eraCount === 1 ? 'it' : 'them'}; ${celebrityName} is the one who also matches the other references.`);
+  }
+  if (recent > 0) {
+    const first = eraCount + 1;
+    parts.push(`REFERENCE ${recent === 1 ? `${first} is a profile photo` : `${first}-${total} are profile photos`} of ${celebrityName}, probably more recent.`);
+  }
+  return parts.join(' ') + ` Judge identity by facial structure — eyes, nose, jaw, ears, face shape — not hair, clothing, age or lighting.\n`;
+}
+
+function buildPrompt(celebrityName, role, count, referenceCount, eraCount = 0) {
   const hasReference = referenceCount > 0;
   const animated = isAnimated(role);
   const target = animated
@@ -85,7 +104,7 @@ function buildPrompt(celebrityName, role, count, referenceCount) {
     : `${celebrityName} as ${role.character} in "${role.title}"`;
 
   return `You are selecting photos for autograph prints of ${target}.
-${hasReference ? `The first ${referenceCount === 1 ? 'image (REFERENCE) is a confirmed photo' : `${referenceCount} images (REFERENCE 1-${referenceCount}) are confirmed photos`} of ${celebrityName}. Judge identity by facial structure — eyes, nose, jaw, ears, face shape — not by hair, clothing, age or lighting; the same person may look different in character. Lookalike co-stars are common: if the face does not clearly match, target_present is false.\n` : ''}
+${hasReference ? referenceIntro(celebrityName, role, eraCount, referenceCount) + 'Lookalike co-stars are common; the careful check later decides uncertain cases.\n' : ''}
 ${animated ? '' : eraNote(celebrityName, role)}Then come ${count} candidate images, labelled Image 1 to Image ${count}. Each label gives where the image was found.
 
 For EACH candidate report:
@@ -269,7 +288,8 @@ async function loadReferences(referencePaths, maxSide) {
 async function reviewImages(images, { celebrityName, role, referencePaths }) {
   const animated = isAnimated(role);
   // A face photo of the performer says nothing about an animated character.
-  const references = animated ? [] : await loadReferences(referencePaths, 768);
+  const era = animated ? [] : await loadReferences(role.eraReferencePaths, 768);
+  const references = animated ? [] : [...era, ...await loadReferences(referencePaths, 768)];
 
   const batchSize = Math.max(1, config.sourcing.reviewBatchSize);
   const reviewed = [];
@@ -291,7 +311,7 @@ async function reviewImages(images, { celebrityName, role, referencePaths }) {
     }
     if (batch.length === 0) return [];
 
-    const prompt = buildPrompt(celebrityName, role, batch.length, references.length);
+    const prompt = buildPrompt(celebrityName, role, batch.length, references.length, era.length);
     let outcome;
     try {
       outcome = await reviewBatch(prompt, references, batch);
@@ -346,12 +366,11 @@ const CONFIRM_SCHEMA = {
  * of a person is confirmed on its own before it can be delivered. A failed
  * check (API error) returns null, and the caller does not deliver the photo.
  */
-async function confirmIdentity(image, { celebrityName, role, references }) {
+async function confirmIdentity(image, { celebrityName, role, references, eraCount = 0 }) {
   if (references.length === 0) return { same_person: true, confidence: 0, reason: 'no reference available', unchecked: true };
 
   const candidate = { ...image, b64: await toJpegBase64(image.filepath, 1280) };
-  const many = references.length > 1;
-  const prompt = `${many ? `REFERENCE 1-${references.length} are confirmed photos` : 'REFERENCE is a confirmed photo'} of ${celebrityName}, taken at different times.
+  const prompt = `${referenceIntro(celebrityName, role, eraCount, references.length)}
 The last image is a candidate for an autograph print of ${celebrityName} as ${role.character} in "${role.title}"${image.decision?.bucket === 'group' ? '. It is a group photo: decide whether ' + celebrityName + ' is one of the people in it' : ''}.
 ${eraNote(celebrityName, role)}
 Is ${celebrityName} in the candidate image? Compare facial structure — eye shape and spacing, nose, mouth, jaw and chin, ears, hairline — and allow for age, makeup, lighting and hair. Co-stars and lookalikes are common in these searches; if any feature clearly differs, answer false.

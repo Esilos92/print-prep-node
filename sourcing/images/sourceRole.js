@@ -98,7 +98,8 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
   let checks = 0;
   const maxChecks = count * 3;
   // Load and encode the reference photos once, not once per check.
-  const references = await loadReferences(referencePaths, 1024);
+  const era = await loadReferences(role.eraReferencePaths, 1024);
+  const references = [...era, ...await loadReferences(referencePaths, 1024)];
 
   for (;;) {
     const chosen = selectMix(pool, count);
@@ -110,7 +111,7 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
     // Several checks at once: each one is a careful, slow call.
     const batch = pending.slice(0, Math.max(1, maxChecks - checks));
     checks += batch.length;
-    const results = await mapLimit(batch, 4, image => confirmIdentity(image, { celebrityName, role, references }));
+    const results = await mapLimit(batch, 4, image => confirmIdentity(image, { celebrityName, role, references, eraCount: era.length }));
 
     batch.forEach((image, i) => {
       const result = results[i];
@@ -191,6 +192,21 @@ async function sourceRole(celebrityName, role, workDir, context) {
     })
   ]);
   report.sources = { tmdb: official.length, tmdbTagged: tagged.length, fandom: fandom.length, google: web.length };
+
+  // Era references: the top tagged stills from this title show the performer
+  // as they looked in this role, which matters most for roles decades old.
+  role.eraReferencePaths = [];
+  if (!animated) {
+    const fs = require('fs').promises;
+    const refDir = path.join(dir, 'era-reference');
+    await fs.mkdir(refDir, { recursive: true });
+    for (const candidate of tagged.slice(0, 4)) {
+      if (role.eraReferencePaths.length >= 2) break;
+      const image = await downloadOne(candidate, refDir, { anySize: true });
+      if (image) role.eraReferencePaths.push(image.filepath);
+    }
+    if (role.eraReferencePaths.length) console.log(`🪪 ${role.character}: ${role.eraReferencePaths.length} era reference still(s) from ${role.title}`);
+  }
   const poster = config.sourcing.alwaysPoster ? await officialPoster(official, dir, triedUrls, seen) : null;
   report.officialPoster = !!poster;
   // Most reliable first: tagged stills, the character's wiki gallery, TMDb art, then the open web.
