@@ -36,15 +36,15 @@ const REVIEW_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['index', 'kind', 'target_present', 'identity_confidence', 'from_production',
-            'matches_title', 'problem', 'print_quality', 'keep_box', 'reason'],
+          required: ['index', 'kind', 'target_present', 'identity_confidence', 'clearly_unofficial',
+            'clearly_other_project', 'problem', 'print_quality', 'keep_box', 'reason'],
           properties: {
             index: { type: 'integer' },
             kind: { type: 'string', enum: ['solo', 'group', 'poster', 'official_art', 'other'] },
             target_present: { type: 'boolean' },
             identity_confidence: { type: 'integer' },
-            from_production: { type: 'boolean' },
-            matches_title: { type: 'boolean' },
+            clearly_unofficial: { type: 'boolean' },
+            clearly_other_project: { type: 'boolean' },
             problem: { type: 'string', enum: PROBLEMS },
             print_quality: { type: 'integer' },
             keep_box: {
@@ -81,11 +81,11 @@ For EACH candidate report:
     : '"solo" when the target is the only or clearly main person; "group" for two or more people where the target is clearly identifiable; "poster" for an official poster, key art or title card; "other" otherwise.'}
 - target_present: ${animated ? `${role.character} is clearly depicted` : `the REFERENCE person appears and can be identified`}. For posters, whether ${animated ? 'the character' : 'they'} appear on it.
 - identity_confidence: 1-10, how sure you are about target_present being true. 1 if absent.
-- from_production: ${animated
-    ? 'official material — studio art, official promotion, or a real screenshot. FALSE for fan art, fan edits, cosplay, AI-generated art, merchandise.'
-    : `the photo comes from the production or its official promotion — scene still, episode screenshot, on-set photo, official cast or promo photo, poster. Many roles are set in the present day, so the "costume" can be ordinary clothes; do not mark false just because there is no distinctive costume. FALSE on clear signs of a public appearance — red carpet or press wall, premiere, interview or talk-show set, podcast, convention panel or signing, fan photo, selfie, paparazzi — and FALSE for personal headshots, agency or modelling portraits and magazine shoots that are not promotion for this title (plain studio backdrop, no costume, set or co-stars from the production).`}
-- matches_title: the image belongs to "${role.title}" specifically, not another project.
-- problem: the single main reason it is unusable, or "none". merchandise_or_packaging covers DVD/Blu-ray/VHS cases, toys, shop listings and photos of physical posters for sale. collage_or_text_overlay covers memes, collages, article screenshots and heavy captions (a real poster's own text is fine).
+- clearly_unofficial: ${animated
+    ? 'TRUE only when the image is clearly NOT official material: fan art, fan edits, cosplay, AI-generated art, merchandise photos. Studio art, official promotion and real screenshots are FALSE.'
+    : `TRUE only on clear visible evidence the photo is NOT from the production or its promotion: red carpet or press wall, premiere, interview or talk-show set, podcast, convention panel or signing, fan photo, selfie, paparazzi, or an obvious personal headshot / modelling shoot (photographer's seamless backdrop, posed fashion styling). Many roles are set in the present day in ordinary clothes, and most scene stills give no sign of which production they are from — that is normal and is FALSE. When in doubt, FALSE.`}
+- clearly_other_project: TRUE only when there is clear evidence the image belongs to a different film or show than "${role.title}" (another title's poster or logo, a costume or setting that unmistakably belongs elsewhere, or the source label names another title). Not being able to tell which project it is from is FALSE.
+- problem: the single main reason it is unusable, or "none". Use not_from_production / other_project only when the matching clearly_ field is TRUE. merchandise_or_packaging covers DVD/Blu-ray/VHS cases, toys, shop listings and photos of physical posters for sale. collage_or_text_overlay covers memes, collages, article screenshots and heavy captions (a real poster's own text is fine).
 - print_quality: 1-5 for a large print — sharpness, noise, lighting, composition. 1 = unusable, 3 = fine, 5 = excellent.
 - keep_box: the smallest box (x, y, w, h as fractions 0-1 of the image width/height, origin top-left) that a crop must not cut: it must contain EVERY face in the image (forehead to chin, ear to ear) and the target's whole head and hair. Faces only, not bodies — the crop adds its own margin. For posters, the whole artwork including the title.
 - reason: at most 12 words.
@@ -220,8 +220,9 @@ function decide(review, role) {
 
   if (review.problem && review.problem !== 'none') return { accepted: false, why: review.problem };
   if (kind === 'other') return { accepted: false, why: 'not_a_usable_kind' };
-  if (!review.from_production) return { accepted: false, why: animated ? 'not_official' : 'not_from_production' };
-  if (!review.matches_title) return { accepted: false, why: 'other_project' };
+  // Context checks reject only on evidence; identity is where the strictness lives.
+  if (review.clearly_unofficial) return { accepted: false, why: animated ? 'not_official' : 'not_from_production' };
+  if (review.clearly_other_project) return { accepted: false, why: 'other_project' };
   if ((review.print_quality || 0) < config.sourcing.minPrintQuality) return { accepted: false, why: 'low_quality' };
 
   // A poster qualifies on being the official poster; the person need not be on it.

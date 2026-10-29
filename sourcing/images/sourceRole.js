@@ -41,9 +41,14 @@ function selectMix(accepted, count) {
   for (const bucket of ['solo', 'group', 'poster']) {
     chosen.push(...ranked.filter(i => i.decision.bucket === bucket).slice(0, quotas[bucket]));
   }
+  // Leftover slots go to the best remaining photos, but never pile up
+  // posters: one extra at most beyond the poster quota.
+  const posterCap = quotas.poster + 1;
   for (const image of ranked) {
     if (chosen.length >= count) break;
-    if (!chosen.includes(image)) chosen.push(image);
+    if (chosen.includes(image)) continue;
+    if (image.decision.bucket === 'poster' && chosen.filter(i => i.decision.bucket === 'poster').length >= posterCap) continue;
+    chosen.push(image);
   }
   return chosen.slice(0, count).sort((a, b) => score(b) - score(a));
 }
