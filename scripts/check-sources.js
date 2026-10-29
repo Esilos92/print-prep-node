@@ -73,7 +73,7 @@ async function main() {
   }
   show('TMDb tagged (usable size)', await c.tmdbTaggedCandidates(name, role));
 
-  show('Fandom gallery', await c.fandomCandidates(role));
+  show("Fandom gallery (printable)", (await c.fandomCandidates(role)).filter(f => !f.belowFloor));
 
   if (withGoogle) {
     show('Google (fallback queries)', await c.googleCandidates(c.templateQueries(name, role)));

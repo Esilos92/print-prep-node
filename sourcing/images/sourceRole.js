@@ -196,7 +196,7 @@ async function sourceRole(celebrityName, role, workDir, context) {
       return [];
     })
   ]);
-  report.sources = { tmdb: official.length, tmdbTagged: tagged.length, fandom: fandom.length, google: web.length };
+  report.sources = { tmdb: official.length, tmdbTagged: tagged.length, fandom: fandom.filter(f => !f.belowFloor).length, google: web.length };
 
   // Era references: the top tagged stills from this title show the performer
   // as they looked in this role, which matters most for roles decades old.
@@ -205,7 +205,11 @@ async function sourceRole(celebrityName, role, workDir, context) {
     const fs = require('fs').promises;
     const refDir = path.join(dir, 'era-reference');
     await fs.mkdir(refDir, { recursive: true });
-    for (const candidate of tagged.slice(0, 4)) {
+    // TMDb's tagged stills first; failing that, the character's own wiki
+    // images whose file names name the character (any size will do).
+    const nameParts = (role.character || '').toLowerCase().split(/[\s/]+/).filter(w => w.length >= 3);
+    const wikiRefs = fandom.filter(f => nameParts.some(w => (f.title || '').toLowerCase().includes(w)));
+    for (const candidate of [...tagged.slice(0, 4), ...wikiRefs.slice(0, 4)]) {
       if (role.eraReferencePaths.length >= 2) break;
       const image = await downloadOne(candidate, refDir, { anySize: true });
       if (image) role.eraReferencePaths.push(image.filepath);
@@ -215,7 +219,7 @@ async function sourceRole(celebrityName, role, workDir, context) {
   const poster = config.sourcing.alwaysPoster ? await officialPoster(official, dir, triedUrls, seen) : null;
   report.officialPoster = !!poster;
   // Most reliable first: tagged stills, the character's wiki gallery, TMDb art, then the open web.
-  await runPass([...tagged, ...fandom, ...official, ...web]);
+  await runPass([...tagged, ...fandom.filter(f => !f.belowFloor), ...official, ...web]);
 
   // Pass 2, only when the first came up short.
   if (accepted.length < config.sourcing.minPerRole) {

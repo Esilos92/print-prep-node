@@ -238,8 +238,33 @@ function guessWikiNames(title) {
 
 const normName = (v) => (v || '').toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 
+const STOP_WORDS = new Set(['the', 'a', 'an', 'of', 'and', 'wiki', 'fandom', 'database', 'series', 'movie', 'film', 'tv']);
+const keyWords = (v) => (v || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+  .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+
+/**
+ * Is this wiki about the title? "Scream Wiki" is for Scream 4; "Tropedia"
+ * is not for Trespass. Compares the wiki's own name with the title.
+ */
+async function wikiMatchesTitle(origin, title) {
+  try {
+    const response = await axios.get(`${origin}/api.php`, {
+      params: { action: 'query', format: 'json', meta: 'siteinfo', siprop: 'general' },
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PrintPrep/2.0)' }
+    });
+    const site = keyWords(response.data?.query?.general?.sitename);
+    const host = origin.replace(/^https:\/\//, '').split('.')[0].replace(/-/g, '');
+    const words = keyWords(title);
+    return words.some(w => site.includes(w) || host.includes(w));
+  } catch {
+    return false;
+  }
+}
+
 /** Ask a wiki's own search for the character's page; null if it has none. */
-async function wikiCharacterPage(origin, name) {
+async function wikiCharacterPage(origin, name, title) {
+  if (title && !(await wikiMatchesTitle(origin, title))) return null;
   try {
     const response = await axios.get(`${origin}/api.php`, {
       params: { action: 'query', format: 'json', list: 'search', srsearch: name, srlimit: 8, srnamespace: 0 },
@@ -266,7 +291,7 @@ async function findFandomPage(name, role) {
   const origins = guessWikiNames(role.title).map(n => `https://${n}.fandom.com`);
 
   for (const origin of origins) {
-    const title = await wikiCharacterPage(origin, name);
+    const title = await wikiCharacterPage(origin, name, role.title);
     if (title) return { origin, title };
   }
 
@@ -277,7 +302,7 @@ async function findFandomPage(name, role) {
     .filter(o => o && !FANON.test(o) && !origins.includes(o)))].slice(0, 3);
 
   for (const origin of found) {
-    const title = await wikiCharacterPage(origin, name);
+    const title = await wikiCharacterPage(origin, name, role.title);
     if (title) return { origin, title };
   }
   return null;
@@ -314,12 +339,14 @@ async function fandomCandidates(role) {
       .map(p => ({ title: p.title, info: p.imageinfo?.[0] }))
       .filter(f => f.info?.url && /^image\/(jpeg|png|webp)$/i.test(f.info.mime || ''))
       .filter(f => !/(wordmark|logo|favicon|placeholder|icon|avatar|badge|flag|symbol)/i.test(f.title))
-      .filter(f => bigEnough(f.info.width, f.info.height))
+      .filter(f => (f.info.width || 0) >= 300 && (f.info.height || 0) >= 300)
       .sort((a, b) => b.info.width * b.info.height - a.info.width * a.info.height);
 
     const gallery = `${page.origin}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
-    console.log(`📚 ${name}: ${files.length} usable image(s) on ${gallery}`);
-    return files.slice(0, 40).map((f, i) => ({
+    // Small images can't be printed but still work as era references.
+    const usable = files.filter(f => bigEnough(f.info.width, f.info.height)).length;
+    console.log(`📚 ${name}: ${usable} printable image(s) of ${files.length} on ${gallery}`);
+    return files.slice(0, 60).map((f, i) => ({
       url: f.info.url,
       pageUrl: gallery,
       title: f.title.replace(/^File:/, ''),
@@ -327,6 +354,7 @@ async function fandomCandidates(role) {
       height: f.info.height,
       source: 'fandom',
       hint: 'solo',
+      belowFloor: !bigEnough(f.info.width, f.info.height),
       rank: i
     }));
   } catch (error) {

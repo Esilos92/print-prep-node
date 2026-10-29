@@ -87,7 +87,7 @@ function referenceIntro(celebrityName, role, eraCount, total) {
   const recent = total - eraCount;
   const parts = [];
   if (eraCount > 0) {
-    parts.push(`REFERENCE ${eraCount === 1 ? '1 is a still' : `1-${eraCount} are stills`} from "${role.title}" itself${role.year ? ` (${role.year})` : ''}, recorded by TMDb as containing ${celebrityName} — the best guide to how they looked in this role. Other people may also be in ${eraCount === 1 ? 'it' : 'them'}; ${celebrityName} is the one who also matches the other references.`);
+    parts.push(`REFERENCE ${eraCount === 1 ? '1 is a still' : `1-${eraCount} are stills`} from "${role.title}" itself${role.year ? ` (${role.year})` : ''}, recorded (by TMDb or the title's wiki) as showing ${celebrityName} as ${role.character} — the best guide to how they looked in this role. Other people may also be in ${eraCount === 1 ? 'it' : 'them'}; ${celebrityName} is the one who also matches the other references.`);
   }
   if (recent > 0) {
     const first = eraCount + 1;
