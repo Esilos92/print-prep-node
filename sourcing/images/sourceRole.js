@@ -1,7 +1,7 @@
 const path = require('path');
 const config = require('../../utils/config');
-const { tmdbCandidates, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
-const { downloadCandidates, downloadOne } = require('./download');
+const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
+const { downloadCandidates, downloadOne, isDuplicate } = require('./download');
 const { reviewImages, confirmIdentity, loadReferences } = require('./review');
 const { mapLimit } = require('../../utils/concurrency');
 
@@ -61,13 +61,13 @@ function mergeReasons(into, from) {
  * The title's official poster, taken straight from TMDb: it is the record,
  * so it needs no identity check, and it is always delivered at 11x17.
  */
-async function officialPoster(official, dir, triedUrls) {
+async function officialPoster(official, dir, triedUrls, seen) {
   const fs = require('fs').promises;
   await fs.mkdir(dir, { recursive: true });
   for (const candidate of official.filter(c => c.hint === 'poster').slice(0, 3)) {
     triedUrls.add(candidate.url);
     const image = await downloadOne(candidate, dir, { anySize: true });
-    if (!image) continue;
+    if (!image || isDuplicate(image, seen)) continue;
     return {
       ...image,
       guaranteedPoster: true,
@@ -147,7 +147,7 @@ async function sourceRole(celebrityName, role, workDir, context) {
     report.passes++;
     report.candidatesFound += candidates.length;
 
-    const { images } = await downloadCandidates(candidates.slice(0, perPass), dir, { seen, triedUrls });
+    const { images } = await downloadCandidates(candidates, dir, { seen, triedUrls, want: perPass });
     report.downloaded += images.length;
     if (images.length === 0) return;
 
@@ -163,16 +163,20 @@ async function sourceRole(celebrityName, role, workDir, context) {
   // Pass 1
   const queries = await plannedQueries(celebrityName, role);
   report.queries = queries.map(q => q.q);
-  const [official, web] = await Promise.all([
+  const [official, tagged, fandom, web] = await Promise.all([
     tmdbCandidates(role),
+    tmdbTaggedCandidates(celebrityName, role),
+    fandomCandidates(role),
     googleCandidates(queries, { animated }).catch(error => {
       report.error = error.message;
       return [];
     })
   ]);
-  const poster = config.sourcing.alwaysPoster ? await officialPoster(official, dir, triedUrls) : null;
+  report.sources = { tmdb: official.length, tmdbTagged: tagged.length, fandom: fandom.length, google: web.length };
+  const poster = config.sourcing.alwaysPoster ? await officialPoster(official, dir, triedUrls, seen) : null;
   report.officialPoster = !!poster;
-  await runPass([...official, ...web]);
+  // Most reliable first: tagged stills, the character's wiki gallery, TMDb art, then the open web.
+  await runPass([...tagged, ...fandom, ...official, ...web]);
 
   // Pass 2, only when the first came up short.
   if (accepted.length < config.sourcing.minPerRole) {

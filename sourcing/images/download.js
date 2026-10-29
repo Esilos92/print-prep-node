@@ -97,30 +97,37 @@ function isDuplicate(image, seen) {
  * that duplicate ones already kept (`seen` is shared across a whole run).
  * When two copies of one picture appear, the larger one is kept.
  */
-async function downloadCandidates(candidates, dir, { seen = [], triedUrls = new Set(), limit = 6 } = {}) {
+async function downloadCandidates(candidates, dir, { seen = [], triedUrls = new Set(), limit = 6, want = Infinity } = {}) {
   await fs.mkdir(dir, { recursive: true });
 
   const fresh = candidates.filter(c => !triedUrls.has(c.url));
-  fresh.forEach(c => triedUrls.add(c.url));
-
-  const results = await settleLimit(fresh, limit, c => downloadOne(c, dir));
   const kept = [];
+  let attempted = 0;
 
-  for (const result of results) {
-    const image = result.ok ? result.value : null;
-    if (!image) continue;
+  // Many sites refuse hotlinked downloads, so keep working down the list
+  // until `want` usable images are in hand rather than trying a fixed count.
+  for (let start = 0; start < fresh.length && kept.length < want; start += limit * 2) {
+    const chunk = fresh.slice(start, start + limit * 2);
+    chunk.forEach(c => triedUrls.add(c.url));
+    attempted += chunk.length;
 
-    const twinIndex = kept.findIndex(other => hammingDistance(image.hash, other.hash) <= NEAR_DUPLICATE);
-    if (twinIndex >= 0) {
-      const twin = kept[twinIndex];
-      if (image.width * image.height > twin.width * twin.height) kept[twinIndex] = image;
-      continue;
+    const results = await settleLimit(chunk, limit, c => downloadOne(c, dir));
+    for (const result of results) {
+      const image = result.ok ? result.value : null;
+      if (!image) continue;
+
+      const twinIndex = kept.findIndex(other => hammingDistance(image.hash, other.hash) <= NEAR_DUPLICATE);
+      if (twinIndex >= 0) {
+        const twin = kept[twinIndex];
+        if (image.width * image.height > twin.width * twin.height) kept[twinIndex] = image;
+        continue;
+      }
+      if (isDuplicate(image, seen)) continue;
+      kept.push(image);
     }
-    if (isDuplicate(image, seen)) continue;
-    kept.push(image);
   }
 
-  return { images: kept, attempted: fresh.length };
+  return { images: kept.slice(0, want), attempted };
 }
 
 module.exports = { downloadCandidates, downloadOne, perceptualHash, hammingDistance, isDuplicate };

@@ -1,7 +1,7 @@
 const axios = require('axios');
 const config = require('../../utils/config');
 const { chat } = require('../../utils/openai');
-const { searchImages } = require('../../utils/serpapi');
+const { searchImages, searchWeb } = require('../../utils/serpapi');
 const { settleLimit } = require('../../utils/concurrency');
 
 /**
@@ -121,6 +121,126 @@ async function tmdbCandidates(role) {
     return [...posters.map(toCandidate('poster')), ...stills.map(toCandidate('still'))];
   } catch (error) {
     console.log(`⚠️ TMDb images unavailable for ${role.title}: ${error.message}`);
+    return [];
+  }
+}
+
+/**
+ * Images TMDb has tagged as containing this person, for this title only.
+ * The tag is TMDb's own record of who is in the frame, so these are the
+ * most reliable stills there are. Fetched once per run and shared by roles.
+ */
+const taggedCache = new Map();
+
+async function tmdbPersonId(celebrityName) {
+  const response = await axios.get(`${TMDB}/search/person`, {
+    params: { api_key: config.api.tmdbKey, query: celebrityName },
+    timeout: 15000
+  });
+  const results = response.data?.results || [];
+  if (results.length === 0) return null;
+  const norm = (v) => (v || '').toLowerCase().trim();
+  const exact = results.filter(p => norm(p.name) === norm(celebrityName));
+  const pool = exact.length ? exact : results;
+  return pool.reduce((a, b) => ((b.popularity || 0) > (a.popularity || 0) ? b : a)).id;
+}
+
+async function taggedImages(celebrityName) {
+  if (taggedCache.has(celebrityName)) return taggedCache.get(celebrityName);
+  const load = (async () => {
+    const personId = await tmdbPersonId(celebrityName);
+    if (!personId) return [];
+    const all = [];
+    for (let page = 1; page <= 5; page++) {
+      const response = await axios.get(`${TMDB}/person/${personId}/tagged_images`, {
+        params: { api_key: config.api.tmdbKey, page },
+        timeout: 15000
+      });
+      all.push(...(response.data?.results || []));
+      if (page >= (response.data?.total_pages || 1)) break;
+    }
+    return all;
+  })().catch(error => {
+    console.log(`⚠️ TMDb tagged images unavailable: ${error.message}`);
+    return [];
+  });
+  taggedCache.set(celebrityName, load);
+  return load;
+}
+
+async function tmdbTaggedCandidates(celebrityName, role) {
+  if (!config.api.tmdbKey || !role.tmdbId) return [];
+  const images = await taggedImages(celebrityName);
+  return images
+    .filter(img => img.media?.id === role.tmdbId && (!role.mediaType || img.media_type === role.mediaType))
+    .filter(img => img.file_path && bigEnough(img.width, img.height))
+    .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0) || (b.width || 0) - (a.width || 0))
+    .slice(0, 20)
+    .map((img, i) => ({
+      url: `${TMDB_IMAGE}${img.file_path}`,
+      pageUrl: `https://www.themoviedb.org/${role.mediaType || 'movie'}/${role.tmdbId}`,
+      title: `${role.title} still tagged with ${celebrityName}`,
+      width: img.width,
+      height: img.height,
+      source: 'tmdb',
+      hint: img.image_type === 'poster' ? 'poster' : 'tagged',
+      rank: i
+    }));
+}
+
+// ---------------------------------------------------------------- fandom
+
+/**
+ * The character's gallery on the show's fan wiki. Most shows have one, and
+ * its gallery page is mostly official screenshots and promo photos of
+ * exactly this character. Fan art can appear too; the reviewer rejects it.
+ */
+async function fandomCandidates(role) {
+  const name = (role.character || '').split(/\s*\/\s*/)[0];
+  if (!name || !config.api.serpApiKey) return [];
+
+  try {
+    const data = await searchWeb(`"${name}" "${role.title}" fandom wiki`);
+    const pages = (data.organic_results || [])
+      .map(r => r.link)
+      .filter(link => /\.fandom\.com\/wiki\//.test(link || ''));
+    if (pages.length === 0) return [];
+
+    const page = pages[0].split('#')[0].replace(/\/Gallery$/i, '');
+    let html = '';
+    let pageUrl = `${page}/Gallery`;
+    for (const url of [pageUrl, page]) {
+      try {
+        const response = await axios.get(url, {
+          timeout: 20000,
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PrintPrep/2.0)' }
+        });
+        html = String(response.data || '');
+        pageUrl = url;
+        if (html.includes('static.wikia.nocookie.net')) break;
+      } catch {
+        // gallery subpage may not exist; fall back to the character page
+      }
+    }
+
+    // Strip Fandom's resize suffixes to get the original upload.
+    const urls = new Set();
+    for (const match of html.matchAll(/https:\/\/static\.wikia\.nocookie\.net\/[^"'\s)]+?\.(?:jpe?g|png|webp)/gi)) {
+      const original = match[0].replace(/\/revision\/.*$/, '');
+      if (/(wiki-wordmark|site-logo|favicon|placeholder|icon|avatar|badge)/i.test(original)) continue;
+      urls.add(`${original}/revision/latest`);
+    }
+
+    return [...urls].slice(0, 40).map((url, i) => ({
+      url,
+      pageUrl,
+      title: decodeURIComponent(url.split('/').slice(-3, -2)[0] || '').replace(/_/g, ' '),
+      source: 'fandom',
+      hint: 'solo',
+      rank: i
+    }));
+  } catch (error) {
+    console.log(`⚠️ Fandom gallery unavailable for ${name}: ${error.message}`);
     return [];
   }
 }
@@ -269,6 +389,8 @@ async function googleCandidates(queries, { page = 0, animated = false } = {}) {
 
 module.exports = {
   tmdbCandidates,
+  tmdbTaggedCandidates,
+  fandomCandidates,
   plannedQueries,
   templateQueries,
   googleCandidates,

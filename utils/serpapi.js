@@ -47,8 +47,12 @@ async function search(params, { retries = 3, timeout = 20000, label = 'search' }
         timeout
       });
 
-      // SerpApi reports some failures in the body with a 200.
+      // SerpApi reports some failures in the body with a 200. "No results"
+      // is an answer, not a failure: retrying it only spends credits.
       if (response.data?.error) {
+        if (/hasn't returned any results|no results/i.test(response.data.error)) {
+          return { ...response.data, images_results: [], organic_results: [] };
+        }
         throw new Error(`SerpApi: ${response.data.error}`);
       }
 
