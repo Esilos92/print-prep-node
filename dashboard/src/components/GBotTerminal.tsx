@@ -448,8 +448,8 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
         `Here's what I can do:\n` +
         `  • Auto: type a name and I'll handle everything\n` +
         `  • Select: type a name, choose Popular or Newest, and I'll list their roles for you to pick from\n` +
-        `  • Bulk: give me a whole guest list and I'll work through it\n` +
-        `  • Custom: type a name and the shows or movies you want\n\n` +
+        `  • Custom: type a name and the shows or movies you want\n` +
+        `  • Bulk: give me a whole guest list and I'll work through it\n\n` +
         `You can also type:\n` +
         `  status   how the current job is going\n` +
         `  stats    totals so far\n` +
