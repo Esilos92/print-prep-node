@@ -7,7 +7,7 @@ const logger = require('./utils/logger');
 const progress = require('./utils/progress');
 const { fetchCelebrityRoles } = require('./sourcing/roles');
 const { sourceRole } = require('./sourcing/images/sourceRole');
-const { preparePrints, buildContactSheet } = require('./sourcing/images/print');
+const { preparePrints, buildContactSheet, preparePotentialUpscale } = require('./sourcing/images/print');
 const ReferencePortrait = require('./sourcing/ai-services/ReferencePortrait');
 const { generateManifest } = require('./sourcing/generateManifest');
 const { zipAndUpload } = require('./sourcing/zipAndUpload');
@@ -122,14 +122,16 @@ async function main() {
 
     const context = { referencePaths, seen: [], triedUrls: new Set() };
     const selectedImages = [];
+    const upscaleImages = [];
     const roleReports = [];
     let outages = 0;
 
     for (const [i, role] of roles.entries()) {
       progress.phase('image_search', 30 + Math.round((i / roles.length) * 50), `Photos for ${role.character} (${i + 1}/${roles.length})`);
       try {
-        const { images, report } = await sourceRole(celebrityName, role, workDir, context);
+        const { images, upscale = [], report } = await sourceRole(celebrityName, role, workDir, context);
         selectedImages.push(...images);
+        upscaleImages.push(...upscale);
         roleReports.push(report);
         summariseRole(report);
         progress.roleDone(report);
@@ -168,6 +170,11 @@ async function main() {
       fail('Photos were found, but none could be printed at the DPI floor without cutting the subject.');
     }
 
+    const potentialUpscale = await preparePotentialUpscale(upscaleImages, workDir, celebrityName);
+    if (potentialUpscale.length) {
+      logger.info(`🔍 ${potentialUpscale.length} confirmed-but-soft photo(s) saved to potential_upscale/ for refinement`);
+    }
+
     try {
       await buildContactSheet(prints, path.join(workDir, 'resized', 'contact_sheet.jpg'));
     } catch (error) {
@@ -179,6 +186,7 @@ async function main() {
     const manifest = await generateManifest(prints, celebrityName, roles);
     manifest.roleReports = roleReports;
     manifest.skippedPrints = skipped;
+    manifest.potentialUpscale = potentialUpscale;
     await fs.writeFile(path.join(workDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
     // 5. Zip and upload

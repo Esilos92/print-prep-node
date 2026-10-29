@@ -25,6 +25,17 @@ function score(image) {
     + ((image.printable || []).includes('8x10') ? 1 : 0);
 }
 
+/** Fails every sheet only on resolution, and would pass at twice the size. */
+function onlyTooSmall(image) {
+  const config = require('../../utils/config');
+  const floor = config.print.minDpi;
+  return Object.keys(config.print.formats).some(format => {
+    const plan = planCrop(image, image.width, image.height, format);
+    const dpi = /only (\d+) DPI/.exec(plan.skip || '');
+    return dpi && Number(dpi[1]) * 2 >= floor;
+  });
+}
+
 /** Which sheets this photo can be printed on without cutting anyone or going soft. */
 function printableFormats(image) {
   const config = require('../../utils/config');
@@ -97,7 +108,10 @@ async function officialPoster(official, dir, triedUrls, seen) {
  * fails the stricter check is replaced by the next best, so a lookalike
  * costs a slot only until something better is found.
  */
-async function selectConfirmed(accepted, count, { celebrityName, role, referencePaths, report }) {
+// Failures an upscale or clean-up could fix. Expression and framing can't be fixed.
+const REFINABLE = new Set(['blurry', 'artifacts', 'low_quality_full_size']);
+
+async function selectConfirmed(accepted, count, { celebrityName, role, referencePaths, report, nearMisses = [] }) {
   const needsCheck = (image) => !isAnimated(role) && image.decision.bucket !== 'poster';
   const pool = accepted.slice();
   const confirmed = new Set();
@@ -129,6 +143,8 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
       } else {
         pool.splice(pool.indexOf(image), 1);
         report.rejected[why] = (report.rejected[why] || 0) + 1;
+        // Confirmed as them, but soft: a candidate for manual refinement.
+        if (REFINABLE.has(why)) nearMisses.push({ ...image, finalCheck: result, upscaleReason: why });
       }
     });
   }
@@ -156,6 +172,8 @@ async function sourceRole(celebrityName, role, workDir, context) {
   };
 
   const accepted = [];
+  const tooSmall = [];
+  const nearMisses = [];
   // Co-stars tell the search which "Trespass" we mean, and the reviewer which faces aren't the target.
   role.coStars = role.coStars || await titleCast(celebrityName, role);
   // Other films in the series: which count, which don't, and who the lookalikes are.
@@ -185,6 +203,8 @@ async function sourceRole(celebrityName, role, workDir, context) {
       image.printable = printableFormats(image);
       if (image.printable.length === 0) {
         report.rejected.unprintable = (report.rejected.unprintable || 0) + 1;
+        // Too small by up to half: a 2x upscale would make it printable.
+        if (onlyTooSmall(image)) tooSmall.push(image);
         continue;
       }
       accepted.push(image);
@@ -236,7 +256,7 @@ async function sourceRole(celebrityName, role, workDir, context) {
   }
 
   const slots = config.sourcing.imagesPerRole - (poster ? 1 : 0);
-  const selected = await selectConfirmed(accepted, slots, { celebrityName, role, referencePaths, report });
+  const selected = await selectConfirmed(accepted, slots, { celebrityName, role, referencePaths, report, nearMisses });
 
   // A small TMDb poster prints soft; a larger reviewed one from the web wins.
   const posterPixels = (img) => img.width * img.height;
@@ -257,6 +277,31 @@ async function sourceRole(celebrityName, role, workDir, context) {
   // Later roles must not reuse these pictures.
   seen.push(...selected);
 
+  // Potential upscale: confirmed-but-soft photos, then small photos that pass
+  // an identity check. Never anything unconfirmed.
+  const upscale = [];
+  if (config.sourcing.potentialUpscale && !animated) {
+    const limit = config.sourcing.upscalePerRole;
+    upscale.push(...nearMisses.sort((a, b) => score(b) - score(a)).slice(0, limit));
+
+    const room = limit - upscale.length;
+    if (room > 0 && tooSmall.length) {
+      const era = await loadReferences(role.eraReferencePaths, 1024);
+      const references = [...era, ...await loadReferences(referencePaths, 1024)];
+      const shortlist = tooSmall.sort((a, b) => score(b) - score(a)).slice(0, room * 2);
+      const results = await mapLimit(shortlist, 4, image => confirmIdentity(image, { celebrityName, role, references, eraCount: era.length }));
+      shortlist.forEach((image, i) => {
+        const r = results[i];
+        const identityOk = r && r.same_person && (r.confidence || 0) >= config.sourcing.confirmConfidence;
+        if (identityOk && r.good_expression && r.target_featured && upscale.length < limit) {
+          upscale.push({ ...image, finalCheck: r, upscaleReason: 'too_small' });
+        }
+      });
+    }
+    seen.push(...upscale);
+  }
+  report.potentialUpscale = upscale.length;
+
   report.accepted = accepted.length;
   report.selected = selected.length;
   for (const image of selected) {
@@ -265,6 +310,7 @@ async function sourceRole(celebrityName, role, workDir, context) {
 
   return {
     images: selected.map(image => ({ ...image, role: `${role.character} (${role.title})`, character: role.character, title: role.title, isVoiceRole: animated })),
+    upscale: upscale.map(image => ({ ...image, role: `${role.character} (${role.title})`, character: role.character, title: role.title })),
     report
   };
 }

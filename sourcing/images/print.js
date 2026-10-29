@@ -259,4 +259,44 @@ async function buildContactSheet(prints, outPath) {
   return outPath;
 }
 
-module.exports = { preparePrints, planCrop, buildContactSheet, keepRegion };
+/**
+ * Copy near-miss photos, uncropped and at full resolution, into
+ * resized/potential_upscale/ for manual refinement.
+ */
+async function preparePotentialUpscale(images, workDir, celebrityName) {
+  if (images.length === 0) return [];
+  const dir = path.join(workDir, 'resized', 'potential_upscale');
+  await fs.mkdir(dir, { recursive: true });
+  const lastName = slug(celebrityName.split(/\s+/).pop());
+  const counters = {};
+  const why = { blurry: 'soft', artifacts: 'artifacts', low_quality_full_size: 'quality', too_small: 'small' };
+  const out = [];
+
+  for (const image of images) {
+    const key = `${image.character}|${image.title}`;
+    counters[key] = (counters[key] || 0) + 1;
+    const name = [lastName, slug(image.character), slug(image.title), String(counters[key]).padStart(2, '0'),
+      why[image.upscaleReason] || 'refine'].join('_') + '.jpg';
+    const outPath = path.join(dir, name);
+    try {
+      await sharp(image.filepath, { failOn: 'none' }).rotate()
+        .jpeg({ quality: 95, chromaSubsampling: '4:4:4' })
+        .toFile(outPath);
+      out.push({
+        file: `potential_upscale/${name}`,
+        character: image.character,
+        title: image.title,
+        reason: image.upscaleReason,
+        width: image.width,
+        height: image.height,
+        sourceUrl: image.url,
+        note: image.finalCheck?.reason || null
+      });
+    } catch {
+      // skip a file that won't convert
+    }
+  }
+  return out;
+}
+
+module.exports = { preparePrints, planCrop, buildContactSheet, keepRegion, preparePotentialUpscale };

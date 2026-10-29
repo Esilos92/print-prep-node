@@ -112,6 +112,16 @@ class ZipUploader {
       logger.warn('No manifest file found');
     }
 
+    // Confirmed-but-soft photos for manual refinement. Not counted as prints.
+    try {
+      const upscaleDir = path.join(resizedDir, 'potential_upscale');
+      const files = (await fs.readdir(upscaleDir)).filter(f => /\.(jpe?g|png)$/i.test(f));
+      for (const file of files) archive.file(path.join(upscaleDir, file), { name: `potential_upscale/${file}` });
+      if (files.length) logger.info(`Adding ${files.length} potential-upscale photos to zip`);
+    } catch {
+      // none this run
+    }
+
     const contactSheet = path.join(resizedDir, 'contact_sheet.jpg');
     try {
       await fs.access(contactSheet);

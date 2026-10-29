@@ -147,6 +147,12 @@ const config = {
     finalPrintQuality: int(process.env.FINAL_PRINT_QUALITY, 4),
     /** Confidence (1-10) the one-photo identity check needs before delivery. */
     confirmConfidence: int(process.env.CONFIRM_CONFIDENCE, 8),
+    /**
+     * Confirmed photos of the person that miss only on sharpness/quality or
+     * on size go to a potential_upscale/ folder for manual refinement.
+     */
+    potentialUpscale: process.env.POTENTIAL_UPSCALE !== 'false',
+    upscalePerRole: int(process.env.UPSCALE_PER_ROLE, 6),
     /** Always include the title's official poster at 11x17. */
     alwaysPoster: process.env.ALWAYS_POSTER !== 'false',
     /**
