@@ -2,7 +2,8 @@ const path = require('path');
 const config = require('../../utils/config');
 const { tmdbCandidates, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
 const { downloadCandidates, downloadOne } = require('./download');
-const { reviewImages, confirmIdentity } = require('./review');
+const { reviewImages, confirmIdentity, loadReferences } = require('./review');
+const { mapLimit } = require('../../utils/concurrency');
 
 /**
  * Finds, reviews and selects the photos for one role.
@@ -83,6 +84,8 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
   const confirmed = new Set();
   let checks = 0;
   const maxChecks = count * 3;
+  // Load and encode the reference photos once, not once per check.
+  const references = await loadReferences(referencePaths, 1024);
 
   for (;;) {
     const chosen = selectMix(pool, count);
@@ -91,9 +94,13 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
       return chosen.filter(image => !needsCheck(image) || confirmed.has(image));
     }
 
-    for (const image of pending) {
-      checks++;
-      const result = await confirmIdentity(image, { celebrityName, role, referencePaths });
+    // Several checks at once: each one is a careful, slow call.
+    const batch = pending.slice(0, Math.max(1, maxChecks - checks));
+    checks += batch.length;
+    const results = await mapLimit(batch, 4, image => confirmIdentity(image, { celebrityName, role, references }));
+
+    batch.forEach((image, i) => {
+      const result = results[i];
       const pass = result && result.same_person
         && (result.unchecked || result.confidence >= config.sourcing.confirmConfidence);
       if (pass) {
@@ -104,8 +111,7 @@ async function selectConfirmed(accepted, count, { celebrityName, role, reference
         const why = result ? 'failed_identity_check' : 'identity_check_unavailable';
         report.rejected[why] = (report.rejected[why] || 0) + 1;
       }
-      if (checks >= maxChecks) break;
-    }
+    });
   }
 }
 

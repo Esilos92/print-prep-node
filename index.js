@@ -134,7 +134,9 @@ async function main() {
         selectedImages.push(...images);
         roleReports.push(report);
         const kinds = Object.entries(report.byKind).map(([k, n]) => `${n} ${k}`).join(', ') || 'none';
-        logger.info(`📸 ${role.character} (${role.title}): ${report.selected} selected (${kinds}) from ${report.reviewed} reviewed`);
+        logger.info(`📸 ${role.character} (${role.title}): ${report.selected} selected (${kinds}) from ${report.reviewed} reviewed, ${report.accepted} passed review, ${report.downloaded} downloaded of ${report.candidatesFound} found`);
+        const rejected = Object.entries(report.rejected).sort((a, b) => b[1] - a[1]).map(([why, n]) => `${why} ${n}`).join(', ');
+        if (rejected) logger.info(`   rejected: ${rejected}`);
         if (report.selected === 0) {
           const top = Object.entries(report.rejected).sort((a, b) => b[1] - a[1]).slice(0, 3)
             .map(([why, n]) => `${n} ${why.replace(/_/g, ' ')}`).join(', ');
@@ -167,6 +169,14 @@ async function main() {
     const { prints: resizedImages, skipped } = await preparePrints(selectedImages, workDir, celebrityName);
     progress.counts({ printable: resizedImages.length });
     logger.info(`✅ ${resizedImages.length} print files from ${selectedImages.length} photos (${skipped.length} size/photo combinations skipped to avoid bad crops or low DPI)`);
+    const skipSummary = {};
+    for (const s of skipped) {
+      const key = `${s.format}: ${s.why.replace(/only \d+ DPI/, 'below DPI floor')}`;
+      skipSummary[key] = (skipSummary[key] || 0) + 1;
+    }
+    for (const [why, n] of Object.entries(skipSummary)) logger.info(`   skipped ${n} × ${why}`);
+    const noPrint = selectedImages.length - new Set(resizedImages.map(p => p.hash)).size;
+    if (noPrint > 0) logger.info(`   ${noPrint} selected photo(s) produced no print file at any size`);
 
     if (resizedImages.length === 0) {
       progress.problem('Photos were found, but none could be printed at the DPI floor without cutting the subject.');

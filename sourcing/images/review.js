@@ -2,6 +2,7 @@ const sharp = require('sharp');
 const config = require('../../utils/config');
 const { chat } = require('../../utils/openai');
 const { isAnimated } = require('./candidates');
+const { mapLimit } = require('../../utils/concurrency');
 
 /**
  * Batch image review.
@@ -86,7 +87,7 @@ For EACH candidate report:
 - matches_title: the image belongs to "${role.title}" specifically, not another project.
 - problem: the single main reason it is unusable, or "none". merchandise_or_packaging covers DVD/Blu-ray/VHS cases, toys, shop listings and photos of physical posters for sale. collage_or_text_overlay covers memes, collages, article screenshots and heavy captions (a real poster's own text is fine).
 - print_quality: 1-5 for a large print — sharpness, noise, lighting, composition. 1 = unusable, 3 = fine, 5 = excellent.
-- keep_box: a box (x, y, w, h as fractions 0-1 of the image width/height, origin top-left) that must survive any crop: it must contain EVERY face in the image, the target's whole head and hair with a little room above, and for posters the whole artwork including the title. If unsure, make it larger.
+- keep_box: the smallest box (x, y, w, h as fractions 0-1 of the image width/height, origin top-left) that a crop must not cut: it must contain EVERY face in the image (forehead to chin, ear to ear) and the target's whole head and hair. Faces only, not bodies — the crop adds its own margin. For posters, the whole artwork including the title.
 - reason: at most 12 words.
 
 Return one entry per candidate, using its Image number as index.`;
@@ -254,19 +255,22 @@ async function reviewImages(images, { celebrityName, role, referencePaths }) {
   const reasons = {};
   let outageError = null;
 
-  for (let start = 0; start < images.length; start += batchSize) {
+  const batches = [];
+  for (let start = 0; start < images.length; start += batchSize) batches.push(images.slice(start, start + batchSize));
+
+  // Two batches at a time: faster, without tripping per-minute rate limits.
+  const batchResults = await mapLimit(batches, 2, async (slice) => {
     const batch = [];
-    for (const image of images.slice(start, start + batchSize)) {
+    for (const image of slice) {
       try {
         batch.push({ ...image, b64: await toJpegBase64(image.filepath) });
       } catch {
         reasons.unreadable = (reasons.unreadable || 0) + 1;
       }
     }
-    if (batch.length === 0) continue;
+    if (batch.length === 0) return [];
 
     const prompt = buildPrompt(celebrityName, role, batch.length, references.length);
-
     let outcome;
     try {
       outcome = await reviewBatch(prompt, references, batch);
@@ -274,9 +278,10 @@ async function reviewImages(images, { celebrityName, role, referencePaths }) {
       outageError = error;
       reasons.review_unavailable = (reasons.review_unavailable || 0) + batch.length;
       console.log(`⚠️ ${error.message}`);
-      continue;
+      return [];
     }
 
+    const out = [];
     for (const [i, image] of batch.entries()) {
       const { b64, ...rest } = image;
       const review = outcome.results.find(r => r.index === i + 1);
@@ -286,9 +291,11 @@ async function reviewImages(images, { celebrityName, role, referencePaths }) {
       }
       const decision = decide(review, role);
       if (!decision.accepted) reasons[decision.why] = (reasons[decision.why] || 0) + 1;
-      reviewed.push({ ...rest, review: { ...review, keep_box: normaliseBox(review.keep_box) }, decision, reviewedBy: outcome.service });
+      out.push({ ...rest, review: { ...review, keep_box: normaliseBox(review.keep_box) }, decision, reviewedBy: outcome.service });
     }
-  }
+    return out;
+  });
+  reviewed.push(...batchResults.flat());
 
   // Every batch failed: this is an outage, and must not look like a rejection.
   if (reviewed.length === 0 && outageError) throw outageError;
@@ -318,8 +325,7 @@ const CONFIRM_SCHEMA = {
  * of a person is confirmed on its own before it can be delivered. A failed
  * check (API error) returns null, and the caller does not deliver the photo.
  */
-async function confirmIdentity(image, { celebrityName, role, referencePaths }) {
-  const references = await loadReferences(referencePaths, 1024);
+async function confirmIdentity(image, { celebrityName, role, references }) {
   if (references.length === 0) return { same_person: true, confidence: 0, reason: 'no reference available', unchecked: true };
 
   const candidate = { ...image, b64: await toJpegBase64(image.filepath, 1280) };
@@ -344,4 +350,4 @@ confidence: 1-10 for your answer. reason: at most 12 words.`;
   }
 }
 
-module.exports = { reviewImages, confirmIdentity, decide, buildPrompt, REVIEW_SCHEMA };
+module.exports = { reviewImages, confirmIdentity, loadReferences, decide, buildPrompt, REVIEW_SCHEMA };

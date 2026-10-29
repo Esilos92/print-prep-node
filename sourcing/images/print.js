@@ -49,12 +49,12 @@ function keepRegion(image, W, H) {
   }
   if (!box) return inset(0.05);
 
-  // Model boxes are approximate: pad the sides, and add headroom above.
-  const padX = W * 0.04;
-  const padY = H * 0.03;
+  // Model boxes are approximate: a small margin, and a little headroom above.
+  const padX = W * 0.02;
+  const padY = H * 0.02;
   return {
     x0: Math.max(0, box.x * W - padX),
-    y0: Math.max(0, box.y * H - padY - box.h * H * 0.12),
+    y0: Math.max(0, box.y * H - padY - box.h * H * 0.08),
     x1: Math.min(W, (box.x + box.w) * W + padX),
     y1: Math.min(H, (box.y + box.h) * H + padY)
   };
