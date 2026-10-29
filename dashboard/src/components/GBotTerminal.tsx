@@ -61,7 +61,7 @@ const PHASE_LINES: Record<string, (subject: string) => string> = {
 
 const GREETING =
   `Hey! I'm GBot 👋 Give me a name and I'll find their best roles, hunt down photos and get them print-ready.\n\n` +
-  `Auto does the whole thing. Select lets you pick the roles. Custom lets you type the shows yourself.\n` +
+  `Auto does the whole thing. Select shows you their most popular or newest roles so you can pick. Custom lets you type the shows yourself. Bulk runs a whole guest list.\n` +
   `Type "help" anytime.`;
 
 function plural(n: number, one: string, many = `${one}s`) {
@@ -315,7 +315,7 @@ function BulkTip({ onClose }: { onClose: () => void }) {
 
 const MODES: Array<{ id: UiMode; label: string; hint: string }> = [
   { id: 'auto', label: 'Auto', hint: 'I pick the roles and do everything' },
-  { id: 'select', label: 'Select', hint: 'I show you their roles, you pick' },
+  { id: 'select', label: 'Select', hint: 'I list their most popular or newest roles, you pick' },
   { id: 'custom', label: 'Custom', hint: 'You type the shows and movies' },
   { id: 'bulk', label: 'Bulk', hint: 'A whole guest list, one after another' }
 ];
@@ -447,7 +447,8 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
       say(
         `Here's what I can do:\n` +
         `  • Auto: type a name and I'll handle everything\n` +
-        `  • Select: type a name, pick Popular or Newest, and choose roles from my list\n` +
+        `  • Select: type a name, choose Popular or Newest, and I'll list their roles for you to pick from\n` +
+        `  • Bulk: give me a whole guest list and I'll work through it\n` +
         `  • Custom: type a name and the shows or movies you want\n\n` +
         `You can also type:\n` +
         `  status   how the current job is going\n` +
