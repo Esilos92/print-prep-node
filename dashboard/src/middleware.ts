@@ -37,6 +37,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next's own static assets.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+  // Everything except Next's own static build files (JS/CSS chunks).
+  matcher: ['/((?!_next/static|favicon.ico).*)']
 };
