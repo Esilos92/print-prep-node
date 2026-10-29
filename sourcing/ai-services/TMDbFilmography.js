@@ -112,6 +112,8 @@ class TMDbFilmography {
         episodes: isTv ? credit.episode_count : undefined,
         billing: isTv ? undefined : credit.order,
         votes: credit.vote_count || 0,
+        tmdbId: credit.id,
+        mediaType: isTv ? 'tv' : 'movie',
         score: reach * billing * buzz,
         source: 'tmdb'
       });

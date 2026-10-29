@@ -1,8 +1,9 @@
 // Updated to use AI-powered celebrity role discovery
 const { fetchCelebrityRoles } = require('./sourcing/main.js');
-const { fetchImages } = require('./sourcing/fetchImages');
-const { validateImages } = require('./sourcing/validateImages');
-const { resizeImages } = require('./sourcing/resizeImages');
+const { sourceRole } = require('./sourcing/images/sourceRole');
+const { preparePrints, buildContactSheet } = require('./sourcing/images/print');
+const ReferencePortrait = require('./sourcing/ai-services/ReferencePortrait');
+const config = require('./utils/config');
 const { generateManifest } = require('./sourcing/generateManifest');
 const { zipAndUpload } = require('./sourcing/zipAndUpload');
 const logger = require('./utils/logger');
@@ -53,6 +54,8 @@ async function main() {
       process.exit(1);
     }
 
+    // Start clean: leftovers from an earlier failed run must not ship in this package.
+    await fs.rm(workDir, { recursive: true, force: true });
     await fs.mkdir(workDir, { recursive: true });
     
     // Step 1: AI-powered role discovery (replaces old fetchRoles)
@@ -108,83 +111,81 @@ async function main() {
       logger.info(`  ${i + 1}. ${role.character} in ${role.title}${voiceMarker}${mediumMarker}${popularityMarker}${multiActorMarker}`);
     });
     
-    // 🎯 DEBUG: Verify smart search data is preserved
-    logger.info('🔧 DEBUG: Smart search data verification:');
-    roles.forEach((role, i) => {
-      logger.info(`  Role ${i + 1} - ${role.character}:`);
-      logger.info(`    finalSearchTerms: ${role.finalSearchTerms?.length || 0} terms`);
-      logger.info(`    isMultiActorCharacter: ${role.isMultiActorCharacter}`);
-      logger.info(`    smartSearchApproach: ${role.smartSearchApproach}`);
-      if (role.finalSearchTerms?.length > 0) {
-        logger.info(`    First search term: "${role.finalSearchTerms[0]}"`);
-      }
-    });
-    
-    // Step 2: Fetch images for each role (enhanced with AI search terms)
-    progress.phase('image_search', 40, 'Searching for images...');
-    logger.info('🖼️  Step 2: Fetching images with AI-optimized search terms...');
-    const allImages = [];
-    for (const role of roles) {
+    // Step 2: find, review and select photos for each role
+    progress.phase('image_search', 40, 'Finding photos...');
+    logger.info('🖼️  Step 2: Sourcing photos (TMDb official images + targeted search, batch review)...');
+
+    const referencePath = config.verification.useReferenceImage
+      ? await new ReferencePortrait().getPortrait(celebrityName, path.join(workDir, 'reference'))
+      : null;
+
+    const context = { referencePath, seen: [], triedUrls: new Set() };
+    const selectedImages = [];
+    const roleReports = [];
+    const outages = [];
+
+    for (const [i, role] of roles.entries()) {
+      progress.phase('image_search', 40 + Math.round((i / roles.length) * 40), `Photos for ${role.character} (${i + 1}/${roles.length})`);
       try {
-        // 🎯 NOW PASSING COMPLETE SMART SEARCH DATA TO fetchImages
-        const images = await fetchImages(celebrityName, role, workDir);
-        allImages.push(...images);
-        progress.counts({ verified: allImages.length });
-        logger.info(`📸 ${role.character}: ${images.length} images found`);
+        const { images, report } = await sourceRole(celebrityName, role, workDir, context);
+        selectedImages.push(...images);
+        roleReports.push(report);
+        const kinds = Object.entries(report.byKind).map(([k, n]) => `${n} ${k}`).join(', ') || 'none';
+        logger.info(`📸 ${role.character} (${role.title}): ${report.selected} selected (${kinds}) from ${report.reviewed} reviewed`);
+        if (report.selected === 0) {
+          const top = Object.entries(report.rejected).sort((a, b) => b[1] - a[1]).slice(0, 3)
+            .map(([why, n]) => `${n} ${why.replace(/_/g, ' ')}`).join(', ');
+          const detail = report.reviewed === 0
+            ? `no candidate images found${report.error ? ` (${report.error})` : ''}`
+            : `none of ${report.reviewed} reviewed were usable${top ? ` — ${top}` : ''}`;
+          progress.problem(`${role.character} (${role.title}): ${detail}`);
+        }
       } catch (error) {
-        logger.warn(`❌ Failed to fetch images for ${role.character}: ${error.message}`);
+        logger.warn(`❌ ${role.character}: ${error.message}`);
+        outages.push(error.message);
+        roleReports.push({ character: role.character, title: role.title, selected: 0, error: error.message });
+        progress.problem(`${role.character} (${role.title}): ${error.message}`);
       }
+      progress.counts({ verified: selectedImages.length });
     }
-    
-    if (allImages.length === 0) {
-      progress.problem('No images passed identity verification for any role.');
-      logger.error('❌ No images survived search and verification for any role.');
-      logger.error('   Check SERP_API_KEY, and OPENAI_API_KEY / ANTHROPIC_API_KEY for verification.');
+
+    if (selectedImages.length === 0) {
+      const why = outages.length === roles.length
+        ? `Image review service unavailable: ${outages[0]}`
+        : 'No usable photos found for any role (see the per-role notes above).';
+      progress.problem(why);
+      logger.error(`❌ ${why}`);
       process.exit(1);
     }
-    
-    // Step 3: Validate and filter images
-    progress.phase('validation', 70, 'Validating image quality...');
-    logger.info('🔍 Step 3: Validating images...');
-    let validImages = [];
-    
-    // Group images by role for proper validation context
-    const imagesByRole = {};
-    allImages.forEach(img => {
-      const roleKey = img.role || `${img.character || 'unknown'} (${img.title || 'unknown'})`;
-      if (!imagesByRole[roleKey]) imagesByRole[roleKey] = [];
-      imagesByRole[roleKey].push(img);
-    });
-    
-    // Validate each role's images separately
-    for (const [roleName, roleImages] of Object.entries(imagesByRole)) {
-      const roleInfo = roles.find(r => 
-        r.name === roleName || 
-        roleName.includes(r.character) || 
-        roleName.includes(r.title)
-      ) || {};
-      const validated = await validateImages(roleImages, workDir, roleInfo);
-      validImages.push(...validated);
-    }
-    
-    logger.info(`✅ ${validImages.length} images passed validation (from ${allImages.length} total)`);
-    
-    if (validImages.length === 0) {
-      logger.error('❌ No images passed validation. Check validation settings.');
-      process.exit(1);
-    }
-    
-    // Step 4: Resize images
-    progress.phase('resize', 82, 'Preparing print formats...');
-    logger.info('📐 Step 4: Resizing images for print formats...');
-    const resizedImages = await resizeImages(validImages, workDir, celebrityName);
+
+    // Step 3: crop/resize to the true print shapes
+    progress.phase('resize', 82, 'Preparing print files...');
+    logger.info('📐 Step 3: Preparing print files...');
+    const { prints: resizedImages, skipped } = await preparePrints(selectedImages, workDir, celebrityName);
     progress.counts({ printable: resizedImages.length });
-    logger.info(`✅ Resized ${resizedImages.length} images across multiple formats`);
-    
+    logger.info(`✅ ${resizedImages.length} print files from ${selectedImages.length} photos (${skipped.length} size/photo combinations skipped to avoid bad crops or low DPI)`);
+
+    if (resizedImages.length === 0) {
+      progress.problem('Photos were found, but none could be printed at the DPI floor without cutting the subject.');
+      logger.error('❌ No printable files. Lower MIN_PRINT_DPI or check the sources.');
+      process.exit(1);
+    }
+
+    try {
+      await buildContactSheet(resizedImages, path.join(workDir, 'resized', 'contact_sheet.jpg'));
+    } catch (error) {
+      logger.warn(`Contact sheet skipped: ${error.message}`);
+    }
+
+    const allImages = selectedImages;
+    const validImages = selectedImages;
+
     // Step 5: Generate manifest with AI metadata
     progress.phase('manifest', 90, 'Writing manifest...');
     logger.info('📄 Step 5: Generating AI-enhanced manifest...');
     const manifest = await generateManifest(resizedImages, celebrityName, roles);
+    manifest.roleReports = roleReports;
+    manifest.skippedPrints = skipped;
     
     // Add AI system metadata to manifest with smart search info
     manifest.system = {

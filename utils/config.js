@@ -62,7 +62,7 @@ const config = {
      * page that happens to mention a DVD release — which for an older title
      * is most of the pages carrying good stills. Broad markers like dvd,
      * blu-ray and amazon are filtered instead at download time against the
-     * image's own title and URL (fetchImages.packagingExclusions), where
+     * image's own title and URL (now the vision review in sourcing/images/review.js), where
      * matching is precise. Only high-precision terms belong here.
      */
     /**
@@ -127,6 +127,29 @@ const config = {
   roles: {
     /** Roles per run. Each role costs image searches and identity checks. */
     maxRoles: int(process.env.MAX_ROLES, 6)
+  },
+
+  /**
+   * Image sourcing. See sourcing/images/.
+   */
+  sourcing: {
+    /** Photos delivered per role. */
+    imagesPerRole: int(process.env.IMAGES_PER_ROLE, 12),
+    /** Fewer accepted than this after the first pass triggers a wider second search. */
+    minPerRole: int(process.env.MIN_IMAGES_PER_ROLE, 4),
+    /** Candidates downloaded and reviewed per pass, per role. */
+    candidatesPerPass: int(process.env.CANDIDATES_PER_PASS, 40),
+    /** Images sent to the vision model per call. */
+    reviewBatchSize: int(process.env.REVIEW_BATCH_SIZE, 8),
+    /**
+     * Target share of each kind of photo. Slots a role can't fill go to the
+     * other kinds. For animated roles, "solo" means character art/screenshots.
+     */
+    mix: {
+      solo: float(process.env.MIX_SOLO, 0.6),
+      group: float(process.env.MIX_GROUP, 0.25),
+      poster: float(process.env.MIX_POSTER, 0.15)
+    }
   },
 
   verification: {

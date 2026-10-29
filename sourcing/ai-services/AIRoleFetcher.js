@@ -192,6 +192,9 @@ class AIRoleFetcher {
       year: role.year || 'unknown',
       popularity: role.popularity || 'medium',
       franchise: role.franchise || null,
+      tmdbId: role.tmdbId || null,
+      mediaType: role.mediaType || null,
+      episodes: role.episodes || null,
       source: role.source || 'ai_memory'
     };
   }

@@ -34,13 +34,20 @@ const REASONING_HEADROOM = 4000;
  * @param {number} opts.maxTokens  length of the answer itself
  * @param {number} [opts.temperature]  used only by legacy models
  * @param {string} [opts.effort]  reasoning effort override
- * @returns {Promise<string>} the reply text, trimmed
+ * @param {object} [opts.schema]  JSON schema; the reply is then parsed and returned as an object
+ * @returns {Promise<string|object>} the reply text, trimmed (or the parsed object with `schema`)
  */
-async function chat({ model, messages, maxTokens = 500, temperature = 0, effort }) {
+async function chat({ model, messages, maxTokens = 500, temperature = 0, effort, schema }) {
   const openai = getClient();
   if (!openai) throw new Error('OPENAI_API_KEY is not set');
 
   const params = { model, messages };
+  if (schema) {
+    params.response_format = {
+      type: 'json_schema',
+      json_schema: { name: schema.name || 'reply', strict: true, schema: schema.schema }
+    };
+  }
 
   if (isLegacyModel(model)) {
     params.max_tokens = maxTokens;
@@ -68,7 +75,13 @@ async function chat({ model, messages, maxTokens = 500, temperature = 0, effort 
     const reason = completion.choices?.[0]?.finish_reason;
     throw new Error(`OpenAI ${model} returned an empty reply (finish_reason: ${reason})`);
   }
-  return text.trim();
+  if (!schema) return text.trim();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`OpenAI ${model} returned invalid JSON: ${text.slice(0, 120)}`);
+  }
 }
 
 module.exports = { chat, getClient, isLegacyModel };

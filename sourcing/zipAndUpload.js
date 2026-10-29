@@ -89,7 +89,7 @@ class ZipUploader {
     // Fallback for loose images sitting in the resized root.
     try {
       const loose = (await fs.readdir(resizedDir))
-        .filter(f => /\.(jpe?g|png)$/i.test(f));
+        .filter(f => /\.(jpe?g|png)$/i.test(f) && f !== 'contact_sheet.jpg');
 
       if (loose.length > 0) {
         logger.info(`Adding ${loose.length} images from resized root (fallback)`);
@@ -103,13 +103,21 @@ class ZipUploader {
       logger.warn('Error reading resized directory for fallback');
     }
 
+    // entryCount counts images only, so the empty-package guard below can fire.
     const manifestPath = path.join(workDir, 'manifest.json');
     try {
       await fs.access(manifestPath);
       archive.file(manifestPath, { name: 'manifest.json' });
-      entryCount++;
     } catch (error) {
       logger.warn('No manifest file found');
+    }
+
+    const contactSheet = path.join(resizedDir, 'contact_sheet.jpg');
+    try {
+      await fs.access(contactSheet);
+      archive.file(contactSheet, { name: 'contact_sheet.jpg' });
+    } catch {
+      // optional
     }
 
     if (entryCount === 0) {

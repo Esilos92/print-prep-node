@@ -179,6 +179,8 @@ class CelebrityRoleOrchestrator {
             ...role,
             character: verdict.credit.character || role.character,
             year: role.year || verdict.credit.year,
+            tmdbId: role.tmdbId || verdict.credit.tmdbId,
+            mediaType: role.mediaType || verdict.credit.mediaType,
             creditVerified: true,
             // Drives the search branch: a voice role needs character art,
             // never a photograph of the performer.
@@ -195,6 +197,8 @@ class CelebrityRoleOrchestrator {
               ...role,
               character: verdict.correction.character,
               year: verdict.correction.year,
+              tmdbId: verdict.correction.tmdbId,
+              mediaType: verdict.correction.mediaType,
               creditVerified: true,
               creditCorrected: true,
               roleType: verdict.correction.isVoice ? 'voice' : 'live_action',
@@ -229,6 +233,8 @@ class CelebrityRoleOrchestrator {
           character: c.character,
           title: c.title,
           year: c.year,
+          tmdbId: c.tmdbId,
+          mediaType: c.mediaType,
           medium: c.isVoice ? 'voice' : `live_action_${c.mediaType}`,
           popularity: 'high',
           creditVerified: true,
@@ -515,7 +521,7 @@ If no change needed: TITLE|NO_CHANGE|CONFIDENCE`;
       roles: optimizedRoles.map((role, index) => ({
         ...role,
         priority: index + 1,
-        name: role.title, // For compatibility with fetchImages
+        name: role.title, // Kept for older callers
         characterName: role.character,
         
         // Ensure search data is properly structured

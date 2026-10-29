@@ -19,7 +19,7 @@ const CACHE_DIR = path.join(__dirname, '..', '.cache', 'roles');
 const TTL_HOURS = parseInt(process.env.ROLE_CACHE_TTL_HOURS, 10) || 24 * 30;
 const ENABLED = process.env.ROLE_CACHE !== 'false';
 // Bump when role discovery changes, so roles found the old way are not reused.
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 function keyFor(celebrityName) {
   const slug = celebrityName

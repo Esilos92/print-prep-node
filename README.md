@@ -31,11 +31,18 @@ Automates celebrity image sourcing for high-quality autograph print preparation.
 - **Role Discovery**: the performer's real TMDb credits (talk shows and guest
   spots filtered out); an OpenAI model picks the best-known ones. Falls back to
   the model's own knowledge only when TMDb has no match
-- **Image Sourcing**: SerpApi (Google Images)
-- **Identity Verification**: vision model compares each candidate against a
-  TMDb reference portrait; only a confident match is kept
-- **Quality Control**: resolution, deduplication, and print-DPI eligibility
-- **Processing**: Sharp for 8x10 and 11x17 — never upscales
+- **Image Sourcing**: TMDb's official posters and stills first, then Google
+  Images (SerpApi) with queries written per role; fan-art, marketplace and
+  stock-photo sites are blocked by domain
+- **Review**: a vision model reviews candidates in batches against a TMDb
+  reference portrait and reports, per image, the kind of photo (solo, group,
+  poster), identity, whether it is from the production or official, print
+  quality, and the area a crop must keep. Each role gets a solo/group/poster
+  mix (`MIX_*`), and a role that comes up short gets a wider second search
+- **Print files**: every file has the sheet's true shape. A photo already that
+  shape is only resized; otherwise it is cropped without cutting any face, and
+  skipped for that size if it can't be. Wide photos go on landscape sheets.
+  Never upscales. Each package includes `contact_sheet.jpg` to check crops
 - **Output**: Manifest JSON + Google Drive upload
 
 ## 🔧 Configuration
