@@ -1,6 +1,6 @@
 const path = require('path');
 const config = require('../../utils/config');
-const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, titleCast, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
+const { tmdbCandidates, tmdbTaggedCandidates, fandomCandidates, titleCast, seriesContext, plannedQueries, googleCandidates, isAnimated } = require('./candidates');
 const { planCrop } = require('./print');
 const { downloadCandidates, downloadOne, isDuplicate } = require('./download');
 const { reviewImages, confirmIdentity, finalVerdict, loadReferences } = require('./review');
@@ -158,6 +158,13 @@ async function sourceRole(celebrityName, role, workDir, context) {
   const accepted = [];
   // Co-stars tell the search which "Trespass" we mean, and the reviewer which faces aren't the target.
   role.coStars = role.coStars || await titleCast(celebrityName, role);
+  // Other films in the series: which count, which don't, and who the lookalikes are.
+  if (!role.series) {
+    role.series = await seriesContext(celebrityName, role);
+    if (role.series.siblings.length) {
+      console.log(`🎬 ${role.title} is part of a series: ${role.series.siblings.map(s => `${s.title} (${s.relation})`).join(', ')}`);
+    }
+  }
 
   const runPass = async (candidates) => {
     report.passes++;

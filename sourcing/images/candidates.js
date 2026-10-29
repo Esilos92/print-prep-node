@@ -213,6 +213,65 @@ async function titleCast(celebrityName, role) {
   }
 }
 
+/**
+ * The other entries in a film series, and whether the performer is in them.
+ *
+ * Sequels look alike, so "Saw" stills pass for "Saw II". Each other entry is
+ * classed by the performer's own credits:
+ *   same      — they play the same character there: photos of them as that
+ *               character from it are fine for this role
+ *   different — they play someone else there: photos don't count for this role
+ *   absent    — they're not in it: photos don't count, and its cast are the
+ *               likeliest lookalikes
+ */
+async function seriesContext(celebrityName, role) {
+  const empty = { siblings: [], lookalikes: [] };
+  if (!config.api.tmdbKey) return empty;
+  try {
+    const title = await findTitleId(role);
+    if (!title || title.mediaType !== 'movie') return empty;
+
+    const details = await axios.get(`${TMDB}/movie/${title.id}`, {
+      params: { api_key: config.api.tmdbKey }, timeout: 15000
+    });
+    const collection = details.data?.belongs_to_collection;
+    if (!collection) return empty;
+
+    const parts = (await axios.get(`${TMDB}/collection/${collection.id}`, {
+      params: { api_key: config.api.tmdbKey }, timeout: 15000
+    })).data?.parts || [];
+
+    const TmdbCredits = require('../ai-services/TmdbCredits');
+    const credits = (await new TmdbCredits().getCredits(celebrityName)) || [];
+    const norm = (v) => (v || '').toLowerCase().replace(/\s*\(.*?\)/g, '').trim();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const siblings = [];
+    const lookalikes = new Set();
+    for (const part of parts) {
+      if (part.id === title.id || !part.release_date || part.release_date > today) continue;
+      const credit = credits.find(c => c.tmdbId === part.id);
+      const relation = !credit ? 'absent'
+        : TmdbCredits.charactersMatch(norm(credit.character), norm(role.character)) ? 'same' : 'different';
+      siblings.push({ title: part.title, year: part.release_date.slice(0, 4), relation, character: credit?.character || null });
+
+      if (relation === 'absent' && lookalikes.size < 12) {
+        try {
+          const cast = (await axios.get(`${TMDB}/movie/${part.id}/credits`, {
+            params: { api_key: config.api.tmdbKey }, timeout: 15000
+          })).data?.cast || [];
+          cast.slice(0, 4).forEach(c => { if (norm(c.name) !== norm(celebrityName)) lookalikes.add(c.name); });
+        } catch {
+          // a missing cast list just means fewer named lookalikes
+        }
+      }
+    }
+    return { siblings, lookalikes: [...lookalikes].filter(n => !(role.coStars || []).includes(n)) };
+  } catch {
+    return empty;
+  }
+}
+
 // ---------------------------------------------------------------- fandom
 
 /**
@@ -513,6 +572,7 @@ module.exports = {
   tmdbTaggedCandidates,
   fandomCandidates,
   titleCast,
+  seriesContext,
   guessWikiNames,
   plannedQueries,
   templateQueries,

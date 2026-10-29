@@ -143,6 +143,8 @@ const config = {
     reviewBatchSize: int(process.env.REVIEW_BATCH_SIZE, 8),
     /** Reviewer's print-quality score (1-5) a photo needs. 3 = fine. */
     minPrintQuality: int(process.env.MIN_PRINT_QUALITY, 3),
+    /** Print-quality score (1-5) the final full-size check needs. 4 = good. */
+    finalPrintQuality: int(process.env.FINAL_PRINT_QUALITY, 4),
     /** Confidence (1-10) the one-photo identity check needs before delivery. */
     confirmConfidence: int(process.env.CONFIRM_CONFIDENCE, 8),
     /** Always include the title's official poster at 11x17. */

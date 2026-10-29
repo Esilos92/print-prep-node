@@ -74,7 +74,27 @@ function eraNote(celebrityName, role) {
   const cast = role.coStars?.length
     ? `Other cast members of "${role.title}": ${role.coStars.join(', ')}. They are NOT the target, but their presence is good evidence the photo is from this title.\n`
     : '';
-  return era + cast;
+  return era + cast + seriesNote(celebrityName, role);
+}
+
+/**
+ * Sequels look alike. Spell out which other films in the series count for
+ * this role (same character) and which don't, and name the lookalikes.
+ */
+function seriesNote(celebrityName, role) {
+  const siblings = role.series?.siblings || [];
+  if (siblings.length === 0) return '';
+  const list = (items) => items.map(s => `${s.title} (${s.year})`).join(', ');
+  const same = siblings.filter(s => s.relation === 'same');
+  const different = siblings.filter(s => s.relation === 'different');
+  const absent = siblings.filter(s => s.relation === 'absent');
+
+  let note = `"${role.title}" is part of a film series, and the films look alike.\n`;
+  if (same.length) note += `${celebrityName} also plays ${role.character} in ${list(same)}: photos of them as ${role.character} from ${same.length === 1 ? 'that film' : 'those films'} are fine — do NOT mark them clearly_other_project.\n`;
+  if (different.length) note += `${celebrityName} plays a different character in ${list(different)}: photos from ${different.length === 1 ? 'that film' : 'those films'} are other projects for this role.\n`;
+  if (absent.length) note += `${celebrityName} is NOT in ${list(absent)}: photos from ${absent.length === 1 ? 'that film' : 'those films'} are other projects, and anyone in them is not ${celebrityName}.\n`;
+  if (role.series?.lookalikes?.length) note += `Actors from those films who may look similar and are NOT the target: ${role.series.lookalikes.join(', ')}.\n`;
+  return note;
 }
 
 /**
@@ -410,7 +430,7 @@ ${eraNote(celebrityName, role)}
 Answer:
 - same_person: is ${celebrityName} in the candidate? Compare facial structure — eye shape and spacing, nose, mouth, jaw and chin, ears, hairline — allowing for age, makeup, lighting and hair. Co-stars and lookalikes are common; if any feature clearly differs, false.${references.length ? '' : ' (No reference photos are available: judge from your own knowledge, and be conservative.)'}
 - confidence: 1-10 for same_person.
-- face_sharp: ${celebrityName}'s face is in focus at full size — no motion blur, no focus miss, no smeared detail.
+- face_sharp: ${celebrityName}'s face would look crisp printed at 8x10 — real fine detail in eyes, skin and hair, not merely acceptable on a screen. Screenshots from older or DVD-era video are often soft and should be false. No motion blur, focus miss or smeared detail.
 - clean_image: free of heavy JPEG blocking, banding, noise, visible upscaling smear, watermarks or burned-in captions/logos.
 - good_expression: a strong moment — eyes open, a natural or in-character expression. Dramatic in-character expressions are good: a scream in a horror film, fear, anger, tears. Blood, gore and death scenes are fine too. False for an accidental, unflattering moment: mid-blink, caught mid-word with mouth hanging open, chewing, a blank gape, or a badly unflattering angle.
 - target_featured: ${group ? `${celebrityName} is a clear, prominent part of the photo — not tiny, cut off, turned away or half hidden behind someone.` : 'true unless the face is tiny, cut off or turned away.'}
@@ -438,7 +458,7 @@ function finalVerdict(result) {
   if (!result.clean_image) return 'artifacts';
   if (!result.good_expression) return 'unflattering';
   if (!result.target_featured) return 'not_featured';
-  if ((result.print_quality || 0) < config.sourcing.minPrintQuality) return 'low_quality_full_size';
+  if ((result.print_quality || 0) < config.sourcing.finalPrintQuality) return 'low_quality_full_size';
   return null;
 }
 
