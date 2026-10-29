@@ -220,35 +220,78 @@ async function titleCast(celebrityName, role) {
  * its gallery page is mostly official screenshots and promo photos of
  * exactly this character. Fan art can appear too; the reviewer rejects it.
  */
+// Fan-fiction and role-play wikis host invented stories, not official images.
+const FANON = /(fanon|fanfic|fan-fiction|fanfiction|roleplay|role-play|rp-|ideas|headhunters)/i;
+
+/** "Scream 4" -> scream, "The Walking Dead: World Beyond" -> walkingdead */
+function guessWikiNames(title) {
+  const base = (title || '')
+    .replace(/[:\u2013\u2014-].*$/, '')
+    .replace(/\b(part|chapter|vol|volume|season)\b.*$/i, '')
+    .replace(/\b([0-9]+|i{1,3}|iv|v|vi{1,3})\s*$/i, '')
+    .toLowerCase()
+    .normalize('NFKD');
+  const words = base.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+  const noArticle = words[0] === 'the' ? words.slice(1) : words;
+  return [...new Set([noArticle.join(''), words.join(''), noArticle.join('-')].filter(n => n.length >= 3))];
+}
+
+const normName = (v) => (v || '').toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
+/** Ask a wiki's own search for the character's page; null if it has none. */
+async function wikiCharacterPage(origin, name) {
+  try {
+    const response = await axios.get(`${origin}/api.php`, {
+      params: { action: 'query', format: 'json', list: 'search', srsearch: name, srlimit: 8, srnamespace: 0 },
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PrintPrep/2.0)' }
+    });
+    const target = normName(name);
+    const hits = response.data?.query?.search || [];
+    const hit = hits.find(h => normName(h.title) === target)
+      || hits.find(h => normName(h.title).startsWith(target));
+    return hit ? hit.title : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find the character's page on the title's official Fandom wiki. Tries the
+ * obvious wiki address first (no search credit spent), then wikis from a web
+ * search, skipping fan-fiction wikis. Each candidate wiki is asked through its
+ * own search whether it has a page for this character.
+ */
 async function findFandomPage(name, role) {
-  const queries = [
-    `"${name}" "${role.title}" fandom wiki`,
-    `"${name}" ${role.title} wiki`
-  ];
-  for (const q of queries) {
-    const data = await searchWeb(q, { timeout: 45000 });
-    const link = (data.organic_results || [])
-      .map(r => r.link || '')
-      .find(l => /^https:\/\/[a-z0-9-]+\.fandom\.com\/(?:[a-z-]+\/)?wiki\//i.test(l));
-    if (link) return link;
+  const origins = guessWikiNames(role.title).map(n => `https://${n}.fandom.com`);
+
+  for (const origin of origins) {
+    const title = await wikiCharacterPage(origin, name);
+    if (title) return { origin, title };
+  }
+
+  if (!config.api.serpApiKey) return null;
+  const data = await searchWeb(`"${name}" ${role.title} wiki`, { timeout: 45000 }).catch(() => ({}));
+  const found = [...new Set((data.organic_results || [])
+    .map(r => (r.link || '').match(/^(https:\/\/[a-z0-9-]+\.fandom\.com)\//i)?.[1])
+    .filter(o => o && !FANON.test(o) && !origins.includes(o)))].slice(0, 3);
+
+  for (const origin of found) {
+    const title = await wikiCharacterPage(origin, name);
+    if (title) return { origin, title };
   }
   return null;
 }
 
 async function fandomCandidates(role) {
   const name = (role.character || '').split(/\s*\/\s*/)[0];
-  if (!name || !config.api.serpApiKey) return [];
+  if (!name) return [];
 
   try {
-    const link = await findFandomPage(name, role);
-    if (!link) return [];
-
-    // https://scream.fandom.com/wiki/Trevor_Sheldon -> host, base path, page title
-    const url = new URL(link.split('#')[0]);
-    const [, langPrefix = '', rawTitle] = url.pathname.match(/^\/(?:([a-z-]+)\/)?wiki\/(.+)$/i) || [];
-    if (!rawTitle) return [];
-    const pageTitle = decodeURIComponent(rawTitle).replace(/\/Gallery$/i, '').replace(/_/g, ' ');
-    const api = `${url.origin}${langPrefix ? `/${langPrefix}` : ''}/api.php`;
+    const page = await findFandomPage(name, role);
+    if (!page) return [];
+    const pageTitle = page.title;
+    const api = `${page.origin}/api.php`;
 
     // Fandom's MediaWiki API: every image used on the character page and its
     // gallery subpage, with the original file's URL and real pixel size.
@@ -274,7 +317,8 @@ async function fandomCandidates(role) {
       .filter(f => bigEnough(f.info.width, f.info.height))
       .sort((a, b) => b.info.width * b.info.height - a.info.width * a.info.height);
 
-    const gallery = `${url.origin}${langPrefix ? `/${langPrefix}` : ''}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
+    const gallery = `${page.origin}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
+    console.log(`📚 ${name}: ${files.length} usable image(s) on ${gallery}`);
     return files.slice(0, 40).map((f, i) => ({
       url: f.info.url,
       pageUrl: gallery,
@@ -441,6 +485,7 @@ module.exports = {
   tmdbTaggedCandidates,
   fandomCandidates,
   titleCast,
+  guessWikiNames,
   plannedQueries,
   templateQueries,
   googleCandidates,
