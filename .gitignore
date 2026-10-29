@@ -72,3 +72,5 @@ download_links.json
 
 # TypeScript incremental build info
 dashboard/tsconfig.tsbuildinfo
+roster.json
+roster.json.tmp

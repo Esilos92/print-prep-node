@@ -40,6 +40,33 @@ export type ResolvedTitle =
   | { input: string; status: 'matched'; role: RoleChoice }
   | { input: string; status: 'not_found'; guess: { title: string; year: string; tmdbId: number; mediaType: 'tv' | 'movie'; poster: string | null } | null };
 
+export type RosterItemStatus = 'waiting' | 'running' | 'done' | 'failed';
+
+export interface RosterItem {
+  id: number;
+  name: string;
+  titles: string[];
+  status: RosterItemStatus;
+  attempts: number;
+  jobId: string | null;
+  downloadLink: string | null;
+  printable: number;
+  error: string | null;
+  notes: string[];
+}
+
+export interface Roster {
+  id?: string;
+  status: 'idle' | 'running' | 'stopping' | 'stopped' | 'done';
+  items: RosterItem[];
+  counts: Record<RosterItemStatus, number>;
+}
+
+export interface RosterGuest {
+  name: string;
+  titles: string[];
+}
+
 export interface RoleResult {
   character: string;
   title: string;
@@ -112,6 +139,33 @@ class CelebrityAPI {
     const result: StartJobResponse = await response.json();
     return result.jobId;
   }
+
+  /* ---------------- bulk roster ---------------- */
+
+  async getRoster(): Promise<Roster | null> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/roster`, { headers: headers() });
+      return response.ok ? (await response.json()) as Roster : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async rosterCall(path: string, method: string, body?: unknown): Promise<Roster> {
+    const response = await fetch(`${API_BASE_URL}/roster${path}`, {
+      method,
+      headers: headers(body ? { 'Content-Type': 'application/json' } : {}),
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(data.error || `Request failed (${response.status})`, response.status);
+    return data as Roster;
+  }
+
+  startRoster(guests: RosterGuest[]) { return this.rosterCall('', 'POST', { guests }); }
+  stopRoster() { return this.rosterCall('/stop', 'POST'); }
+  resumeRoster() { return this.rosterCall('/resume', 'POST'); }
+  clearRoster() { return this.rosterCall('', 'DELETE'); }
 
   /** Select mode: roles to choose from. */
   async listRoles(name: string, sort: 'popular' | 'newest'): Promise<RoleList> {

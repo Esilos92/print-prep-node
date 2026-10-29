@@ -52,6 +52,11 @@ Automates celebrity image sourcing for high-quality autograph print preparation.
 - **Custom**: type a name and the shows/movies (➕ for more). Titles are
   matched to the person's credits; one that isn't can still be searched by
   typing the character name.
+- **Bulk**: a guest list, run one after another on the server (close the tab
+  and it keeps going). Plain names run on Auto; names with titles run like
+  Custom. Add rows with ➕ or paste one guest per line
+  (`Erik Knudsen: Saw II, Continuum`). A failed guest is retried once at the
+  end; the list survives API restarts (`roster.json`).
 
 The dashboard is password-protected (`DASHBOARD_PASSWORD` in
 `dashboard/.env.local`) and forwards `/api` to the API, which listens only on

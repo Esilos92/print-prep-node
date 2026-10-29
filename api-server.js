@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const roleLookup = require('./sourcing/roles');
+const roster = require('./roster');
 const path = require('path');
 const fs = require('fs').promises;
 const rateLimit = require('express-rate-limit');
@@ -207,6 +208,9 @@ class JobTracker {
   }
 
   complete(downloadLink = null) {
+    // A job ends once. Without this, cancelling (error) and then the process
+    // exiting (error again) overwrote "cancelled by user" with "code null".
+    if (this.status !== 'running') return;
     this.status = 'completed';
     this.progress = 100;
     this.currentPhase = 'Mission Complete!';
@@ -225,9 +229,11 @@ class JobTracker {
     
     // 🎯 NEW: Save completed job to persistent storage
     saveCompletedJob(this);
+    this.onFinish?.(this);
   }
 
   error(errorMessage) {
+    if (this.status !== 'running') return;
     this.status = 'error';
     this.currentPhase = `Error: ${errorMessage}`;
     this.endTime = new Date();
@@ -239,6 +245,7 @@ class JobTracker {
     
     // 🎯 NEW: Save failed job to persistent storage
     saveCompletedJob(this);
+    this.onFinish?.(this);
   }
 }
 
@@ -289,6 +296,46 @@ function cleanRoles(roles) {
   return { roles: cleaned };
 }
 
+/**
+ * Start one job. Used by POST /api/jobs and by the bulk roster.
+ * Throws { status, message } when it can't start.
+ */
+async function launchJob(celebrity, roles = null, mode = 'auto', { onFinish } = {}) {
+  if (activeJobs.size >= MAX_CONCURRENT_JOBS) {
+    throw Object.assign(new Error(`Already running ${activeJobs.size} job(s). Wait for one to finish.`), { status: 429 });
+  }
+
+  const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const job = new JobTracker(jobId, celebrity.trim());
+  job.mode = roles ? (mode === 'custom' ? 'custom' : 'select') : 'auto';
+  if (mode === 'roster') job.mode = roles ? 'roster-custom' : 'roster-auto';
+  job.onFinish = onFinish;
+  activeJobs.set(jobId, job);
+
+  try {
+    const args = ['index.js', celebrity.trim()];
+    let rolesFile = null;
+    if (roles) {
+      const dir = path.join(__dirname, 'temp', 'jobs');
+      await fs.mkdir(dir, { recursive: true });
+      rolesFile = path.join(dir, `${jobId}.json`);
+      await fs.writeFile(rolesFile, JSON.stringify(roles));
+      args.push('--roles', rolesFile);
+    }
+
+    const childProcess = spawn('node', args, { cwd: __dirname, stdio: ['pipe', 'pipe', 'pipe'] });
+    if (rolesFile) childProcess.on('close', () => fs.unlink(rolesFile).catch(() => {}));
+
+    job.process = childProcess;
+    job.addLog(`Started ${job.mode} job for ${celebrity}${roles ? ` (${roles.length} chosen roles)` : ''}`);
+    monitorJobProgress(job, childProcess);
+    return job;
+  } catch (error) {
+    job.error(`Failed to start process: ${error.message}`);
+    throw Object.assign(new Error('Failed to start job'), { status: 500 });
+  }
+}
+
 app.post('/api/jobs', requireApiKey, jobLimiter, async (req, res) => {
   const { celebrity, mode } = req.body;
 
@@ -302,52 +349,48 @@ app.post('/api/jobs', requireApiKey, jobLimiter, async (req, res) => {
     return res.status(400).json({ error: chosen.error });
   }
 
-  if (activeJobs.size >= MAX_CONCURRENT_JOBS) {
-    return res.status(429).json({
-      error: `Already running ${activeJobs.size} job(s). Wait for one to finish.`,
-      activeJobs: activeJobs.size,
-      maxConcurrent: MAX_CONCURRENT_JOBS
-    });
+  try {
+    const job = await launchJob(celebrity, chosen.roles, mode);
+    res.json({ jobId: job.id, status: 'started', celebrity, mode: job.mode, message: 'Job started successfully' });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
+// Bulk roster. Guests run one at a time; plain names run on Auto, guests
+// with titles run in Custom mode.
+app.get('/api/roster', (req, res) => res.json(roster.view()));
+
+app.post('/api/roster', requireApiKey, async (req, res) => {
+  const guests = req.body?.guests;
+  if (!Array.isArray(guests) || guests.length === 0) return res.status(400).json({ error: 'Add at least one guest.' });
+  if (guests.length > roster.MAX_GUESTS) return res.status(400).json({ error: `At most ${roster.MAX_GUESTS} guests per roster.` });
+
+  const cleaned = [];
+  for (const g of guests) {
+    const name = typeof g?.name === 'string' ? g.name.trim() : '';
+    const nameError = invalidCelebrityName(name);
+    if (nameError) return res.status(400).json({ error: `${name || '(blank)'}: ${nameError}` });
+    const titles = (Array.isArray(g.titles) ? g.titles : [])
+      .map(t => String(t).trim().slice(0, 200)).filter(Boolean);
+    if (titles.length > MAX_CHOSEN_ROLES) return res.status(400).json({ error: `${name}: at most ${MAX_CHOSEN_ROLES} titles.` });
+    cleaned.push({ name, titles });
   }
 
-  const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-  const job = new JobTracker(jobId, celebrity.trim());
-  job.mode = chosen.roles ? (mode === 'custom' ? 'custom' : 'select') : 'auto';
-  activeJobs.set(jobId, job);
-
   try {
-    const args = ['index.js', celebrity.trim()];
-    let rolesFile = null;
-    if (chosen.roles) {
-      const dir = path.join(__dirname, 'temp', 'jobs');
-      await fs.mkdir(dir, { recursive: true });
-      rolesFile = path.join(dir, `${jobId}.json`);
-      await fs.writeFile(rolesFile, JSON.stringify(chosen.roles));
-      args.push('--roles', rolesFile);
-    }
-
-    const childProcess = spawn('node', args, {
-      cwd: __dirname,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    if (rolesFile) childProcess.on('close', () => fs.unlink(rolesFile).catch(() => {}));
-
-    job.process = childProcess;
-    job.addLog(`Started ${job.mode} job for ${celebrity}${chosen.roles ? ` (${chosen.roles.length} chosen roles)` : ''}`);
-
-    monitorJobProgress(job, childProcess);
-
-    res.json({
-      jobId,
-      status: 'started',
-      celebrity,
-      mode: job.mode,
-      message: 'Job started successfully'
-    });
-
+    res.json(await roster.create(cleaned));
   } catch (error) {
-    job.error(`Failed to start process: ${error.message}`);
-    res.status(500).json({ error: 'Failed to start job' });
+    res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
+app.post('/api/roster/stop', requireApiKey, async (req, res) => res.json(await roster.stop()));
+app.post('/api/roster/resume', requireApiKey, async (req, res) => res.json(await roster.resume()));
+app.delete('/api/roster', requireApiKey, async (req, res) => {
+  try {
+    res.json(await roster.clear());
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 
@@ -735,7 +778,8 @@ const PORT = process.env.API_PORT || 4000;
  * died with EADDRINUSE against the running instance.
  */
 function start() {
-  return loadPersistedData().then(() => {
+  return loadPersistedData().then(async () => {
+    await roster.init({ launchJob, resolveTitles: roleLookup.resolveTitles });
     // Only reachable from this machine: the dashboard's server forwards
     // browser requests here, so the API itself is never open to the internet.
     // Set API_HOST=0.0.0.0 to expose it directly (not recommended).

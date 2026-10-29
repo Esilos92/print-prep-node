@@ -6,7 +6,8 @@ import GBotTerminal from '@/components/GBotTerminal';
 import MissionStatus from '@/components/MissionStatus';
 import SubjectLog from '@/components/SubjectLog';
 import Analytics from '@/components/Analytics';
-import { celebrityAPI, computeAnalytics, ApiError, type JobStatus, type RoleChoice, type Mode } from '@/services/api';
+import RosterPanel from '@/components/RosterPanel';
+import { celebrityAPI, computeAnalytics, ApiError, type JobStatus, type RoleChoice, type Mode, type Roster, type RosterGuest } from '@/services/api';
 import { DATA } from '@/lib/theme';
 
 type Tab = 'ops' | 'log' | 'analytics';
@@ -23,6 +24,7 @@ export default function Dashboard() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<JobStatus[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
+  const [roster, setRoster] = useState<Roster | null>(null);
 
   const loadJobs = useCallback(async () => {
     setJobs(await celebrityAPI.getAllJobs());
@@ -89,6 +91,56 @@ export default function Dashboard() {
           : 'Unknown error';
     }
   }, [loadJobs]);
+
+  const followJob = useCallback((jobId: string) => {
+    setCurrentJobId(jobId);
+    celebrityAPI.startPolling(jobId, job => {
+      setCurrentJob(job);
+      if (job && (job.status === 'completed' || job.status === 'error')) {
+        setCurrentJobId(null);
+        loadJobs();
+      }
+    });
+  }, [loadJobs]);
+
+  /**
+   * The roster runs on the server. Check on it every few seconds, and follow
+   * whichever guest is running so Mission Status and GBot track them.
+   */
+  const refreshRoster = useCallback(async () => {
+    const r = await celebrityAPI.getRoster();
+    setRoster(r && r.items.length ? r : null);
+    const runningJob = r?.items.find(i => i.status === 'running' && i.jobId)?.jobId;
+    if (runningJob && runningJob !== currentJobId) followJob(runningJob);
+  }, [currentJobId, followJob]);
+
+  useEffect(() => {
+    refreshRoster();
+    const timer = setInterval(refreshRoster, 5000);
+    return () => clearInterval(timer);
+  }, [refreshRoster]);
+
+  const startRoster = useCallback(async (guests: RosterGuest[]): Promise<string | null> => {
+    try {
+      setRoster(await celebrityAPI.startRoster(guests));
+      setTab('ops');
+      setTimeout(refreshRoster, 1500);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Unknown error';
+    }
+  }, [refreshRoster]);
+
+  const rosterAction = useCallback(async (action: 'stop' | 'resume' | 'clear') => {
+    try {
+      const r = action === 'stop' ? await celebrityAPI.stopRoster()
+        : action === 'resume' ? await celebrityAPI.resumeRoster()
+          : await celebrityAPI.clearRoster();
+      setRoster(r.items.length ? r : null);
+    } catch {
+      refreshRoster();
+    }
+  }, [refreshRoster]);
 
   const cancelJob = useCallback(async () => {
     if (!currentJobId) return;
@@ -184,9 +236,21 @@ export default function Dashboard() {
             analytics={analytics}
             lastJob={lastJob}
             onStartJob={startJob}
+            onStartRoster={startRoster}
+            rosterRunning={!!roster && ['running', 'stopping'].includes(roster.status)}
             busy={!!busy}
           />
-          <MissionStatus currentJob={currentJob} onCancel={cancelJob} />
+          <div className="grid gap-5" style={{ alignItems: 'start' }}>
+            <MissionStatus currentJob={currentJob} onCancel={cancelJob} />
+            {roster && (
+              <RosterPanel
+                roster={roster}
+                onStop={() => rosterAction('stop')}
+                onResume={() => rosterAction('resume')}
+                onClear={() => rosterAction('clear')}
+              />
+            )}
+          </div>
         </div>
 
         <div role="tabpanel" id="panel-log" aria-labelledby="tab-log" hidden={tab !== 'log'}>

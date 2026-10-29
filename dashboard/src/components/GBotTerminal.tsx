@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Send, Volume2, VolumeX, Plus, X, Search, Check } from 'lucide-react';
-import type { JobStatus, Analytics, RoleChoice, ResolvedTitle, Mode, RoleResult } from '@/services/api';
+import { Bot, Send, Volume2, VolumeX, Plus, X, Search, Check, ClipboardList } from 'lucide-react';
+import type { JobStatus, Analytics, RoleChoice, ResolvedTitle, Mode, RoleResult, RosterGuest } from '@/services/api';
 import { celebrityAPI, formatDuration, deliveredCount } from '@/services/api';
 import { DATA, NEON } from '@/lib/theme';
 
@@ -12,12 +12,31 @@ interface Props {
   analytics: Analytics;
   lastJob: JobStatus | null;
   onStartJob: (name: string, options?: { roles?: RoleChoice[]; mode?: Mode }) => Promise<string | null>;
+  onStartRoster: (guests: RosterGuest[]) => Promise<string | null>;
+  rosterRunning: boolean;
   busy: boolean;
+}
+
+type UiMode = Mode | 'bulk';
+
+/** "Erik Knudsen: Saw II, Continuum" -> { name, titles }. One guest per line. */
+function parseRosterText(text: string): RosterGuest[] {
+  return text.split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => {
+      const cut = line.indexOf(':');
+      const name = (cut === -1 ? line : line.slice(0, cut)).trim();
+      const titles = cut === -1 ? [] : line.slice(cut + 1).split(/[,;]/).map(t => t.trim()).filter(Boolean);
+      return { name, titles };
+    })
+    .filter(g => g.name);
 }
 
 type Card =
   | { kind: 'pick'; name: string; roles: RoleChoice[]; sort: 'popular' | 'newest' }
-  | { kind: 'resolve'; name: string; results: ResolvedTitle[] };
+  | { kind: 'resolve'; name: string; results: ResolvedTitle[] }
+  | { kind: 'roster'; guests: RosterGuest[] };
 
 interface Line {
   id: number;
@@ -219,17 +238,95 @@ function ResolveCard({ card, disabled, onConfirm }: {
   );
 }
 
+function RosterCard({ card, disabled, onConfirm }: {
+  card: Extract<Card, { kind: 'roster' }>;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
+  const [sent, setSent] = useState(false);
+  return (
+    <div style={cardStyle}>
+      <ol className="flex flex-col gap-1" style={{ listStyle: 'none', padding: 0, margin: 0, maxHeight: 220, overflowY: 'auto' }}>
+        {card.guests.map((g, i) => (
+          <li key={`${g.name}-${i}`} style={{ fontSize: '0.82rem', color: 'var(--ink)' }}>
+            {i + 1}. {g.name}
+            <span style={{ color: 'var(--ink-3)' }}>
+              {g.titles.length ? ` · ${g.titles.join(', ')}` : ' · Auto'}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <button
+        type="button"
+        className="cyber-button"
+        style={{ marginTop: 10 }}
+        disabled={sent || disabled}
+        onClick={() => {
+          setSent(true);
+          onConfirm();
+        }}
+      >
+        <Check className="w-4 h-4" aria-hidden />
+        {sent ? 'Started!' : `Start roster (${plural(card.guests.length, 'guest')})`}
+      </button>
+    </div>
+  );
+}
+
+/** GBot's how-to bubble for Bulk mode, pinned to the right of the screen. */
+function BulkTip({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.aside
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.25 }}
+      role="note"
+      aria-label="GBot tip for Bulk mode"
+      style={{
+        position: 'fixed', right: 16, bottom: 16, zIndex: 40,
+        width: 320, maxWidth: 'calc(100vw - 32px)',
+        border: `1px solid ${NEON.blue}`, borderRadius: 10,
+        background: 'rgba(7,11,20,.96)', boxShadow: '0 8px 30px rgba(0,191,255,.18)',
+        padding: '12px 14px', fontSize: '0.82rem', color: 'var(--ink-2)', lineHeight: 1.5
+      }}
+    >
+      <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+        <Bot className="w-4 h-4" style={{ color: NEON.blue }} aria-hidden />
+        <span className="font-cyber" style={{ fontSize: '0.7rem', letterSpacing: '0.1em', color: NEON.blue }}>GBOT TIP</span>
+        <button type="button" onClick={onClose} className="ml-auto" aria-label="Close tip" style={{ color: 'var(--ink-3)' }}>
+          <X className="w-4 h-4" aria-hidden />
+        </button>
+      </div>
+      <p style={{ margin: 0 }}>Give me a whole guest list and I&apos;ll work through it one by one 📋</p>
+      <ul style={{ margin: '8px 0 0', paddingLeft: 18, listStyle: 'disc', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <li><strong style={{ color: 'var(--ink)' }}>Just a name</strong> and I&apos;ll run them on Auto and pick their roles myself.</li>
+        <li><strong style={{ color: 'var(--ink)' }}>Add titles</strong> (comma-separated) and I&apos;ll only search those, like Custom mode.</li>
+        <li>Got a long list? Hit <strong style={{ color: 'var(--ink)' }}>Paste a list</strong> and put one guest per line, like:<br />
+          <code className="font-term" style={{ color: 'var(--ink)' }}>Erik Knudsen: Saw II, Continuum</code><br />
+          <code className="font-term" style={{ color: 'var(--ink)' }}>Nico Tortorella</code>
+        </li>
+      </ul>
+      <p style={{ margin: '8px 0 0', color: 'var(--ink-3)' }}>Each guest takes about 10-20 minutes, so big lists are an overnight thing. You can close this tab; I&apos;ll keep going.</p>
+    </motion.aside>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 
-const MODES: Array<{ id: Mode; label: string; hint: string }> = [
+const MODES: Array<{ id: UiMode; label: string; hint: string }> = [
   { id: 'auto', label: 'Auto', hint: 'I pick the roles and do everything' },
   { id: 'select', label: 'Select', hint: 'I show you their roles, you pick' },
-  { id: 'custom', label: 'Custom', hint: 'You type the shows and movies' }
+  { id: 'custom', label: 'Custom', hint: 'You type the shows and movies' },
+  { id: 'bulk', label: 'Bulk', hint: 'A whole guest list, one after another' }
 ];
 
-export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJob, busy }: Props) {
+export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJob, onStartRoster, rosterRunning, busy }: Props) {
   const [lines, setLines] = useState<Line[]>([{ id: lineId++, from: 'GBOT', text: GREETING }]);
-  const [mode, setMode] = useState<Mode>('auto');
+  const [mode, setMode] = useState<UiMode>('auto');
+  const [guests, setGuests] = useState<Array<{ name: string; titles: string }>>([{ name: '', titles: '' }]);
+  const [pasting, setPasting] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [tipOpen, setTipOpen] = useState(true);
   const [sort, setSort] = useState<'popular' | 'newest'>('popular');
   const [name, setName] = useState('');
   const [titles, setTitles] = useState<string[]>(['']);
@@ -472,8 +569,53 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
     }
   };
 
+  const bulkGuests = (): RosterGuest[] => guests
+    .map(g => ({ name: g.name.trim(), titles: g.titles.split(/[,;]/).map(t => t.trim()).filter(Boolean) }))
+    .filter(g => g.name);
+
+  const applyPaste = () => {
+    const parsed = parseRosterText(pasteText);
+    if (parsed.length) {
+      setGuests(parsed.map(g => ({ name: g.name, titles: g.titles.join(', ') })));
+      setPasting(false);
+      setPasteText('');
+      say(`Got it, ${plural(parsed.length, 'guest')} filled in below. Give them a once-over and hit Check list.`);
+    }
+  };
+
+  const checkRoster = () => {
+    const list = bulkGuests();
+    if (!list.length) {
+      say(`Add at least one guest and I'll take it from there.`);
+      return;
+    }
+    if (list.length > 60) {
+      say(`That's a lot! I can take up to 60 guests per list. Split it in two?`);
+      return;
+    }
+    const custom = list.filter(g => g.titles.length).length;
+    say(`${plural(list.length, 'guest')} on the list`, 'USER', true);
+    push({
+      from: 'GBOT',
+      text: `Got ${plural(list.length, 'guest')}! ${list.length - custom} on Auto${custom ? `, ${custom} with titles` : ''}. ` +
+        `That's roughly ${Math.max(1, Math.round(list.length * 15 / 60))} hour${list.length * 15 >= 90 ? 's' : ''} of work. Want me to start?`,
+      card: { kind: 'roster', guests: list }
+    });
+  };
+
+  const startRoster = async (list: RosterGuest[]) => {
+    const error = await onStartRoster(list);
+    say(error
+      ? `Hmm, I couldn't start the list: ${error}`
+      : `Here we go! Starting with ${list[0].name}. I'll keep you posted as each one finishes.`);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === 'bulk') {
+      checkRoster();
+      return;
+    }
     const value = name.trim();
     if (!value) return;
 
@@ -551,12 +693,18 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
                     {line.text}
                   </div>
                 )}
-                {line.card?.kind === 'pick' && (
-                  <PickCard card={line.card} disabled={busy} onConfirm={roles => begin(line.card!.name, roles, 'select')} />
-                )}
-                {line.card?.kind === 'resolve' && (
-                  <ResolveCard card={line.card} disabled={busy} onConfirm={roles => begin(line.card!.name, roles, 'custom')} />
-                )}
+                {line.card?.kind === 'pick' && (() => {
+                  const card = line.card;
+                  return <PickCard card={card} disabled={busy} onConfirm={roles => begin(card.name, roles, 'select')} />;
+                })()}
+                {line.card?.kind === 'resolve' && (() => {
+                  const card = line.card;
+                  return <ResolveCard card={card} disabled={busy} onConfirm={roles => begin(card.name, roles, 'custom')} />;
+                })()}
+                {line.card?.kind === 'roster' && (() => {
+                  const card = line.card;
+                  return <RosterCard card={card} disabled={rosterRunning} onConfirm={() => startRoster(card.guests)} />;
+                })()}
               </motion.div>
             ))}
 
@@ -579,7 +727,7 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
 
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Mode">
           {MODES.map(m => (
-            <button key={m.id} type="button" style={segment(mode === m.id)} aria-pressed={mode === m.id} onClick={() => setMode(m.id)} title={m.hint}>
+            <button key={m.id} type="button" style={segment(mode === m.id)} aria-pressed={mode === m.id} onClick={() => { setMode(m.id); if (m.id === 'bulk') setTipOpen(true); }} title={m.hint}>
               {m.label}
             </button>
           ))}
@@ -592,7 +740,86 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
         </div>
 
         <form onSubmit={submit} className="flex flex-col gap-2">
-          <div className="flex gap-2">
+          {mode === 'bulk' && (
+            <>
+              {pasting ? (
+                <>
+                  <label htmlFor="gbot-paste" className="sr-only">Guest list, one per line</label>
+                  <textarea
+                    id="gbot-paste"
+                    className="cyber-input"
+                    rows={6}
+                    value={pasteText}
+                    onChange={e => setPasteText(e.target.value)}
+                    placeholder={'One guest per line. Titles after a colon:\nErik Knudsen: Saw II, Continuum\nNico Tortorella'}
+                    style={{ resize: 'vertical', fontSize: '0.85rem' }}
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" className="cyber-button" onClick={() => setPasting(false)}>Cancel</button>
+                    <button type="button" className="cyber-button ml-auto" disabled={!pasteText.trim()} onClick={applyPaste}>
+                      <ClipboardList className="w-4 h-4" aria-hidden />
+                      <span>Fill in the list</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ maxHeight: 260, overflowY: 'auto' }} className="flex flex-col gap-2">
+                    {guests.map((g, i) => (
+                      <div key={i} className="flex gap-2">
+                        <label htmlFor={`gbot-guest-${i}`} className="sr-only">Guest {i + 1} name</label>
+                        <input
+                          id={`gbot-guest-${i}`}
+                          className="cyber-input"
+                          style={{ flex: '1 1 40%', minWidth: 0 }}
+                          value={g.name}
+                          onChange={e => setGuests(prev => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                          placeholder={i === 0 ? 'guest name' : 'another guest'}
+                          autoComplete="off"
+                        />
+                        <label htmlFor={`gbot-guest-titles-${i}`} className="sr-only">Guest {i + 1} titles (optional)</label>
+                        <input
+                          id={`gbot-guest-titles-${i}`}
+                          className="cyber-input"
+                          style={{ flex: '1 1 60%', minWidth: 0 }}
+                          value={g.titles}
+                          onChange={e => setGuests(prev => prev.map((x, j) => (j === i ? { ...x, titles: e.target.value } : x)))}
+                          placeholder="titles, optional (blank = Auto)"
+                          autoComplete="off"
+                        />
+                        {guests.length > 1 && (
+                          <button
+                            type="button"
+                            className="cyber-button"
+                            aria-label={`Remove ${g.name || `guest ${i + 1}`}`}
+                            onClick={() => setGuests(prev => prev.filter((_, j) => j !== i))}
+                          >
+                            <X className="w-4 h-4" aria-hidden />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="cyber-button" disabled={guests.length >= 60} onClick={() => setGuests(prev => [...prev, { name: '', titles: '' }])}>
+                      <Plus className="w-4 h-4" aria-hidden />
+                      <span>Add guest</span>
+                    </button>
+                    <button type="button" className="cyber-button" onClick={() => setPasting(true)}>
+                      <ClipboardList className="w-4 h-4" aria-hidden />
+                      <span>Paste a list</span>
+                    </button>
+                    <button type="submit" className="cyber-button ml-auto" disabled={!guests.some(g => g.name.trim()) || rosterRunning}>
+                      <Search className="w-4 h-4" aria-hidden />
+                      <span>{rosterRunning ? 'List running…' : 'Check list'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {mode !== 'bulk' && <div className="flex gap-2">
             <label htmlFor="gbot-name" className="sr-only">Celebrity name, or a command like help</label>
             <input
               id="gbot-name"
@@ -608,7 +835,7 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
                 <span className="hidden sm:inline">{submitLabel}</span>
               </button>
             )}
-          </div>
+          </div>}
 
           {mode === 'custom' && (
             <>
@@ -654,6 +881,7 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
           )}
         </form>
       </div>
+      {mode === 'bulk' && tipOpen && <BulkTip onClose={() => setTipOpen(false)} />}
     </div>
   );
 }
