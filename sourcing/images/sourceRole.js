@@ -72,7 +72,13 @@ function mergeReasons(into, from) {
 async function officialPoster(official, dir, triedUrls, seen) {
   const fs = require('fs').promises;
   await fs.mkdir(dir, { recursive: true });
-  for (const candidate of official.filter(c => c.hint === 'poster').slice(0, 3)) {
+  // Among the best-voted posters (English first), try the largest first:
+  // the top-voted one is often a small 1000x1500 upload.
+  const posters = official.filter(c => c.hint === 'poster');
+  const english = posters.filter(c => c.lang === 'en');
+  const shortlist = (english.length ? english : posters).slice(0, 5)
+    .sort((a, b) => (b.width || 0) * (b.height || 0) - (a.width || 0) * (a.height || 0));
+  for (const candidate of shortlist.slice(0, 3)) {
     triedUrls.add(candidate.url);
     const image = await downloadOne(candidate, dir, { anySize: true });
     if (!image || isDuplicate(image, seen)) continue;
