@@ -605,6 +605,8 @@ export default function GBotTerminal({ currentJob, analytics, lastJob, onStartJo
 
   const startRoster = async (list: RosterGuest[]) => {
     const error = await onStartRoster(list);
+    // The how-to has done its job; get it out of the way of the roster panel.
+    if (!error) setTipOpen(false);
     say(error
       ? `Hmm, I couldn't start the list: ${error}`
       : `Here we go! Starting with ${list[0].name}. I'll keep you posted as each one finishes.`);
