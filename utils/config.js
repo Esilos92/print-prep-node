@@ -87,7 +87,7 @@ const config = {
      * raise it toward 300 for stricter output, lower it to accept softer
      * sources.
      */
-    minDpi: int(process.env.MIN_PRINT_DPI, 150),
+    minDpi: int(process.env.MIN_PRINT_DPI, 130),
     /**
      * Upscaling invents pixels. It makes a small image the right dimensions
      * without making it the right quality, which is how a 900px web image
