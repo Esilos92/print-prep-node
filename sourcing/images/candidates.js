@@ -494,7 +494,25 @@ const QUERY_SCHEMA = {
   }
 };
 
+/**
+ * The search a person would type: character and title, no quotes, no
+ * operators. Quoted phrases make Google favour pages containing the exact
+ * text (articles, listings) over image-rich pages; this plain search is
+ * what found good Sons of Anarchy stills by hand when ours didn't.
+ */
+function plainQuery(role) {
+  const character = (role.character || '').split(/\s*\/\s*/)[0];
+  return { q: `${character} ${role.title}`.replace(/["]/g, '').trim(), aim: 'solo', plain: true };
+}
+
+/** Planned queries, always led by the plain search. */
 async function plannedQueries(celebrityName, role) {
+  const plain = plainQuery(role);
+  const rest = await plannedQueriesInner(celebrityName, role);
+  return [plain, ...rest.filter(q => q.q.replace(/["]/g, '').toLowerCase() !== plain.q.toLowerCase())];
+}
+
+async function plannedQueriesInner(celebrityName, role) {
   if (!process.env.OPENAI_API_KEY) return templateQueries(celebrityName, role);
 
   const animated = isAnimated(role);
@@ -543,7 +561,8 @@ async function googleCandidates(queries, { page = 0, animated = false } = {}) {
   // A few at a time, so one slow search doesn't hold up the rest.
   const outcomes = await settleLimit(queries, 3, async (query) => {
     const data = await searchImages({
-      q: `${query.q} ${suffix}`.trim(),
+      // The plain search goes exactly as a person would type it.
+      q: query.plain ? query.q : `${query.q} ${suffix}`.trim(),
       ijn: page,
       // Large images only for photos; official animation art is often mid-sized.
       ...(animated ? {} : { tbs: 'isz:l' })
@@ -602,6 +621,7 @@ module.exports = {
   seriesContext,
   guessWikiNames,
   plannedQueries,
+  plainQuery,
   templateQueries,
   googleCandidates,
   isBlocked,

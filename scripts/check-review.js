@@ -87,9 +87,10 @@ async function main() {
   if (!eraPaths.length) console.log('   (none)');
 
   // One search, top 8 results.
-  const q = query || `"${role.character.split(/\s*\/\s*/)[0]}" "${role.title}"`;
-  console.log(`\nSearch: ${q}`);
-  const results = await c.googleCandidates([{ q, aim: 'solo' }]);
+  // Default: the plain search every job now leads with.
+  const search = query ? { q: query, aim: 'solo' } : c.plainQuery(role);
+  console.log(`\nSearch: ${search.q}`);
+  const results = await c.googleCandidates([search]);
   const { images } = await downloadCandidates(results, path.join(dir, 'candidates'), { want: 8 });
   console.log(`Downloaded ${images.length} of ${results.length} results`);
 
