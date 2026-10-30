@@ -273,7 +273,9 @@ function decide(review, role) {
   const kind = review.kind === 'official_art' ? 'solo' : review.kind;
 
   const identityDoubt = review.problem === 'wrong_person' && (review.identity_confidence || 0) > 3 && !animated;
-  if (review.problem && review.problem !== 'none' && !identityDoubt) return { accepted: false, why: review.problem };
+  // A poster qualifies whether or not the target is on it.
+  const posterWithoutTarget = kind === 'poster' && review.problem === 'wrong_person';
+  if (review.problem && review.problem !== 'none' && !identityDoubt && !posterWithoutTarget) return { accepted: false, why: review.problem };
   if (kind === 'other') return { accepted: false, why: 'not_a_usable_kind' };
   // Context checks reject only on evidence; identity is where the strictness lives.
   if (review.clearly_unofficial) return { accepted: false, why: animated ? 'not_official' : 'not_from_production' };
