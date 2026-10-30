@@ -457,7 +457,9 @@ function templateQueries(celebrityName, role) {
     ];
   }
 
-  const year = role.year && role.year !== 'unknown' ? ` ${role.year}` : '';
+  // A film's year pins down which "Trespass"; a series runs for years, so
+  // its first-air year would only narrow results to season one.
+  const year = !tv && role.year && role.year !== 'unknown' ? ` ${role.year}` : '';
   const costar = role.coStars?.[0] ? ` "${role.coStars[0]}"` : '';
   return [
     { q: `"${celebrityName}" ${t}${year} still`, aim: 'solo' },
@@ -509,7 +511,7 @@ Write 7 queries:
 - 1 with aim "poster": the official poster or key art for the title
 
 Make one of the solo queries end with the word imdb (IMDb's photo galleries are full of official stills).
-Tips: quote exact names. Many titles are shared by several films or shows, so include the year in most queries, and a co-star's name in some, so results are about THIS "${role.title}". Words like still, scene, episode, season, promotional, official help. Do not use site: or minus operators.`;
+Tips: quote exact names. ${(role.mediaType === 'tv' || /tv/.test(role.medium || '')) ? `This is a TV series that ran for years: do NOT add a year (it would narrow results to one season). Add a co-star's name to some queries if the title is a common word.` : `Many films share a title, so include the year in most queries, and a co-star's name in some, so results are about THIS "${role.title}".`} Words like still, scene, episode, season, promotional, official help. Do not use site: or minus operators.`;
 
   try {
     const reply = await chat({
