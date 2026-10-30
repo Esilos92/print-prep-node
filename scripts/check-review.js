@@ -88,7 +88,7 @@ async function main() {
 
   // One search, top 8 results.
   // Default: the plain search every job now leads with.
-  const search = query ? { q: query, aim: 'solo' } : c.plainQuery(role);
+  const search = query ? { q: query, aim: 'solo' } : c.plainQuery(role, name);
   console.log(`\nSearch: ${search.q}`);
   const results = await c.googleCandidates([search]);
   const { images } = await downloadCandidates(results, path.join(dir, 'candidates'), { want: 8 });

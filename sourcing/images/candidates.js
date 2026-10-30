@@ -500,14 +500,16 @@ const QUERY_SCHEMA = {
  * text (articles, listings) over image-rich pages; this plain search is
  * what found good Sons of Anarchy stills by hand when ours didn't.
  */
-function plainQuery(role) {
-  const character = (role.character || '').split(/\s*\/\s*/)[0];
-  return { q: `${character} ${role.title}`.replace(/["]/g, '').trim(), aim: 'solo', plain: true };
+function plainQuery(role, celebrityName = '') {
+  const character = (role.character || '').split(/\s*\/\s*/)[0].trim();
+  // "Josh Younger" finds random Joshes; a one-word character needs the actor.
+  const who = character.split(/\s+/).length < 2 && celebrityName ? `${celebrityName} ${character}` : character;
+  return { q: `${who} ${role.title}`.replace(/["]/g, '').trim(), aim: 'solo', plain: true };
 }
 
 /** Planned queries, always led by the plain search. */
 async function plannedQueries(celebrityName, role) {
-  const plain = plainQuery(role);
+  const plain = plainQuery(role, celebrityName);
   const rest = await plannedQueriesInner(celebrityName, role);
   return [plain, ...rest.filter(q => q.q.replace(/["]/g, '').toLowerCase() !== plain.q.toLowerCase())];
 }
