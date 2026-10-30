@@ -27,7 +27,8 @@ const TMDB_IMAGE = 'https://image.tmdb.org/t/p/original';
 const BLOCKED_HOSTS = [
   'deviantart.com', 'deviantart.net', 'pinterest.com', 'pinimg.com', 'artstation.com',
   'tumblr.com', 'reddit.com', 'redd.it', 'wattpad.com', 'pixiv.net', 'fanpop.com',
-  'ebay.com', 'ebayimg.com', 'etsy.com', 'etsystatic.com', 'amazon.com', 'media-amazon.com',
+  // Note: not media-amazon.com — IMDb's photos are hosted there (see isBlocked).
+  'ebay.com', 'ebayimg.com', 'etsy.com', 'etsystatic.com', 'amazon.com',
   'aliexpress.com', 'redbubble.com', 'teepublic.com', 'zazzle.com', 'mercari.com', 'poshmark.com',
   'alamy.com', 'gettyimages.com', 'gettyimages.co.uk', 'shutterstock.com', 'istockphoto.com',
   'dreamstime.com', 'depositphotos.com', '123rf.com', 'bigstockphoto.com', 'agefotostock.com',
@@ -45,8 +46,24 @@ function hostOf(url) {
 function isBlocked(...urls) {
   return urls.some(url => {
     const host = hostOf(url);
-    return host && BLOCKED_HOSTS.some(b => host === b || host.endsWith(`.${b}`));
+    if (!host) return false;
+    // Amazon's image server hosts both IMDb (/images/M/: stills, posters,
+    // the best official photos there are) and shop listings (/images/I/).
+    if (host.endsWith('media-amazon.com')) return /\/images\/I\//.test(url);
+    return BLOCKED_HOSTS.some(b => host === b || host.endsWith(`.${b}`));
   });
+}
+
+/**
+ * IMDb image links usually point at a resized copy
+ * (...@._V1_FMjpg_UX2048_.jpg). Dropping the size codes gives the original
+ * upload, which is often several times larger.
+ */
+function fullSizeUrl(url) {
+  if (/media-amazon\.com\/images\/M\//.test(url)) {
+    return url.replace(/\._V1_[^/]*?\.(jpe?g|png|webp)(\?.*)?$/i, '._V1_.$1');
+  }
+  return url;
 }
 
 /** Smallest source that can fill the smallest sheet at the DPI floor. */
@@ -446,6 +463,7 @@ function templateQueries(celebrityName, role) {
     { q: `"${celebrityName}" ${t}${year} still`, aim: 'solo' },
     { q: `${c} ${t}${year} scene`, aim: 'solo' },
     { q: `"${celebrityName}" as ${c}${tv ? '' : year}`, aim: 'solo' },
+    { q: `${c} ${t} imdb`, aim: 'solo' },
     { q: `${t}${year}${costar} cast ${tv ? 'promotional photo' : 'still'}`, aim: 'group' },
     { q: `${t}${year} official poster`, aim: 'poster' }
   ];
@@ -490,6 +508,7 @@ Write 7 queries:
 - 2 with aim "group": ${animated ? 'the character with other characters, official group art' : 'official cast photos or scenes with co-stars'}
 - 1 with aim "poster": the official poster or key art for the title
 
+Make one of the solo queries end with the word imdb (IMDb's photo galleries are full of official stills).
 Tips: quote exact names. Many titles are shared by several films or shows, so include the year in most queries, and a co-star's name in some, so results are about THIS "${role.title}". Words like still, scene, episode, season, promotional, official help. Do not use site: or minus operators.`;
 
   try {
@@ -530,18 +549,24 @@ async function googleCandidates(queries, { page = 0, animated = false } = {}) {
 
     return (data.images_results || [])
       .filter(r => r.original && !isBlocked(r.original, r.link))
-      .filter(r => bigEnough(r.original_width, r.original_height))
-      .map((r, i) => ({
-        url: r.original,
+      // IMDb copies are resized; their originals are judged after download.
+      .filter(r => fullSizeUrl(r.original) !== r.original || bigEnough(r.original_width, r.original_height))
+      .map((r, i) => {
+        const url = fullSizeUrl(r.original);
+        const resized = url !== r.original;
+        return {
+        url,
         pageUrl: r.link,
         title: r.title || '',
-        width: r.original_width,
-        height: r.original_height,
+        // The original is larger than Google reported; measure after download.
+        width: resized ? undefined : r.original_width,
+        height: resized ? undefined : r.original_height,
         source: 'google',
         hint: query.aim,
         query: query.q,
         rank: i
-      }));
+        };
+      });
   });
 
   const lists = [];
@@ -578,6 +603,7 @@ module.exports = {
   templateQueries,
   googleCandidates,
   isBlocked,
+  fullSizeUrl,
   bigEnough,
   minimumSize,
   isAnimated
